@@ -1,1 +1,4 @@
 theme: jekyll-theme-slate
+title: Numerical Politics
+description: A laboratory for numerical experiments in the politics of interacting, autonomous agents
+baseurl: /NumericalPolitics
