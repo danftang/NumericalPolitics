@@ -1,2 +1,2 @@
-# NumericalPolitics
-A numerical laboratory for experiments in the politics of multi-agent systems
+# Numerical Politics
+A laboratory for numerical experiments in the politics of interacting, autonomous agents.
