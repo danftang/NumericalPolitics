@@ -14,7 +14,7 @@ Less trivially, most people would be willing to accept that the world is made up
 
 ## How can a numerical experiment tell us something about the real world?
 
-The problem we face is that, on the one hand, the agent's state, $$\psi$$, needs to be sufficiently detailed to to give a believable wellbeing function, $$W$$. The detail captured in $$\psi$$ defines the detail that needs to be captured in agent actions $$a$$ and agent observations $$O$$; however, this makes, $$P(a|O,\psi)$$, very difficult to define in a way that is provably correct for the level of detail contained in $$a$$, $$O$$ and $$\psi$$. That is to say, it's hard to model human behaviour.
+The problem we face is that, on the one hand, the agent's state, $$\psi$$, needs to be sufficiently detailed to to give a believable wellbeing function, $$W$$. The detail captured in $$\psi$$ defines the detail that needs to be captured in agent actions $$a$$ and agent observations $$O$$; however, this makes, $$P(a\|O,\psi)$$, very difficult to define in a way that is provably correct for the level of detail contained in $$a$$, $$O$$ and $$\psi$$. That is to say, it's hard to model human behaviour.
 
 In order to deal with this, we will develop inference techniques that do not require an exact specification of $$P$$. That is we wish to infer something about $$\Omega$$ given incomplete information about $$P$$, $$\psi$$, $$O$$, $$a$$ and $$W$$.
 
