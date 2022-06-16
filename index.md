@@ -14,19 +14,25 @@ Less trivially, most people would be willing to accept that the world is made up
 
 ## How can a numerical experiment tell us something about the real world?
 
-There are many ways that a numerical experiment can give us knowledge to make predictive statements about the real world:
+The problem we face is that, on the one hand, the agent's state, $$\psi$$, needs to be sufficiently detailed to to give a believable wellbeing function, $$W$$. The detail captured in $$\psi$$ defines the detail that needs to be captured in agent actions $$a$$ and agent observations $$O$$; however, this makes, $$P(a|O,\psi)$$, very difficult to define in a way that is provably correct for the level of detail contained in $$a$$, $$O$$ and $$\psi$$. That is to say, it's hard to model human behaviour.
 
-### Categorical inference
+In order to deal with this, we will develop inference techniques that do not require an exact specification of $$P$$. That is we wish to infer something about $$\Omega$$ given incomplete information about $$P$$, $$\psi$$, $$O$$, $$a$$ and $$W$$.
 
-We may be able to use numerical inference to prove an implication of the form
+### Tractable societies
+
+One approach to this is to develop "tractable societies", for which we can prove implications of the form
 
 $$
-A(P,W) \rightarrow B(\Omega)
+\forall P,W: A(P,W) \rightarrow B(\Omega)
 $$
 
-where $$A$$ and $$B$$ are predicates, $$P$$ is agent behaviour, $$W$$ is the agent wellbeing function and $$\Omega$$ is collective wellbeing. Given this, if we are willing to accept that $$A$$ is true of reality, then we must also accept that $$B$$ is true of real collective wellbeing. Also, if $$A$$ is not true of reality, and nor is $$B$$ of $$\Omega$$ it means that we can bring about $$B(\Omega)$$ by changing behaviour such that $$A(P,W)$$ is true.
+where $$A$$ and $$B$$ are predicates.
+
+Given this, if we are willing to accept that $$A$$ is true of reality, then we must also accept that $$B$$ is true of real collective wellbeing.
 
 Notice that this doesn't require us to have full knowledge of $$P$$, only whether $$A(P,W)$$ is true or not. This is important because we are unlikely to ever have full knowledge of $$P$$ in reality. However, we do have a problem of semantics; in order to judge whether $$A$$ is true in reality, we need to relate the behaviour $$P$$ to the behaviour of real agents.
+
+
 
 ### Probabilistic inference
 
