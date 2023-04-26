@@ -19,7 +19,7 @@ We begin with a very simple world where agents farm sugar and spice. However, so
 
 Suppose half the agents can farm only sugar and half can farm only spice, each at a rate of one unit per unit time. Suppose the agents randomly encouter eachother, whereupon each agent can either offer to trade or try to steal the other agent's crop. If both agents offer to trade then half the crop of each agent is swapped, however, if one agent offers to trade and the other tries to steal then the stealing agent gets half the others crop and the other is left with only half its original crop. If both try to steal then they are both unsuccessful and no food is transferred. This is the classic prisoner's dilemma, and can be summarised in the following agent wellbeing function
 
-| Me  | Other | My wellbein|g |
+| Me  | Other | My wellbeing |
 | --- | --- | --- |
 | trade | trade | 3 |
 | trade | steal | 0 |
@@ -66,7 +66,7 @@ The agents can also learn to both adopt the policy of always trying to steal unl
 
 Interestingly, the agents can learn to both adopt the following policy:
 
-My last move | your last move | my move | human trait
+| My last move | your last move | my move | human trait
 | --- | --- | --- | --- |
 | trade | trade |  trade |	 mutual-benefit |
 | trade | steal |  steal |	 revenge |
