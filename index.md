@@ -60,9 +60,9 @@ If we give the agents the ability to remember the last encounter they had with a
 
 #### Experiment 1
 
-We start with the simple case of a society of just two agents. Experiment 1 in the accompanying repo shows that there is more than one attractor in this world (i.e. the society is non-ergodic) and that all attractors are points in policy space. The society where both agents always try to steal from eachother is still an attractor, but their memory of the previous encounter allows other attractors.
+We start with the simple case of a society of just two agents. Experiment 1 in the accompanying repo shows that there is more than one attractor in this world (i.e. the society is non-ergodic) and that all attractors are points in policy space. The society where both agents always try to steal from eachother is still an attractor, but their memory of the previous encounter introduces other attractors.
 
-The agents can also learn to both adopt the policy of always trying to steal unless we both traded last time. In this society the agents spend most of the time trying to steal from eachother, but if they both happen to explore the trade option at the same time, they will enter a period of sustained trading until one of them explores the steal option. So, average wellbeing is slightly better than the always-steal case, but still far from optimal.
+The agents can also learn to both adopt the policy of always trying to steal unless they both traded last time. In this society the agents spend most of the time trying to steal from eachother, but if they both happen to explore the trade option at the same time, they will enter a period of sustained trading until one of them explores the steal option. So, average wellbeing is slightly better than the always-steal case, but still far from optimal.
 
 Interestingly, the agents can learn to both adopt the following policy:
 
@@ -75,7 +75,7 @@ Interestingly, the agents can learn to both adopt the following policy:
 
 The first three entries in the table above have analogues in human behaviour, but the last is a little unintuitive. If we both tried to steal from eachother last time, then this time I'll try to trade. This is key to the success of the policy as it means that whatever state the agents get into they quickly revert to mutual trading. As the exploration probability tends to zero, this society tends to the optimum of always trading, while remaining unexploitable (if I always try to steal from an agent with this policy, we'll flip between mutual stealing and me stealing from the agent, but my average wellbeing will be 2.5, less than if I take on the same policy as the other agent).
 
-Note that the agents do not learn the tit-for-tat policy: if you tried to steal from me last time, I'll try to steal from you this time, but if you traded with me last time, I'll try to trade with you again. [what attractor does mutual tit-for-tat lead to?]
+Note that the agents do not learn the tit-for-tat policy: if you tried to steal from me last time, I'll try to steal from you this time, but if you traded with me last time, I'll try to trade with you again. Mutual adoption of this strategy has three stable states: mutual trading, mutual stealing and alternating stealing. So, the agents will get into long runs of non-optimal behaviour. Q-learners learn to avoid this. The mutual tit-for-tat strategy is in the basin of attraction of the mutual adoption of the policy shown in the table above, which leads to better average wellbeing for the agents.
 
 #### Experiment 2
 

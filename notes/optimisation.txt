@@ -1,0 +1,15 @@
+Problem: need an efficient optimisation algorithm for large numbers of
+Q-learning agents.
+
+Solution:
+If we know the probability distribution over single training steps (i.e.
+agent start-state, action, reward, end-state) for each agent, then we can
+easily maximise the Q-parameters to minimise the Q-loss with respect to
+this distribution.
+
+However, we don't know this distribution, and it depends on the Q-parameters
+of all the agents (a set of Q-parameters defines a distribution over
+training sets and vice-versa...there's a one-one mapping).
+
+
+
