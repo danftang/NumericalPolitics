@@ -46,7 +46,9 @@ namespace experiment2 {
     //    of only two agents we have repeated prisoner's dilemma and a possible escape. So, stable societies
     //    are sensitive to population. How does the population change the stability with respect to the agent's
     //    memory size and/or lifespan? [i.e. probability of encountering a stranger...so we can distinguish
-    //    between tight-knit communities and loose-knit communities. ]
+    //    between tight-knit communities and loose-knit communities. ] Also, does experience with known agents
+    //    influence behaviour with strangers (i.e. it is desirable to treat strangers in a way that will make
+    //    them into cooperating known agents)
     //
     //  * If each encounter involves three agents: two traders and a mediator, can the mediator learn to punish
     //    defection in order to change the game to a pure mutual interest game (where the mediator is subsequently
@@ -60,20 +62,30 @@ namespace experiment2 {
     //  * If agents can communicate information about other agents, can they learn to warn other agents about
     //    defectors?
     //
+    //
+    //
     typedef ulong                       time_type;
     typedef abm::Schedule<time_type>    schedule_type;
 
+    void tradingCommunity();
+
     class SugarSpiceAgent1 {
     public:
-        static constexpr size_t NSTATES  = 5; // {stranger, cooperate/cooperate, cooperate/defect, defect/cooperate, defect,defect}
+        static constexpr size_t NSTATES  = 5; // cooperate/cooperate, cooperate/defect, defect/cooperate, defect,defect, isStranger
         static constexpr size_t NACTIONS = 2;
-        static constexpr float  REWARD[2][2] = {{3, 0},
-                                                {4, 1}};
-        static constexpr int MEMORY_SIZE = 10;
 
-//        typedef ulong                               time_type;
+        //        typedef ulong                               time_type;
         typedef abm::QTablePolicy<NSTATES,NACTIONS> policy_type;
 //        typedef abm::Schedule<time_type>            schedule_type;
+
+        static constexpr float  REWARD[2][2] = {{3, 0},
+                                                {4, 1}};
+        static constexpr int MEMORY_SIZE = 10; // Number of other agents this agent can remember
+        static constexpr float     QMIN = 0;
+        static constexpr float     QMAX = REWARD[1][0]/
+                                          (1.0-policy_type::DEFAULT_DISCOUNT); // Value of Q if all future rewards are max reward
+
+
 
         std::map<SugarSpiceAgent1 *, int>          memory; // map from previously encountered agent to last game play
         int myLastMove;
@@ -97,7 +109,7 @@ namespace experiment2 {
             connectTo(newOpponent);
             currentOpponentIt = memory.find(&newOpponent);
             if(currentOpponentIt == memory.end()) {
-                lastState = 4;
+                lastState = 4; // is a stranger
                 if(memory.size() < MEMORY_SIZE) currentOpponentIt = memory.insert(std::pair(&newOpponent, 4)).first;
             } else {
                 lastState = currentOpponentIt->second;
@@ -129,10 +141,11 @@ namespace experiment2 {
         std::vector<int>                    agentOrdering;
         abm::CommunicationChannel<schedule_type, void> selfLoop;
 
-        AgentPairer(int nAgentsDiv2): agents(nAgentsDiv2*2), agentOrdering(nAgentsDiv2*2) {
+        AgentPairer(int nAgentsDiv2, long initialPolicyId): agents(nAgentsDiv2*2), agentOrdering(nAgentsDiv2*2) {
             selfLoop.connectTo(*this, &AgentPairer::handlePairing, 2);
             for(int i=0; i<nAgentsDiv2*2; ++i) {
                 agentOrdering[i] = i;
+                agents[i].policy.setPolicy(initialPolicyId, agent_type::QMIN, agent_type::QMAX);
             }
         }
 
@@ -156,9 +169,17 @@ namespace experiment2 {
             return schedule;
         }
 
+        void add2MoreAgents(int initialPolicyId) {
+            for(int i=0; i<2; ++i) {
+                agents.emplace_back();
+                agents.back().policy.setPolicy(initialPolicyId, agent_type::QMIN, agent_type::QMAX);
+                agentOrdering.push_back(agentOrdering.size());
+            }
+        }
+
         bool hasConverged() {
             for(const agent_type &agent: agents) {
-                if(agent.policy.stepsSinceLastPolicyChange < NTIMESTEPS_TO_CONVERGENCE) return false;
+                if(agent.policy.trainingStepsSinceLastPolicyChange < NTIMESTEPS_TO_CONVERGENCE) return false;
             }
             return true;
         }

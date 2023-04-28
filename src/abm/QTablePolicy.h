@@ -39,7 +39,7 @@ namespace abm {
         float   learningRate;
         int     lastAction;
         int     lastState = -1;
-        uint    stepsSinceLastPolicyChange = 0;
+        uint    trainingStepsSinceLastPolicyChange = 0;
         std::bernoulli_distribution exploreChooser;
         std::uniform_int_distribution<int> randomActionChooser;
 //        std::function<void(const TabularQPolicy<INTERFACE> &)> policyChangeHook;
@@ -103,11 +103,7 @@ namespace abm {
 
         // version that doesn't require interface
         int getActionAndTrain(int newState, float reward) {
-            ++stepsSinceLastPolicyChange;
-            if (lastState != -1) {
-                bool policyChangedLastStep = train(lastState, lastAction, reward, newState);
-                if(policyChangedLastStep) stepsSinceLastPolicyChange = 0;
-            }
+            if (lastState != -1) train(lastState, lastAction, reward, newState);
             lastState = newState;
             lastAction = getAction(newState);
             return lastAction;
@@ -135,14 +131,15 @@ namespace abm {
         // Q(s0,a) <- (1-l)Q(s0,a) + l*(reward(s0,a,s1) + discount * max_a'(Q(s1,a')))
         bool train(int startState, int action, float reward, int endState) {
 //            std::cout << "training..." << std::endl;
+            ++trainingStepsSinceLastPolicyChange;
             bool policyHasChanged = false;
             float forwardQ = reward + discount*Qtable[endState][bestAction[endState]];
             Qtable[startState][action] = (1.0 - learningRate) * Qtable[startState][action] + learningRate * forwardQ;
             for(int a=0; a < NACTIONS; ++a) {
                 if(Qtable[startState][a] > Qtable[startState][bestAction[startState]]) {
                     policyHasChanged = true;
+                    trainingStepsSinceLastPolicyChange = 0;
 //                    std::cout << "New policy " << policyID() << std::endl;
-//                    std::cout << policyID();
                     bestAction[startState] = a;
                 }
             }

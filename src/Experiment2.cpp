@@ -10,33 +10,26 @@ namespace experiment2 {
     // to see at what point cooperation becomes impossible.
     //
     // This can also be thought of as a single growing community. As the
-    // community grows, od previously stable, cooperative societies become unstable
+    // community grows, previously stable, cooperative societies become unstable
     // and descend into defection.
     void tradingCommunity() {
         constexpr int MAX_TIMESTEPS = 40000000; // number of timesteps to give up searching for convergence
-        const float     QMIN = 0;
-        const float     QMAX = SugarSpiceAgent1::REWARD[1][0]/
-                (1.0-abm::QTablePolicy<0,0>::DEFAULT_DISCOUNT); // Value of Q if all future rewards are max reward
+        constexpr int STARTPOPULATION = 2;
+        constexpr int ENDPOPULATION = 1000;
 
-        schedule_type sim;
-
-        for(int nPairs = 10; nPairs < 100; ++nPairs) {
-            AgentPairer sentinel(nPairs);
-            // start with cooperating policy with distrust of strangers[?]
-            for(SugarSpiceAgent1 &agent: sentinel.agents) {
-                agent.policy.setPolicy(0x06, QMIN, QMAX);
-            }
-
-            sim = sentinel.start();
+        AgentPairer sentinel(STARTPOPULATION/2, 0x16);
+        while(sentinel.agents.size() < ENDPOPULATION) {
+            schedule_type sim = sentinel.start();
             sim.execUntil([&sim, &sentinel]() {
                 return sentinel.hasConverged() || sim.time() >= MAX_TIMESTEPS;
             });
-            std::cout << nPairs << " pairs ";
+            std::cout << "Population of " << sentinel.agents.size() << " agents ";
             if(sim.time() < MAX_TIMESTEPS) {
-                std::cout << " converged to " << sentinel.getPopulationByPolicy() << std::endl;
+                std::cout << "converged to " << sentinel.getPopulationByPolicy() << std::endl;
             } else {
-                std::cout << " did not converge " << std::endl;
+                std::cout << "did not converge " << std::endl;
             }
+            sentinel.add2MoreAgents(0x16);
         }
 
     }

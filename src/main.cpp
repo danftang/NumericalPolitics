@@ -9,13 +9,14 @@
 #include <thread>
 
 #include "Experiment1.h"
+#include "Experiment2.h"
 
 
 int main() {
 
 
-    experiment1::QPrisonersDilemma();
-//    experiment1::QPrisonersDilemmaWithPunishingObserver();
+//    experiment1::QPrisonersDilemma();
+    experiment2::tradingCommunity();
 
     return 0;
 }

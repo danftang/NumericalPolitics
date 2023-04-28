@@ -102,12 +102,12 @@ namespace experiment1 {
                 //// exec until no policy change for NTIMESTEPS or NTRANSITIONS policy transitions without convergence.
                 sim.execUntil(
                         [&agents, &sim]() {
-                            return (agents[0].policy.stepsSinceLastPolicyChange > NTIMESTEPS &&
-                            agents[1].policy.stepsSinceLastPolicyChange > NTIMESTEPS) ||
+                            return (agents[0].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS &&
+                                    agents[1].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS) ||
                             sim.time() >= MAXSTEPS;
                         },
                         std::execution::seq);
-                std::cout << "Sim time = " << std::dec << sim.time() << std::endl;
+//                std::cout << "Sim time = " << std::dec << sim.time() << std::endl;
                 long finalSociety = agents[0].policy.policyID() * PrisonersDilemmaAgent::policy_type::nPolicies() + agents[1].policy.policyID();
                 if(sim.time() < MAXSTEPS) {
                     std::cout << std::hex << initialSociety << " goes to point attractor :" << std::hex << finalSociety << std::endl;
@@ -118,7 +118,7 @@ namespace experiment1 {
                     std::cout << finalSociety << " -> ";
                     do {
                         sim.execUntil([&agents]() {
-                            return agents[0].policy.stepsSinceLastPolicyChange==0 || agents[1].policy.stepsSinceLastPolicyChange==0;
+                            return agents[0].policy.trainingStepsSinceLastPolicyChange == 0 || agents[1].policy.trainingStepsSinceLastPolicyChange == 0;
                         }, std::execution::seq);
                         societyOnAttractor = agents[0].policy.policyID() * PrisonersDilemmaAgent::policy_type::nPolicies() + agents[1].policy.policyID();
                         std::cout << societyOnAttractor << " -> ";

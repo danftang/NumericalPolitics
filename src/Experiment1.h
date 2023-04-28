@@ -75,7 +75,7 @@ namespace experiment1 {
 
         schedule_type start() {
             myLastMove = 0;
-            policy.stepsSinceLastPolicyChange = 0;
+            policy.trainingStepsSinceLastPolicyChange = 0;
             return opponent.send(myLastMove, 0);
         }
 
