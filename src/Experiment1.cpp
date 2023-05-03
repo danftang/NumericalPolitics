@@ -76,7 +76,7 @@ namespace experiment1 {
     // of agents.
 
     void QPrisonersDilemma() {
-        constexpr int   NTIMESTEPS = 2000000; // number of timesteps without policy change to assume convergence
+        constexpr int   NTIMESTEPS_TO_CONVERGENCE = 2000000; // number of timesteps without policy change to assume convergence
         constexpr int   MAXSTEPS =  40000000; // number of steps to give up looking for convergence
         const float     QMIN = 0;
         const float     QMAX =
@@ -102,8 +102,8 @@ namespace experiment1 {
                 //// exec until no policy change for NTIMESTEPS or NTRANSITIONS policy transitions without convergence.
                 sim.execUntil(
                         [&agents, &sim]() {
-                            return (agents[0].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS &&
-                                    agents[1].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS) ||
+                            return (agents[0].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS_TO_CONVERGENCE &&
+                                    agents[1].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS_TO_CONVERGENCE) ||
                             sim.time() >= MAXSTEPS;
                         },
                         std::execution::seq);

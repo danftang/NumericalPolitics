@@ -14,6 +14,8 @@ namespace experiment2 {
     // and descend into defection.
     void tradingCommunity() {
         constexpr int MAX_TIMESTEPS = 40000000; // number of timesteps to give up searching for convergence
+        constexpr int BURNIN_TIMESTEPS = 5000000;
+        constexpr int SIM_TIMESTEPS = 5000000;
         constexpr int STARTPOPULATION = 2;
         constexpr int ENDPOPULATION = 1000;
 
@@ -21,14 +23,21 @@ namespace experiment2 {
         while(sentinel.agents.size() < ENDPOPULATION) {
             schedule_type sim = sentinel.start();
             sim.execUntil([&sim, &sentinel]() {
-                return sentinel.hasConverged() || sim.time() >= MAX_TIMESTEPS;
+                return sim.time() >= BURNIN_TIMESTEPS;
             });
-            std::cout << "Population of " << sentinel.agents.size() << " agents ";
-            if(sim.time() < MAX_TIMESTEPS) {
-                std::cout << "converged to " << sentinel.getPopulationByPolicy() << std::endl;
-            } else {
-                std::cout << "did not converge " << std::endl;
-            }
+            sentinel.resetTotalRewardCounts();
+            sim.execUntil([&sim, &sentinel]() {
+                return sim.time() >= BURNIN_TIMESTEPS + SIM_TIMESTEPS;
+            });
+
+            std::pair<double,double> wellbeingMeanSD = sentinel.getRewardMeanAndSD(SIM_TIMESTEPS);
+            std::cout << "Population of " << std::dec << sentinel.agents.size() << " agents ";
+            std::cout << "wellbeing " << wellbeingMeanSD.first << " +- " << wellbeingMeanSD.second << std::endl;
+//            if(sim.time() < MAX_TIMESTEPS) {
+//                std::cout << "converged to " << std::hex << sentinel.getPopulationByPolicy() << std::endl;
+//            } else {
+//                std::cout << "did not converge. Current population: " << std::hex << sentinel.getPopulationByPolicy() << std::endl;
+//            }
             sentinel.add2MoreAgents(0x16);
         }
 

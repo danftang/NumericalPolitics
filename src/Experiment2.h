@@ -80,50 +80,50 @@ namespace experiment2 {
 
         static constexpr float  REWARD[2][2] = {{3, 0},
                                                 {4, 1}};
-        static constexpr int MEMORY_SIZE = 10; // Number of other agents this agent can remember
+        static constexpr int MEMORY_SIZE = 3; // Number of other agents this agent can remember
         static constexpr float     QMIN = 0;
         static constexpr float     QMAX = REWARD[1][0]/
                                           (1.0-policy_type::DEFAULT_DISCOUNT); // Value of Q if all future rewards are max reward
 
 
+//        struct MemoryItem {
+//            int otherLastPlay;
+//            int myLastPlay;
+//        };
 
-        std::map<SugarSpiceAgent1 *, int>          memory; // map from previously encountered agent to last game play
-        int myLastMove;
-        int lastState;
-        int lastAction;
-        std::map<SugarSpiceAgent1 *,int>::iterator currentOpponentIt;
-
+        std::map<SugarSpiceAgent1 *, int>          mem; // map from previously encountered agent to state of last game
         policy_type     policy;
         abm::CommunicationChannel<abm::Schedule<time_type>, int> opponent;
+        std::map<SugarSpiceAgent1 *, int>::iterator currentOpponentIt;
+        int currentState;
+        int myLastMove;
+        float totalReward = 0;
 
         void connectTo(SugarSpiceAgent1 &opponentAgent) {
             opponent.connectTo(opponentAgent, &SugarSpiceAgent1::handleOpponentMove, 1);
         }
 
-        schedule_type start() {
-            myLastMove = 0;
-            return opponent.send(myLastMove, 0);
-        }
-
         schedule_type handleNewOpponent(SugarSpiceAgent1 &newOpponent, time_type time) {
             connectTo(newOpponent);
-            currentOpponentIt = memory.find(&newOpponent);
-            if(currentOpponentIt == memory.end()) {
-                lastState = 4; // is a stranger
-                if(memory.size() < MEMORY_SIZE) currentOpponentIt = memory.insert(std::pair(&newOpponent, 4)).first;
+            currentOpponentIt = mem.find(&newOpponent);
+            if(currentOpponentIt == mem.end()) { // unknown new opponent
+                currentState = 4; // is a stranger
+                if(mem.size() < MEMORY_SIZE) currentOpponentIt = mem.insert(std::pair(&newOpponent, 4)).first;
             } else {
-                lastState = currentOpponentIt->second;
+                currentState = currentOpponentIt->second;
             }
-            lastAction = policy.getAction(lastState);
-            return opponent.send(lastAction, time);
+            myLastMove = policy.getAction(currentState);
+            return opponent.send(myLastMove, time);
         }
 
 
         schedule_type handleOpponentMove(int opponentsMove, time_type time) {
 //            std::cout << "Handling " << opponentsMove << ", " << myLastMove << std::endl;
             int newState = 2*myLastMove + opponentsMove;
-            policy.train(lastState, lastAction, REWARD[myLastMove][opponentsMove], newState);
-            if(currentOpponentIt != memory.end()) currentOpponentIt->second = newState;
+            float reward = REWARD[myLastMove][opponentsMove];
+            policy.train(currentState, myLastMove, reward, newState);
+            totalReward += reward;
+            if(currentOpponentIt != mem.end()) currentOpponentIt->second = newState;
             return abm::Schedule<time_type>();
         }
     };
@@ -133,7 +133,7 @@ namespace experiment2 {
     // and calls the agent's handleNewOpponent method
     class AgentPairer {
     public:
-        static constexpr int NTIMESTEPS_TO_CONVERGENCE = 200000;
+        static constexpr int NTIMESTEPS_TO_CONVERGENCE = 2000000;
 
         typedef SugarSpiceAgent1    agent_type;
 
@@ -190,6 +190,26 @@ namespace experiment2 {
                 population[agent.policy.policyID()] += 1;
             }
             return population;
+        }
+
+        // sum (m + d)(m + d) = sum m^2 + 2md_i + d_i^2
+        // = Nm^2 + sum d_i^2
+        std::pair<double, double> getRewardMeanAndSD(time_type time) {
+            double sumReward = 0.0;
+            double sumRewardSq = 0.0;
+            double NrewardSamples = time/2.0;
+            for(const agent_type &agent: agents) {
+                double meanReward = agent.totalReward/NrewardSamples;
+                sumReward += meanReward;
+                sumRewardSq += meanReward*meanReward;
+            }
+            return { sumReward/agents.size(), sqrt((sumRewardSq - sumReward*sumReward/agents.size())/agents.size()) };
+        }
+
+        void resetTotalRewardCounts() {
+            for(agent_type &agent: agents) {
+                agent.totalReward = 0.0;
+            }
         }
     };
 
