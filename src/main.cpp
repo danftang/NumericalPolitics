@@ -15,8 +15,8 @@
 int main() {
 
 
-//    experiment1::QPrisonersDilemma();
-    experiment2::tradingCommunity();
+    experiment1::QPrisonersDilemma();
+//    experiment2::tradingCommunity();
 
     return 0;
 }

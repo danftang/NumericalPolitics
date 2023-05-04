@@ -12,36 +12,51 @@ namespace experiment1 {
 
     // Background:
     // A repeated prisoner's dilemma, where each agent remembers its own and other's last move
-    // with online Q-learning. The "social state" is the 2 x 8 = 16 Q values of the pair of
-    // Q-table entries, so we can embed this into a 16 dimensional phase space and consider the
-    // structure of the attractors (fixed point probability distribution) in this space.
+    // with online Q-learning.
     //
+    // At each round, an agent has a choice of two actions: co-operate or defect,
+    // so there are 4 agent states corresponding to the last moves of self and opponent.
+    // With 4 states, each with 2 possible actions, the Q-table of an agent has 8 entries.
+    // The "social state" is the 2 x 8 = 16 Q values in the two
+    // Q-tables of the agents, so the pair of agents has a 16 dimensional phase space in which
+    // we can consider the structure of the attractors (fixed point probability distribution).
     //
     // Questions:
     //   * How many attractors are there?
     //   * Are they all point attractors?
     //
     // Approach:
-    // There are only 16 possible agent policies so only 256 possible policy pairs, so we can split
-    // the social space into 256 partitions. For each partition, we can start with a strong bias
+    // There are only 16 possible agent policies (corresponding to the choice of cooperate or defect in
+    // each of the 4 states, which we number ) so only 256 possible policy pairs, so we can split
+    // the social space into 256 partitions (which we number ). For each partition, we start with a strong bias
     // towards this policy pair and execute Q-learning until convergence. If an attractor exists
     // in this partition, the agents should converge to it.
     //
-    // We can test for convergence by running until no policy changes occur for a "large" number
+    // We test for convergence by running until no policy changes occur for a "large" number
     // of steps.
+    //
+    // Numbering convention:
+    //  Agent moves are numbered: 0 = co-operate, 1 = defect
+    //  Agent states are numbered 2*ownMove + opponentMove.
+    //  Agent policies are numbered sum_{s=0}^{N-1} 2^s m_s
+    //    where N is the number of states and m_s is the policy's move in state s
+    //  Social policy (partitions of the social phase space) is numbered 16*p_1 + p_2
+    //    where p_1 is the policy of agent 1 and p_2 is the policy of agent 2.
     //
     // Results:
     // All start points eventually converge to a point attractor. However, convergence is quite slow.
-    // There are 5 attracting societies:
+    // There are 5 attracting social policies:
     //  1) 0x62/0x26
     //  2) 0x66
     //  3) 0xfe/0xef
     //  4) 0xee
     //  5) 0xff
     //
-    // Societies 0xff and 0xfe quickly lead to mutual defection. It is questionable that 0xfe is truly stable.
+    // However, the mixed societies (0x62 and 0xfe) are artifacts of the slow convergence.
+    //
+    // Society 0xff immediately leads to mutual defection.
     // Society 0xee has a stable equilibrium of mutual defection and an unstable equilibrium of mutual cooperation.
-    // Interestingly 0x66 and 0x62 quickly lead to mutual cooperation.
+    // Interestingly 0x66 quickly leads to mutual cooperation.
     //
     // Discussion:
     // For a given pair of policies (Pa,Pb) there is the expected reward for agent A and agent B
@@ -54,9 +69,12 @@ namespace experiment1 {
     // maximum, or does it sometimes reach a local maximum. Certainly the joint policy can get stuck in a local maximum.
     // How is this affected in deep Q-learning, where the Q-table is approximated? For finite games, i think q-learning
     // always finds the global max, but for infinite games perhaps not...does this matter? It affects the possible
-    // equilibria of a society with a large number of agents].
+    // equilibria of a society with a large number of agents.
+    // For fixed environment (other agents have fixed policies) then a q-learning agent will find the optimal policy
+    // as long as it has exploration. However, more importantly, with all agents learning, a society will often not
+    // reach its nash equilibrium].
     //
-    // A point attractor is a Nash equilibrium with respect to policy. i.e. for policy pair (Pa,Pb) on a point attractor
+    // A Nash equilibrium is a point attractor in joint policy space. i.e. for policy pair (Pa,Pb) on a point attractor
     //   * If B has policy Pb then A's best policy is Pa
     //   * If A has policy Pa then B's best policy is Pb
     // In this case it makes no sense for A to deceive B into believing he has policy Pa while actually

@@ -28,7 +28,9 @@ namespace abm {
     class QTablePolicy {
     public:
         static constexpr float DEFAULT_DISCOUNT = 0.99;
-        static constexpr float DEFAULT_EXPLORATION = 0.01;
+//        static constexpr float DEFAULT_EXPLORATION = 0.01;
+        static constexpr float DEFAULT_INITIAL_EXPLORATION = 0.25;
+        static constexpr float DEFAULT_EXPLORATION_DECAY = 0.9999999;
         static constexpr float DEFAULT_INITIALQ = 1.0;
         static constexpr float DEFAULT_LEARNING_RATE = 0.01;
         static constexpr long  NPOLICIES = std::pow(NACTIONS, NSTATES);
@@ -37,21 +39,25 @@ namespace abm {
         std::array<int,NSTATES> bestAction;
         float   discount;     // exponential decay factor of future reward
         float   learningRate;
+        float   pExplore; // probability of exploring
+        float   exploreDecay; // rate of exploration decay
         int     lastAction;
         int     lastState = -1;
         uint    trainingStepsSinceLastPolicyChange = 0;
-        std::bernoulli_distribution exploreChooser;
+        std::uniform_real_distribution<float> uniformReal;
         std::uniform_int_distribution<int> randomActionChooser;
 //        std::function<void(const TabularQPolicy<INTERFACE> &)> policyChangeHook;
 
         QTablePolicy(
         float discount=DEFAULT_DISCOUNT,
-        float exploration=DEFAULT_EXPLORATION, // probability of not taking the best action
+        float exploration=DEFAULT_INITIAL_EXPLORATION, // probability of not taking the best action
+        float explorationDecay=DEFAULT_EXPLORATION_DECAY,
         float initialQ = DEFAULT_INITIALQ,
         float learningRate = DEFAULT_LEARNING_RATE
         ):
         discount(discount), learningRate(learningRate),
-        exploreChooser(exploration), randomActionChooser(0, NACTIONS - 1) {
+        pExplore(exploration), exploreDecay(explorationDecay),
+        uniformReal(0.0,1.0),  randomActionChooser(0, NACTIONS - 1) {
             std::uniform_int_distribution<int> actionDist(0, NACTIONS - 1);
 
             // initialise Q values and set random bestAction
@@ -111,7 +117,8 @@ namespace abm {
 
 
         int getAction(int state) {
-            return exploreChooser(deselby::Random::gen)?randomActionChooser(deselby::Random::gen):bestAction[state];
+            pExplore *= exploreDecay;
+            return (uniformReal(deselby::Random::gen)<=pExplore)?randomActionChooser(deselby::Random::gen):bestAction[state];
         }
 
 //        std::pair<int,bool> getActionAndTrain(int observation, float reward) {
