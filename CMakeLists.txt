@@ -5,5 +5,5 @@ set(CMAKE_CXX_STANDARD 20)
 
 link_libraries(tbb)
 
-add_executable(multiAgentGovernment src/main.cpp src/Experiment1.cpp src/Experiment2.cpp)
+add_executable(multiAgentGovernment src/main.cpp)
 # add_executable(multiAgentGovernment src/main.cpp)

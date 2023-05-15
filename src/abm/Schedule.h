@@ -11,54 +11,47 @@
 #ifndef MULTIAGENTGOVERNMENT_SCHEDULE_H
 #define MULTIAGENTGOVERNMENT_SCHEDULE_H
 
-#include <map>
-#include <functional>
-#include <forward_list>
-#include <execution>
-#include <utility>
 
-namespace abm {
+template<class TIME>
+class Schedule;
 
-    template<class TIME>
-    class Schedule;
+template<class AGENT, class TIME>
+concept HasStepFunction = requires(AGENT agent) {
+    { agent.step() } -> std::convertible_to<Schedule<TIME>>;
+};
 
-    template<class AGENT, class TIME>
-    concept HasStepFunction = requires(AGENT agent) {
-        { agent.step() } -> std::convertible_to<Schedule<TIME>>;
-    };
+template<class T, class TIME>
+concept IterableOfSteppables = requires(T container) {
+    { *container.begin() } -> HasStepFunction<TIME>;
+    { *container.end() } -> HasStepFunction<TIME>;
+};
 
-    template<class T, class TIME>
-    concept IterableOfSteppables = requires(T container) {
-        { *container.begin() } -> HasStepFunction<TIME>;
-        { *container.end() } -> HasStepFunction<TIME>;
-    };
-
-    template<class T,class TIME>
-    concept Task = requires(T callable) {
-        { callable() } -> std::convertible_to<Schedule<TIME>>;
-    };
+template<class T, class TIME>
+concept Task = requires(T callable) {
+    { callable() } -> std::convertible_to<Schedule<TIME>>;
+};
 
 
-    template<class TIME>
-    class Schedule {
-    public:
-        typedef TIME time_type;
-        typedef std::function<Schedule<TIME>()> task_type;
-        typedef std::forward_list<task_type> tasklist_type;
+template<class TIME>
+class Schedule {
+public:
+    typedef TIME time_type;
+    typedef std::function<Schedule<TIME>()> task_type;
+    typedef std::forward_list<task_type> tasklist_type;
 
-        std::map<TIME, tasklist_type> tasks; // TODO: better to be a sorted vector of <time,list> pairs?
+    std::map<TIME, tasklist_type> tasks; // TODO: better to be a sorted vector of <time,list> pairs?
 
-        Schedule() {}
+    Schedule() {}
 
-        template<Task<TIME> TASK>
-        Schedule(TASK task, TIME time = 0) {
-            insert(std::move(task), time);
-        }
+    template<Task<TIME> TASK>
+    Schedule(TASK task, TIME time = 0) {
+        insert(std::move(task), time);
+    }
 
 
-        Schedule(std::forward_list<task_type> &&taskList, TIME time = 0) {
-            tasks[time] = std::move(taskList);
-        }
+    Schedule(std::forward_list<task_type> &&taskList, TIME time = 0) {
+        tasks[time] = std::move(taskList);
+    }
 
 //        Schedule(std::initializer_list<Schedule<TIME> &&> schedulesToMerge) {
 //            auto pSchedule = schedulesToMerge.begin();
@@ -80,19 +73,19 @@ namespace abm {
 //            insert(agents, time);
 //        }
 
-        template<Task<TIME> TASK>
-        inline void insert(TASK task, TIME time) {
-            tasks[time].push_front(std::move(task));
-        }
+    template<Task<TIME> TASK>
+    inline void insert(TASK task, TIME time) {
+        tasks[time].push_front(std::move(task));
+    }
 
-        inline void insert(std::forward_list<task_type> &&taskList, TIME time) {
-            std::forward_list<task_type> &currentTaskList = tasks[time];
-            if(currentTaskList.empty()) {
-                currentTaskList = std::move(taskList);
-            } else {
-                currentTaskList.splice_after(currentTaskList.begin(), std::move(taskList));
-            }
+    inline void insert(std::forward_list<task_type> &&taskList, TIME time) {
+        std::forward_list<task_type> &currentTaskList = tasks[time];
+        if (currentTaskList.empty()) {
+            currentTaskList = std::move(taskList);
+        } else {
+            currentTaskList.splice_after(currentTaskList.begin(), std::move(taskList));
         }
+    }
 
 //        template<HasStepFunction<TIME> AGENT>
 //        inline void insert(AGENT &agent, TIME time) {
@@ -105,68 +98,68 @@ namespace abm {
 //            for (auto &agent: agents) taskList.push_front([&agent]() { return agent.step(); });
 //        }
 
-        Schedule<TIME> operator +(Schedule<TIME> &&other) && {
-            return std::move(merge(std::move(other)));
+    Schedule<TIME> operator+(Schedule<TIME> &&other) &&{
+        return std::move(merge(std::move(other)));
+    }
+
+    Schedule<TIME> &operator+=(Schedule<TIME> &&other) {
+        merge(std::move(other));
+        return *this;
+    }
+
+
+    Schedule<TIME> &merge(Schedule<TIME> &&other) {
+        for (auto &element: other.tasks) {
+            insert(std::move(element.second), element.first);
         }
+        return *this;
+    }
 
-        Schedule<TIME> &operator +=(Schedule<TIME> &&other) {
-            merge(std::move(other));
-            return *this;
-        }
+    static Schedule<TIME> mergeAndDestroy(Schedule<TIME> &a, Schedule<TIME> &&b) {
+        return std::move(a.merge(std::move(b)));
+    }
 
-
-        Schedule<TIME> &merge(Schedule<TIME> &&other) {
-            for (auto &element: other.tasks) {
-                insert(std::move(element.second), element.first);
-            }
-            return *this;
-        }
-
-        static Schedule<TIME> mergeAndDestroy(Schedule<TIME> &a, Schedule<TIME> &&b) {
-            return std::move(a.merge(std::move(b)));
-        }
-
-        template<class ExecutionPolicy>
-        void execFirstEntry(ExecutionPolicy &&executionPolicy) {
-            std::forward_list<task_type> &taskList = tasks.begin()->second;
-            Schedule<TIME> newTasks = std::transform_reduce(
+    template<class ExecutionPolicy>
+    void execFirstEntry(ExecutionPolicy &&executionPolicy) {
+        std::forward_list<task_type> &taskList = tasks.begin()->second;
+        Schedule<TIME> newTasks = std::transform_reduce(
 //                std::forward<ExecutionPolicy>(executionPolicy),
-                    std::execution::par,
-                    taskList.begin(),
-                    taskList.end(),
-                    Schedule<TIME>(),
-                    &mergeAndDestroy,
-                    [](task_type &task) { return task(); });
-            tasks.erase(tasks.begin());
-            merge(std::move(newTasks));
-        }
+                std::execution::par,
+                taskList.begin(),
+                taskList.end(),
+                Schedule<TIME>(),
+                &mergeAndDestroy,
+                [](task_type &task) { return task(); });
+        tasks.erase(tasks.begin());
+        merge(std::move(newTasks));
+    }
 
-        template<class ExecutionPolicy = const std::execution::parallel_policy &>
-        void exec(ExecutionPolicy &&executionPolicy = std::execution::par) {
-            while (!tasks.empty()) execFirstEntry(std::forward<ExecutionPolicy>(executionPolicy));
-        }
+    template<class ExecutionPolicy = const std::execution::parallel_policy &>
+    void exec(ExecutionPolicy &&executionPolicy = std::execution::par) {
+        while (!tasks.empty()) execFirstEntry(std::forward<ExecutionPolicy>(executionPolicy));
+    }
 
-        template<class ExecutionPolicy = const std::execution::parallel_policy &>
-        void execUntil(std::function<bool()> hasEnded, ExecutionPolicy &&executionPolicy = std::execution::par) {
-            if(!tasks.empty()) {
-                do {
-                    execFirstEntry(std::forward<ExecutionPolicy>(executionPolicy));
-                } while (!tasks.empty() && !hasEnded());
-            }
+    template<class ExecutionPolicy = const std::execution::parallel_policy &>
+    void execUntil(std::function<bool()> hasEnded, ExecutionPolicy &&executionPolicy = std::execution::par) {
+        if (!tasks.empty()) {
+            do {
+                execFirstEntry(std::forward<ExecutionPolicy>(executionPolicy));
+            } while (!tasks.empty() && !hasEnded());
         }
+    }
 
-        TIME time() {
-            return tasks.empty() ? 0 : tasks.begin()->first;
-        }
+    TIME time() {
+        return tasks.empty() ? 0 : tasks.begin()->first;
+    }
 
-        friend std::ostream &operator <<(std::ostream &out, const Schedule<TIME> &schedule) {
-            std::forward_list<int> f;
-            for(auto &entry: schedule.tasks) {
-                out << entry.first << " -> " << std::distance(entry.second.begin(), entry.second.end()) << " tasks" << std::endl;
-            }
-            return out;
+    friend std::ostream &operator<<(std::ostream &out, const Schedule<TIME> &schedule) {
+        std::forward_list<int> f;
+        for (auto &entry: schedule.tasks) {
+            out << entry.first << " -> " << std::distance(entry.second.begin(), entry.second.end()) << " tasks"
+                << std::endl;
         }
-    };
-}
+        return out;
+    }
+};
 
 #endif //MULTIAGENTGOVERNMENT_SCHEDULE_H

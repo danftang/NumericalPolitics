@@ -1,3 +1,61 @@
+// Background:
+// When we expand the simulation to many agents stable societies
+// can be defined as populations of policies. If communication channels aren't fixed, then a
+// society may only be stable under a certain set of initial channel configurations. These can be
+// specified, or we can just say that there exists some non-empty set under which the policy
+// population is stable.
+//
+// A "random encounter" society is one where agents encounter other agents at random
+// drawn from a fixed distribution of agent pairs. In this case each agent is effectively in a two-agent
+// game with an opponent who has a policy that is a probabilistic mix of policies (i.e. a policy is chosen at
+// the beginning of each "encounter" and held fixed until the end of the encounter). If each agent's policy
+// is stable with respect to the mixed policy of its encounters then the society is stable (and vice-versa).
+//
+// A "uniform random encounter" society is a special case of a random encounter society where all agent pairs
+// are equally probable. In this case, when the number of agents is large, each agent's opponent's mixed policy
+// is approximately the same, so all policies in the society must be stable with respect to this mixed policy.
+// So, we need to find mixed policies such that all members in the mix are stable against the mix.
+//
+// Suppose we have a trading society, "sugar and spice scape", where agents collect sugar and spice, but some
+// agents can only collect sugar and some only spice. Each agent derives a reward
+// by eating a certain combination of sugar and spice, let's say 50/50 is max reward. On encountering another agent,
+// they can choose to offer to swap sugar for spice or try to steal the other's sugar/spice if offered,
+// thus creating a prisoner's dilemma. Suppose half of agents can collect sugar and half collect spice.
+//
+// If an encounter involves only one iteration of prisoner's dilemma and agents are indistinguishable then
+// the best strategy is to defect irrespective of the strategy of other agents, so there is only one
+// attractor: the world where everyone always defects. So, what can we change about the world in order to
+// make it better?
+//
+// Questions:
+//
+//  * If agents can identify n other agents and remember the last n encounters, then in the limit of infinite
+//    agents, we have the single encounter situation and a descent into total defection, while in the limit
+//    of only two agents we have repeated prisoner's dilemma and a possible escape. So, stable societies
+//    can be sensitive to population. How does the population change the stability with respect to the agent's
+//    memory size and/or lifespan? [i.e. probability of encountering a stranger...so we can distinguish
+//    between tight-knit communities and loose-knit communities. ] Also, does experience with known agents
+//    influence behaviour with strangers (i.e. can the agents learn to treat strangers in a way that will make
+//    them into cooperating "friends")
+//
+//  * If each encounter involves three agents: two traders and a mediator, can the mediator learn to punish
+//    defection in order to change the game to a pure mutual interest game (where the mediator is subsequently
+//    a player)?
+//      - If so, can agents learn to trade only when there is a mediator present? In a spatial simulation
+//        does this result in the emergence of "market towns" if players can also be mediators of other games?
+//
+//  * If agents can choose whether to spray other agents red/white after an encounter, can they collectively learn
+//    to spray defectors while at the same time learning to distrust red agents?
+//
+//  * If agents can communicate information about other agents, can they learn to warn other agents about
+//    defectors?
+//
+// Approach:
+//
+// Starting with a 2-agent society, add agents two at a time and form a uniform, random pairing
+// between agents for trading, observing social equilibrium after each addition.
+// Try this with different agent abilities (memory of other agents, memory of past
+// experience with strangers, with/without parental teaching)
 //
 // Created by daniel on 07/04/23.
 //
@@ -7,215 +65,51 @@
 
 #include <cstdlib>
 #include "abm/abm.h"
+#include "abm/agents/agents.h"
 #include <random>
 
-namespace experiment2 {
-    // Background:
-    // When we expand the simulation to many agents stable societies
-    // can be defined as populations of policies. If communication channels aren't fixed, then a
-    // society may only be stable under a certain set of initial channel configurations. These can be
-    // specified, or we can just say that there exists some non-empty set under which the policy
-    // population is stable.
-    //
-    // A "random encounter" society is one where agents encounter other agents at random
-    // drawn from a fixed distribution of agent pairs. In this case each agent is effectively in a two-agent
-    // game with an opponent who has a policy that is a probabilistic mix of policies (i.e. a policy is chosen at
-    // the beginning of each "encounter" and held fixed until the end of the encounter). If each agent's policy
-    // is stable with respect to the mixed policy of its encounters then the society is stable (and vice-versa).
-    //
-    // A "uniform random encounter" society is a special case of a random encounter society where all agent pairs
-    // are equally probable. In this case, when the number of agents is large, each agent's opponent's mixed policy
-    // is approximately the same, so all policies in the society must be stable with respect to this mixed policy.
-    // So, we need to find mixed policies such that all members in the mix are stable against the mix.
-    //
-    // Suppose we have a trading society, "sugar and spice scape", where agents collect sugar and spice, but some
-    // agents can only collect sugar and some only spice. Each agent derives a reward
-    // by eating a certain combination of sugar and spice, let's say 50/50 is max reward. On encountering another agent,
-    // they can choose to offer to swap sugar for spice or try to steal the other's sugar/spice if offered,
-    // thus creating a prisoner's dilemma. Suppose half of agents can collect sugar and half collect spice.
-    //
-    // If an encounter involves only one iteration of prisoner's dilemma and agents are indistinguishable then
-    // the best strategy is to defect irrespective of the strategy of other agents, so there is only one
-    // attractor: the world where everyone always defects. So, what can we change about the world in order to
-    // make it better?
-    //
-    // Questions:
-    //
-    //  * If agents can identify other agents and remember previous encounters, then in the limit of infinite
-    //    agents, we have the single encounter situation and a descent into total defection, while in the limit
-    //    of only two agents we have repeated prisoner's dilemma and a possible escape. So, stable societies
-    //    are sensitive to population. How does the population change the stability with respect to the agent's
-    //    memory size and/or lifespan? [i.e. probability of encountering a stranger...so we can distinguish
-    //    between tight-knit communities and loose-knit communities. ] Also, does experience with known agents
-    //    influence behaviour with strangers (i.e. it is desirable to treat strangers in a way that will make
-    //    them into cooperating known agents)
-    //
-    //  * If each encounter involves three agents: two traders and a mediator, can the mediator learn to punish
-    //    defection in order to change the game to a pure mutual interest game (where the mediator is subsequently
-    //    a player)?
-    //      - If so, can agents learn to trade only when there is a mediator present? In a spatial simulation
-    //        does this result in the emergence of "market towns" if players can also be mediators of other games?
-    //
-    //  * If agents can choose whether to spray other agents red/white after an encounter, can they collectively learn
-    //    to spray defectors while at the same time learning to distrust red agents?
-    //
-    //  * If agents can communicate information about other agents, can they learn to warn other agents about
-    //    defectors?
-    //
-    //
-    //
-    typedef ulong                       time_type;
-    typedef abm::Schedule<time_type>    schedule_type;
+template<class AGENT> void experiment2();
 
-    void tradingCommunity();
+// Growing society with agents that can only remember their last encounter
+inline void experiment2a() {
+    experiment2<abm::agents::SimpleSugarSpiceAgent>();
+}
 
-    class SugarSpiceAgent1 {
-    public:
-        static constexpr size_t NSTATES  = 5; // cooperate/cooperate, cooperate/defect, defect/cooperate, defect,defect, isStranger
-        static constexpr size_t NACTIONS = 2;
+template<class AGENT>
+void experiment2() {
+    constexpr int MAX_TIMESTEPS = 40000000; // number of timesteps to give up searching for convergence
+    constexpr int BURNIN_TIMESTEPS = 100000000;
+    constexpr int SIM_TIMESTEPS = 10000000;
+    constexpr int STARTPOPULATION = 2;
+    constexpr int ENDPOPULATION = 100;
+//    constexpr int INITIAL_AGENT_STATE = 0x16; // 6 strategy with distrust of strangers
 
-        //        typedef ulong                               time_type;
-        typedef abm::QTablePolicy<NSTATES,NACTIONS> policy_type;
-//        typedef abm::Schedule<time_type>            schedule_type;
+//        typedef abm::agents::SugarSpiceAgent1 agent_type;
 
-        static constexpr float  REWARD[2][2] = {{3, 0},
-                                                {4, 1}};
-        static constexpr int MEMORY_SIZE = 3; // Number of other agents this agent can remember
-        static constexpr float     QMIN = 0;
-        static constexpr float     QMAX = REWARD[1][0]/
-                                          (1.0-policy_type::DEFAULT_DISCOUNT); // Value of Q if all future rewards are max reward
+    abm::agents::SequentialPairingAgent<AGENT> rootAgent(STARTPOPULATION);
+    while (rootAgent.agents.size() < ENDPOPULATION) {
+        std::cout << "Population of " << std::dec << rootAgent.agents.size() << " agents:" << std::endl;
+        typename AGENT::schedule_type sim = rootAgent.start();
+        sim.execUntil([&sim, &rootAgent]() {
+            return sim.time() >= BURNIN_TIMESTEPS;
+        });
+        std::cout << "  Policy population at end of burnin: " << std::hex << rootAgent.getPopulationByPolicy() << std::endl;
+        rootAgent.resetAllTrainingStats();
+        sim.execUntil([&sim, &rootAgent]() {
+            return sim.time() >= BURNIN_TIMESTEPS + SIM_TIMESTEPS;
+        });
 
-
-//        struct MemoryItem {
-//            int otherLastPlay;
-//            int myLastPlay;
-//        };
-
-        std::map<SugarSpiceAgent1 *, int>          mem; // map from previously encountered agent to state of last game
-        policy_type     policy;
-        abm::CommunicationChannel<abm::Schedule<time_type>, int> opponent;
-        std::map<SugarSpiceAgent1 *, int>::iterator currentOpponentIt;
-        int currentState;
-        int myLastMove;
-        float totalReward = 0;
-
-        void connectTo(SugarSpiceAgent1 &opponentAgent) {
-            opponent.connectTo(opponentAgent, &SugarSpiceAgent1::handleOpponentMove, 1);
-        }
-
-        schedule_type handleNewOpponent(SugarSpiceAgent1 &newOpponent, time_type time) {
-            connectTo(newOpponent);
-            currentOpponentIt = mem.find(&newOpponent);
-            if(currentOpponentIt == mem.end()) { // unknown new opponent
-                currentState = 4; // is a stranger
-                if(mem.size() < MEMORY_SIZE) currentOpponentIt = mem.insert(std::pair(&newOpponent, 4)).first;
-            } else {
-                currentState = currentOpponentIt->second;
-            }
-            myLastMove = policy.getAction(currentState);
-            return opponent.send(myLastMove, time);
-        }
-
-
-        schedule_type handleOpponentMove(int opponentsMove, time_type time) {
-//            std::cout << "Handling " << opponentsMove << ", " << myLastMove << std::endl;
-            int newState = 2*myLastMove + opponentsMove;
-            float reward = REWARD[myLastMove][opponentsMove];
-            policy.train(currentState, myLastMove, reward, newState);
-            totalReward += reward;
-            if(currentOpponentIt != mem.end()) currentOpponentIt->second = newState;
-            return abm::Schedule<time_type>();
-        }
-    };
-
-
-    // generates random 1-to-1 mappings between agents
-    // and calls the agent's handleNewOpponent method
-    class AgentPairer {
-    public:
-        static constexpr int NTIMESTEPS_TO_CONVERGENCE = 2000000;
-
-        typedef SugarSpiceAgent1    agent_type;
-
-        std::vector<agent_type>             agents;
-        std::vector<int>                    agentOrdering;
-        abm::CommunicationChannel<schedule_type, void> selfLoop;
-
-        AgentPairer(int nAgentsDiv2, long initialPolicyId): agents(nAgentsDiv2*2), agentOrdering(nAgentsDiv2*2) {
-            selfLoop.connectTo(*this, &AgentPairer::handlePairing, 2);
-            for(int i=0; i<nAgentsDiv2*2; ++i) {
-                agentOrdering[i] = i;
-                agents[i].policy.setPolicy(initialPolicyId, agent_type::QMIN, agent_type::QMAX);
-            }
-        }
-
-        schedule_type start() {
-            return handlePairing(0);
-        }
-
-        schedule_type handlePairing(time_type time) {
-            std::random_shuffle(agentOrdering.begin(), agentOrdering.end());
-            auto agentp = agentOrdering.begin();
-            schedule_type schedule;
-            while(agentp != agentOrdering.end()) {
-                agent_type &agent1 = agents[*agentp];
-                ++agentp;
-                agent_type &agent2 = agents[*agentp];
-                ++agentp;
-                schedule += agent1.handleNewOpponent(agent2, time);
-                schedule += agent2.handleNewOpponent(agent1, time);
-            }
-            schedule += selfLoop(time);
-            return schedule;
-        }
-
-        void add2MoreAgents(int initialPolicyId) {
-            for(int i=0; i<2; ++i) {
-                agents.emplace_back();
-                agents.back().policy.setPolicy(initialPolicyId, agent_type::QMIN, agent_type::QMAX);
-                agentOrdering.push_back(agentOrdering.size());
-            }
-        }
-
-        bool hasConverged() {
-            for(const agent_type &agent: agents) {
-                if(agent.policy.trainingStepsSinceLastPolicyChange < NTIMESTEPS_TO_CONVERGENCE) return false;
-            }
-            return true;
-        }
-
-        std::map<long, int> getPopulationByPolicy() {
-            std::map<long,int> population;
-            for(const agent_type &agent: agents) {
-                population[agent.policy.policyID()] += 1;
-            }
-            return population;
-        }
-
-        // sum (m + d)(m + d) = sum m^2 + 2md_i + d_i^2
-        // = Nm^2 + sum d_i^2
-        std::pair<double, double> getRewardMeanAndSD(time_type time) {
-            double sumReward = 0.0;
-            double sumRewardSq = 0.0;
-            double NrewardSamples = time/2.0;
-            for(const agent_type &agent: agents) {
-                double meanReward = agent.totalReward/NrewardSamples;
-                sumReward += meanReward;
-                sumRewardSq += meanReward*meanReward;
-            }
-            return { sumReward/agents.size(), sqrt((sumRewardSq - sumReward*sumReward/agents.size())/agents.size()) };
-        }
-
-        void resetTotalRewardCounts() {
-            for(agent_type &agent: agents) {
-                agent.totalReward = 0.0;
-            }
-        }
-    };
-
-
-
-};
+        std::pair<double, double> wellbeingMeanSD = rootAgent.getRewardMeanAndSD();
+        std::cout << "  Wellbeing " << wellbeingMeanSD.first << " +- " << wellbeingMeanSD.second << std::endl;
+        std::cout << "  Policy population: " << std::hex << rootAgent.getPopulationByPolicy() << std::endl;
+//            if(sim.time() < MAX_TIMESTEPS) {
+//                std::cout << "converged to " << std::hex << sentinel.getPopulationByPolicy() << std::endl;
+//            } else {
+//                std::cout << "did not converge. Current population: " << std::hex << sentinel.getPopulationByPolicy() << std::endl;
+//            }
+        rootAgent.addAgent();
+    }
+}
 
 
 #endif //MULTIAGENTGOVERNMENT_EXPERIMENT2_H
