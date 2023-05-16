@@ -6,7 +6,8 @@
 int main() {
 
 //    experiment1();
-    experiment2<abm::agents::SimpleSugarSpiceAgent>();
+//    experiment2a();
+    experiment2b();
 
     return 0;
 }

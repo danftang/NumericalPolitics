@@ -68,35 +68,47 @@
 #include "abm/agents/agents.h"
 #include <random>
 
-template<class AGENT> void experiment2();
+template<class AGENT> void experiment2(int startPopulation, int endPopulation, int burninTimesteps, int simTimesteps);
 
 // Growing society with agents that can only remember their last encounter
+// Results:
+// Even at a population of 3, the likelihood that a given agent will have
+// n consecutive encounters with the same agent is 2^(1-n), so society
+// eventually breaks down into defection (though somewhat slowly).
 inline void experiment2a() {
-    experiment2<abm::agents::SimpleSugarSpiceAgent>();
+    experiment2<abm::agents::SimpleSugarSpiceAgent>(2, 3, 200000000, 10000000);
 }
 
+// Test agents that can identify and remember the last encounter with the 3 most
+// recently met agents.
+// Results:
+// Up to 3, we have simple repeated prisoner's dilemma and all agents reach policy 6.
+// However, since strangers become friends (for the next 3 turns) in a small society
+// it pays to cooperate, so cooperation persists beyond the memory size of the agents.
+// However, as the probability that a remembered agent will be re-encounter reduces, so we're
+// back to single-shot prisoner's dilemma.
+inline void experiment2b() {
+    experiment2<abm::agents::SugarSpiceAgentWithFriends>(2, 12, 50000000, 10000000);
+}
+
+//
+
 template<class AGENT>
-void experiment2() {
-    constexpr int MAX_TIMESTEPS = 40000000; // number of timesteps to give up searching for convergence
-    constexpr int BURNIN_TIMESTEPS = 100000000;
-    constexpr int SIM_TIMESTEPS = 10000000;
-    constexpr int STARTPOPULATION = 2;
-    constexpr int ENDPOPULATION = 100;
-//    constexpr int INITIAL_AGENT_STATE = 0x16; // 6 strategy with distrust of strangers
+void experiment2(int startPopulatinon, int endPopulation, int burninTimesteps, int simTimesteps) {
 
 //        typedef abm::agents::SugarSpiceAgent1 agent_type;
 
-    abm::agents::SequentialPairingAgent<AGENT> rootAgent(STARTPOPULATION);
-    while (rootAgent.agents.size() < ENDPOPULATION) {
+    abm::agents::SequentialPairingAgent<AGENT> rootAgent(startPopulatinon);
+    while (rootAgent.agents.size() <= endPopulation) {
         std::cout << "Population of " << std::dec << rootAgent.agents.size() << " agents:" << std::endl;
         typename AGENT::schedule_type sim = rootAgent.start();
-        sim.execUntil([&sim, &rootAgent]() {
-            return sim.time() >= BURNIN_TIMESTEPS;
+        sim.execUntil([&sim, &rootAgent, burninTimesteps]() {
+            return sim.time() >= burninTimesteps;
         });
         std::cout << "  Policy population at end of burnin: " << std::hex << rootAgent.getPopulationByPolicy() << std::endl;
         rootAgent.resetAllTrainingStats();
-        sim.execUntil([&sim, &rootAgent]() {
-            return sim.time() >= BURNIN_TIMESTEPS + SIM_TIMESTEPS;
+        sim.execUntil([&sim, &rootAgent, maxTimesteps = burninTimesteps + simTimesteps]() {
+            return sim.time() >= maxTimesteps;
         });
 
         std::pair<double, double> wellbeingMeanSD = rootAgent.getRewardMeanAndSD();

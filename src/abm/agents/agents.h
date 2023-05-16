@@ -12,7 +12,7 @@ namespace abm {
     namespace agents {
         #include "PrisonersDilemmaAgent.h"
         #include "SimpleSugarSpiceAgent.h"
-        #include "SugarSpiceAgent1.h"
+        #include "SugarSpiceAgentWithFriends.h"
         #include "ParallelPairingAgent.h"
         #include "SequentialPairingAgent.h"
     };

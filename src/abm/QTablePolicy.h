@@ -13,9 +13,11 @@ public:
 //        static constexpr float DEFAULT_EXPLORATION = 0.01;
     static constexpr float DEFAULT_INITIAL_EXPLORATION = 0.25;
     static constexpr float DEFAULT_EXPLORATION_DECAY = 0.9999999;
+    static constexpr float DEFAULT_EXPLORATION_MINIMUM = 0.0025;
     static constexpr float DEFAULT_INITIALQ = 1.0;
     static constexpr float DEFAULT_LEARNING_RATE = 0.01;
     static constexpr long NPOLICIES = std::pow(NACTIONS, NSTATES);
+
 
     std::array<std::array<float, NACTIONS>, NSTATES> Qtable;
     std::array<int, NSTATES> bestAction;
@@ -23,6 +25,7 @@ public:
     float learningRate;
     float pExplore; // probability of exploring
     float exploreDecay; // rate of exploration decay
+    float exploreMin;
     int lastAction;
     int lastState = -1;
     uint trainingStepsSinceLastPolicyChange = 0;
@@ -36,11 +39,12 @@ public:
             float discount = DEFAULT_DISCOUNT,
             float exploration = DEFAULT_INITIAL_EXPLORATION, // probability of not taking the best action
             float explorationDecay = DEFAULT_EXPLORATION_DECAY,
+            float explorationMinimum = DEFAULT_EXPLORATION_MINIMUM,
             float initialQ = DEFAULT_INITIALQ,
             float learningRate = DEFAULT_LEARNING_RATE
     ) :
             discount(discount), learningRate(learningRate),
-            pExplore(exploration), exploreDecay(explorationDecay),
+            pExplore(exploration), exploreDecay(explorationDecay), exploreMin(explorationMinimum),
             uniformReal(0.0, 1.0), randomActionChooser(0, NACTIONS - 1),
             totalReward(0.0f), nTrainingSteps(0) {
         std::uniform_int_distribution<int> actionDist(0, NACTIONS - 1);
@@ -102,7 +106,7 @@ public:
 
 
     int getAction(int state) {
-        pExplore *= exploreDecay;
+        if(pExplore > exploreMin) pExplore *= exploreDecay;
         return (uniformReal(deselby::Random::gen) <= pExplore) ? randomActionChooser(deselby::Random::gen)
                                                                : bestAction[state];
     }
