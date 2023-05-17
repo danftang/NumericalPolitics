@@ -14,9 +14,9 @@ namespace experiment3 {
 //        static constexpr size_t NSTATES = 8; // number of possible outputs from the observation function
 //        static constexpr size_t NACTIONS = 2;
 //        static constexpr size_t BUFFER_SIZE = 64;
-//        static constexpr float  REWARD[2][2] = {{3.0, 0.0},
+//        static constexpr double  REWARD[2][2] = {{3.0, 0.0},
 //                                                {4.0, 1.0}};
-//        static constexpr float PUNISHMENT[2] = {0.0, -5.0};
+//        static constexpr double PUNISHMENT[2] = {0.0, -5.0};
 //
 //        int     observerPhase = 0;
 //
@@ -44,8 +44,8 @@ namespace experiment3 {
 //        }
 //
 //
-//        float reward(time_type time)  {
-//            float reward;
+//        double reward(time_type time)  {
+//            double reward;
 //            switch(phase(time)) {
 //                case 0: // was observer: no reward
 //                    reward = 0.0;
@@ -81,7 +81,7 @@ namespace experiment3 {
 //        static constexpr size_t BUFFER_SIZE = 100;
 //        static constexpr size_t NSTATES = 4;
 //        static constexpr size_t NACTIONS = 2;
-//        static constexpr float  REWARD[2][2] = {{3, 0},
+//        static constexpr double  REWARD[2][2] = {{3, 0},
 //                                                {4, 1}};
 //
 //        // public state
@@ -93,10 +93,10 @@ namespace experiment3 {
 //        // internal state
 //        RoundRobinPrisonersDilemmaView *opponent;
 //
-//        std::pair<float,int> observe(size_t time) {
+//        std::pair<double,int> observe(size_t time) {
 //            int opponentsMove = (opponent->ownMoves)[time-1];
 //            int ownMove = ownMoves[time - 1];
-//            float r = REWARD[ownMove][opponentsMove];
+//            double r = REWARD[ownMove][opponentsMove];
 //            int qstate = 2*ownMove + opponentsMove;
 //            return {r, qstate};
 //        }

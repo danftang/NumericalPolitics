@@ -35,8 +35,8 @@ namespace experiment3 {
 //        constexpr int NTIMESTEPS = 2000000;
 //        constexpr int MAXPOLICYTRANSITIONS = 100000000;
 ////        constexpr int   NSAMPLES = 1000; // number of samples of policy space
-//        const float QMIN = 0;
-//        const float QMAX =
+//        const double QMIN = 0;
+//        const double QMAX =
 //                ObservedPrisonersDilemmaInterface::REWARD[1][0] /
 //                (1.0 - abm::QTablePolicy<ObservedPrisonersDilemmaInterface>::DEFAULT_LEARNING_RATE);
 //

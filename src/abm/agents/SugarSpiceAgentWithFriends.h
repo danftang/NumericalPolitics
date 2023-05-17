@@ -7,7 +7,10 @@
 // to either re-encountering as a stranger or just the "end game" with Q-value 0.
 // So, we can either do the forgetting at the end of a game, for some kind of statistical
 // forgetting (although then it's hard to limit the number of remembered agents) or remember
-// whole interaction histories with agents and train only at the forgetting stage.
+// whole interaction histories with agents and train only at the forgetting stage. [Does it
+// make a difference whether a forgotten agent is classed as a stranger or as a zero-quality
+// end-game? Don't think so, it just multiplies everything by 1/(1-decay) and prob
+// makes eveything less stable]
 //
 // Created by daniel on 15/05/23.
 //
@@ -16,56 +19,108 @@
 #define MULTIAGENTGOVERNMENT_SUGARSPICEAGENT1_H
 
 
-class SugarSpiceAgentWithFriends {
-public:
-    static constexpr size_t NSTATES = 5; // cooperate/cooperate, cooperate/defect, defect/cooperate, defect,defect, isStranger
-    static constexpr size_t NACTIONS = 2;
-    static constexpr int NFRIENDS = 3;
+#include <cstdlib>
+#include <deque>
+#include "../QTablePolicy.h"
+#include "../Schedule.h"
+#include "../CommunicationChannel.h"
+#include "../../DeselbyStd/stlstream.h"
 
-    typedef ulong time_type;
-    typedef abm::QTablePolicy<NSTATES, NACTIONS> policy_type;
-    typedef abm::Schedule<time_type> schedule_type;
+namespace abm {
+    namespace agents {
 
-    static constexpr float REWARD[2][2] = {{3, 0},
-                                           {4, 1}};
-    static constexpr int MEMORY_SIZE = 2; // Number of other agents this agent can remember
+        class SugarSpiceAgentWithFriends {
+        public:
+            static constexpr size_t NSTATES = 5; // cooperate/cooperate, cooperate/defect, defect/cooperate, defect,defect, isStranger
+            static constexpr size_t NACTIONS = 2;
+            static constexpr int NFRIENDS = 3;
+            static constexpr int STRANGER_STATE = 4;
 
-    std::array<std::pair<SugarSpiceAgentWithFriends *, int>, NFRIENDS> friends; // map from previously encountered agent to outcome of last game
-    policy_type policy;
-    abm::CommunicationChannel<abm::Schedule<time_type>, int> opponent;
-    int nextFriendIndex = 0;
-    int currentFriendIndex = 0;
-    int myLastMove;
+            typedef ulong time_type;
+            typedef QTablePolicy<NSTATES, NACTIONS> policy_type;
+            typedef Schedule<time_type> schedule_type;
 
-    // Handler for receiving a message to handle a new opponent
-    // Connect to the new opponent and sends it a trading action at the given time
-    schedule_type handleNewOpponent(SugarSpiceAgentWithFriends &newOpponent, time_type time) {
-        opponent.connectTo(newOpponent, &SugarSpiceAgentWithFriends::handleOpponentMove, 1);
-        currentFriendIndex = 0;
-        while(currentFriendIndex < friends.size() && friends[currentFriendIndex].first != &newOpponent) {
-            ++currentFriendIndex;
-        }
-        if(currentFriendIndex == friends.size()) {
-            // opponent is a stranger
-            currentFriendIndex = nextFriendIndex;
-            nextFriendIndex = (nextFriendIndex + 1)%NFRIENDS;
-            friends[currentFriendIndex] = std::pair(&newOpponent, 4);
-        }
-        myLastMove = policy.getAction(friends[currentFriendIndex].second);
-        return opponent.send(myLastMove, time);
-    }
+            static constexpr double REWARD[4] = {3, 0,
+                                                4, 1}; // indexed by 2*myLastMove + opponentLastMove
+
+            class InteractionHistory {
+            public:
+                SugarSpiceAgentWithFriends *agent;
+                int lastStartState;
+                int lastInteraction;
+            };
+
+            std::array<InteractionHistory, NFRIENDS> friends; // map from previously encountered agent to outcome of last game
+            policy_type policy;
+            CommunicationChannel<Schedule<time_type>, int> opponent;
+            int nextFriendIndexToForget = 0;
+            int currentFriendIndex = 0;
+            int myLastMove;
+
+            // Handler for receiving a message to handle a new opponent
+            // Connect to the new opponent and sends it a trading action at the given time
+            schedule_type handleNewOpponent(SugarSpiceAgentWithFriends &newOpponent, time_type time) {
+                opponent.connectTo(newOpponent, &SugarSpiceAgentWithFriends::handleOpponentMove, 1);
+                currentFriendIndex = 0;
+                while (currentFriendIndex < friends.size() && friends[currentFriendIndex].agent != &newOpponent) {
+                    ++currentFriendIndex;
+                }
+                if (currentFriendIndex == friends.size()) {
+                    // opponent is a stranger, so eldest friend history is in ENDGAME_STATE, and new acquaintance
+                    // is in STRANGER_STATE
+                    if(friends[nextFriendIndexToForget].agent != nullptr) {
+                        const int startState = friends[nextFriendIndexToForget].lastStartState;
+                        const int lastInteraction = friends[nextFriendIndexToForget].lastInteraction;
+                        const int myMove = lastInteraction>>1;
+                        policy.train(startState, myMove, REWARD[lastInteraction], policy_type::ENDGAME_STATE);
+                    }
+                    currentFriendIndex = nextFriendIndexToForget;
+                    nextFriendIndexToForget = (nextFriendIndexToForget + 1) % NFRIENDS;
+                    friends[currentFriendIndex].agent = &newOpponent;
+                    friends[currentFriendIndex].lastStartState = STRANGER_STATE;
+                    myLastMove = policy.getAction(STRANGER_STATE);
+                } else {
+                    // seen this opponent before, so we're in the state of the last interaction
+                    const int startState = friends[currentFriendIndex].lastStartState;
+                    const int endState = friends[currentFriendIndex].lastInteraction;
+                    const int myMove = endState>>1;
+                    policy.train(startState, myMove, REWARD[endState], endState);
+                    friends[currentFriendIndex].lastStartState = endState;
+                    myLastMove = policy.getAction(endState);
+                }
+                return opponent.send(myLastMove, time);
+            }
 
 
-    // handler for receiving
-    schedule_type handleOpponentMove(int opponentsMove, time_type time) {
+            // handler for receiving move. Remember new state for the current friend.
+            // No future actions.
+            schedule_type handleOpponentMove(int opponentsMove, time_type time) {
 //            std::cout << "Handling " << opponentsMove << ", " << myLastMove << std::endl;
-        int newState = 2 * myLastMove + opponentsMove;
-        float reward = REWARD[myLastMove][opponentsMove];
-        policy.train(friends[currentFriendIndex].second, myLastMove, reward, newState);
-        friends[currentFriendIndex].second = newState;
-        return abm::Schedule<time_type>();
-    }
-};
+                friends[currentFriendIndex].lastInteraction = 2 * myLastMove + opponentsMove;
+                return Schedule<time_type>();
+            }
 
+        protected:
+//            void trainOnInteractionHistory(InteractionHistory &forgottenAgentHistory) {
+//                std::cout << "Training on " << forgottenAgentHistory.agent << " " << forgottenAgentHistory.interactionHistory << std::endl;
+//                assert(forgottenAgentHistory.interactionHistory.size() >= 1);
+//                int lastState = STRANGER_STATE;
+//                while (forgottenAgentHistory.interactionHistory.size() > 1) {
+//                    const int newState = forgottenAgentHistory.interactionHistory.front();
+//                    const int myMove = newState >> 1;
+//                    policy.train(lastState, myMove, REWARD[newState], newState);
+//                    lastState = newState;
+//                    forgottenAgentHistory.interactionHistory.pop_front();
+//                }
+//                const int lastInteraction = forgottenAgentHistory.interactionHistory.front();
+//                const int myMove = lastInteraction >> 1;
+//                policy.train(lastState, myMove, REWARD[lastInteraction], policy_type::ENDGAME_STATE);
+//                forgottenAgentHistory.interactionHistory.clear();
+//            }
+
+        };
+
+    }
+}
 
 #endif //MULTIAGENTGOVERNMENT_SUGARSPICEAGENT1_H

@@ -1,0 +1,5 @@
+Mixed strategies
+----------------
+The game of Rock Paper Scissors has no point attractor, instead there is a 6 state limit cycle. However, this is not how people play the game. Instead they have a non-pure stratey, where they choose certain actions with a given probability. In this case, there is a point attractor where both actors choose with uniform probability.
+
+So, should we deal in pure policies or mixed-policies?
