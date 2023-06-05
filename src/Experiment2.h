@@ -1,9 +1,7 @@
 // Background:
-// When we expand the simulation to many agents stable societies
-// can be defined as populations of policies. If communication channels aren't fixed, then a
-// society may only be stable under a certain set of initial channel configurations. These can be
-// specified, or we can just say that there exists some non-empty set under which the policy
-// population is stable.
+// When we expand the simulation to many agents, stable societies
+// can be defined as populations of policies. If communication channels aren't fixed, then the initial
+// channel configuration can affect which attractor is reached.
 //
 // A "random encounter" society is one where agents encounter other agents at random
 // drawn from a fixed distribution of agent pairs. In this case each agent is effectively in a two-agent
@@ -11,8 +9,11 @@
 // the beginning of each "encounter" and held fixed until the end of the encounter). If each agent's policy
 // is stable with respect to the mixed policy of its encounters then the society is stable (and vice-versa).
 //
+// If the agents individually have mixed policies, then a mixed policy that is stable against itself is also
+// stable in a society where all agents have this policy, for any distribution of encounters.
+//
 // A "uniform random encounter" society is a special case of a random encounter society where all agent pairs
-// are equally probable. In this case, when the number of agents is large, each agent's opponent's mixed policy
+// are equally probable. In this case, when the number of agents is large, each agent's effective opponent's mixed policy
 // is approximately the same, so all policies in the society must be stable with respect to this mixed policy.
 // So, we need to find mixed policies such that all members in the mix are stable against the mix.
 //
@@ -45,7 +46,7 @@
 //        does this result in the emergence of "market towns" if players can also be mediators of other games?
 //
 //  * If agents can choose whether to spray other agents red/white after an encounter, can they collectively learn
-//    to spray defectors while at the same time learning to distrust red agents?
+//    to spray defectors while at the same time learning to distrust red agents [i.e. rudimentary communication]?
 //
 //  * If agents can communicate information about other agents, can they learn to warn other agents about
 //    defectors?
@@ -98,7 +99,7 @@ void experiment2(int startPopulatinon, int endPopulation, int burninTimesteps, i
 
 //        typedef abm::agents::SugarSpiceAgent1 agent_type;
 
-    abm::agents::SequentialPairingAgent<AGENT> rootAgent(startPopulatinon);
+    abm::agents::SequentialPairingManager<AGENT> rootAgent(startPopulatinon);
     while (rootAgent.agents.size() <= endPopulation) {
         std::cout << "Population of " << std::dec << rootAgent.agents.size() << " agents:" << std::endl;
         typename AGENT::schedule_type sim = rootAgent.start();

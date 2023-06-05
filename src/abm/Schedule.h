@@ -34,10 +34,10 @@ namespace abm {
 //        { *container.end() } -> HasStepFunction<TIME>;
 //    };
 
-    template<class T, class TIME>
-    concept Task = requires(T callable) {
-        { callable() } -> std::convertible_to<Schedule<TIME>>;
-    };
+//    template<class T, class TIME>
+//    concept Task = requires(T callable) {
+//        { callable() } -> std::convertible_to<Schedule<TIME>>;
+//    };
 
 
     template<class TIME>
@@ -51,11 +51,9 @@ namespace abm {
 
         Schedule() {}
 
-        template<Task<TIME> TASK>
-        Schedule(TASK task, TIME time = 0) {
+        inline Schedule(task_type task, TIME time = 0) {
             insert(std::move(task), time);
         }
-
 
         Schedule(std::forward_list<task_type> &&taskList, TIME time = 0) {
             tasks[time] = std::move(taskList);
@@ -81,8 +79,8 @@ namespace abm {
 //            insert(agents, time);
 //        }
 
-        template<Task<TIME> TASK>
-        inline void insert(TASK task, TIME time) {
+//        template<Task<TIME> TASK>
+        inline void insert(task_type task, TIME time) {
             tasks[time].push_front(std::move(task));
         }
 
@@ -130,6 +128,7 @@ namespace abm {
         template<class ExecutionPolicy>
         void execFirstEntry(ExecutionPolicy &&executionPolicy) {
             std::forward_list<task_type> &taskList = tasks.begin()->second;
+//            time_type time = tasks.begin()->first;
             Schedule<TIME> newTasks = std::transform_reduce(
 //                std::forward<ExecutionPolicy>(executionPolicy),
                     std::execution::par,

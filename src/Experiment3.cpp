@@ -6,31 +6,6 @@
 
 namespace experiment3 {
 
-// Three-player game where two players play prisoner's dilemma and one watches.
-// The watcher can choose to punish the player to its left based on its
-// move 3 timesteps ago.
-// Each player takes turns at being the observer so an agent's punishment
-// behaviour affects its reward via the other agents learning on subsequent
-// games.
-// An agent observes whether it is an observer or player and the moves of the
-// players last time the game was in the same phase. So an agent doesn't know
-// whether or not it is subject to possible punishment.
-//
-// So, we have:
-// Time     observer    observationTime
-//  0       0
-//  1       1
-//  2       2
-//  3       0           0
-//  4       1           1
-//
-// Can the punisher learn to punish defection and can this behaviour spread
-// to all agents (i.e. the establishment of ethics as a social convention)?
-// How does punishment affect the attractors when projected into the same space
-// as the plain prisoner's dilemma agents?
-// Does it increase the size of the basin of attraction of cooperative societies?
-// To what extent does punishment reduce the overall wellbeing? (i.e. distinguish
-// between the threat of punishment and the application of punishment)
     void QPrisonersDilemmaWithPunishingObserver() {
 //        constexpr int NTIMESTEPS = 2000000;
 //        constexpr int MAXPOLICYTRANSITIONS = 100000000;

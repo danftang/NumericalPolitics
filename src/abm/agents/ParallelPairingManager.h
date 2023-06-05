@@ -15,7 +15,7 @@ namespace abm {
     namespace agents {
 
         template<class AGENT>
-        class ParallelPairingAgent {
+        class ParallelPairingManager {
         public:
             static constexpr int NTIMESTEPS_TO_CONVERGENCE = 2000000;
 
@@ -26,9 +26,9 @@ namespace abm {
             std::vector<int> agentOrdering;
             CommunicationChannel<schedule_type, void> selfLoop;
 
-            ParallelPairingAgent(int nAgentsDiv2, long initialPolicyId) : agents(nAgentsDiv2 * 2),
-                                                                          agentOrdering(nAgentsDiv2 * 2) {
-                selfLoop.connectTo(*this, &ParallelPairingAgent<AGENT>::handlePairing, 2);
+            ParallelPairingManager(int nAgentsDiv2, long initialPolicyId) : agents(nAgentsDiv2 * 2),
+                                                                            agentOrdering(nAgentsDiv2 * 2) {
+                selfLoop.connectTo(*this, &ParallelPairingManager<AGENT>::handlePairing, 2);
                 for (int i = 0; i < nAgentsDiv2 * 2; ++i) {
                     agentOrdering[i] = i;
                     agents[i].setPolicy(initialPolicyId);

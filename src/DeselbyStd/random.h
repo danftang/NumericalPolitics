@@ -48,7 +48,6 @@ namespace deselby {
             return std::uniform_int_distribution<long>(from, until - 1)(gen);
         }
 
-
         static bool nextBool() {
             return std::uniform_int_distribution<int>(0, 1)(gen) == 0;
         }

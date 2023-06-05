@@ -1,13 +1,13 @@
 // An agent that randomly pairs agents for binary interaction one at a time
 // so that there is one interaction per unit time.
-// Unlike the ParallelPairingAgent, this can create pairs between any number
+// Unlike the ParallelPairingManager, this can create pairs between any number
 // of agents (not just even numbers).
 //
 // Created by daniel on 15/05/23.
 //
 
-#ifndef MULTIAGENTGOVERNMENT_SEQUENTIALPAIRINGAGENT_H
-#define MULTIAGENTGOVERNMENT_SEQUENTIALPAIRINGAGENT_H
+#ifndef MULTIAGENTGOVERNMENT_SEQUENTIALPAIRINGMANAGER_H
+#define MULTIAGENTGOVERNMENT_SEQUENTIALPAIRINGMANAGER_H
 
 #include <vector>
 #include "../CommunicationChannel.h"
@@ -17,7 +17,7 @@ namespace abm {
     namespace agents {
 
         template<class AGENT>
-        class SequentialPairingAgent {
+        class SequentialPairingManager {
         public:
             static constexpr int NTIMESTEPS_TO_CONVERGENCE = 2000000;
 
@@ -27,8 +27,8 @@ namespace abm {
             std::vector<AGENT> agents;
             CommunicationChannel<schedule_type, void> selfLoop;
 
-            SequentialPairingAgent(int nAgents) : agents(nAgents) {
-                selfLoop.connectTo(*this, &SequentialPairingAgent<AGENT>::handlePairing, 2);
+            SequentialPairingManager(int nAgents) : agents(nAgents) {
+                selfLoop.connectTo(*this, &SequentialPairingManager<AGENT>::handlePairing, 2);
             }
 
             schedule_type start() {
@@ -91,4 +91,4 @@ namespace abm {
     }
 }
 
-#endif //MULTIAGENTGOVERNMENT_SEQUENTIALPAIRINGAGENT_H
+#endif //MULTIAGENTGOVERNMENT_SEQUENTIALPAIRINGMANAGER_H

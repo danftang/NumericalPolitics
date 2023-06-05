@@ -3,3 +3,47 @@ Mixed strategies
 The game of Rock Paper Scissors has no point attractor, instead there is a 6 state limit cycle. However, this is not how people play the game. Instead they have a non-pure stratey, where they choose certain actions with a given probability. In this case, there is a point attractor where both actors choose with uniform probability.
 
 So, should we deal in pure policies or mixed-policies?
+
+Flow-state societies
+--------------------
+How about considering the flow of assets between agents, where each agent has a stock of each asset class and flow arrangements with other agents. Labour is classed as an asset that is created by agents and can transform/mine other assets. An agent's wellbeing is a function of stock and flow state and each agent is trying to maximise this. At each timestep the stock is changes in relation to the surplus/deficit of flow and an agent can choose to change flow levels or create new relationships.
+
+Agents can identify eachother (perhaps only through the flow relationship) and can remember past behaviour of each relationship.
+
+Relationships
+-------------
+Flow can only occur between pairs of agents that are in an existing relationship. The learning process is then learning how to conduct relationships (in terms of flow at each step), and when to create new relationships and destroy old ones. Perhaps agents could propose flow relationships with new agents? Or we could give them the ability to exchange words at the beginning of flow relationships [words are cheap] and see if they learn to negotiate...or just give them the ability to see the stock levels of the other agent.
+On destroying an agent, that shouldn't be considered the "end of the game" since destroying a strong relationship has consequences which depend on the ease of setting up new relationships. So, destroying a relationship leads one to the state of having one less relationship.
+
+Sugar spice with stock
+----------------------
+So, the simplest is sugar/spice scape agents whose state consists of
+    - stock of sugar
+    - stock of spice
+    - set of agents that agent is currently in a relationship with, each
+      of which is associated with a history of flows (up to some maximum
+      memory size).
+
+At each timestep an agent must make a number of decisions (each one can be controlled by a different Q-table, or perhaps the phase of decision making is contained within the state, or they're separate tables but connected via learning [the discounted end state is taken from the next table, and each table is separately approximated]).
+ - how hard to work (generate new sugar/spice).
+ - set the flow for each relationship
+ - which relationships to break (or perhaps just reduce flow to zero).
+ - whether to start a new relationship.
+
+Decentralised message passing ABM
+------------------
+Rather than returning a schedule, handlers send scheduled events (i.e. <time, runnable> pairs) directly to other agents. Each agent has a local time, which can move forward up until the earliest neighbour_local_time + channel_transmit_time. When an agent moves forward in time (i.e. it gets a thread) it executes events until blocked on the first channel
+(if multiple channels are simultaneously blocked, choose some canonical ordering of channels). The blocking agent then
+gets put on the task list, along with any agents that this was blocking.
+
+[what if agents send, along with each message, a guarantee that they won't send another message for some time?]
+
+[Note that the earliest an agent can send a message is the time of the earliest message in its inbox, so an agent's
+local time is the time of the earliest message that could arrive]
+
+      
+Timestepping message passing
+----------------------------
+We can maintain a message passing viewpoint within a timestepping context by having a schedule that is optimised to deal with many messages scheduled for the same time, then at time t, agents send messages to be delivered at time t+0.5. Agents then have handlers to receive "observation" messages, and then a loop message scheduled at t+1 for the timestep. The scheduler can then also deal with parallelisation.
+
+The alternative is to have read channels instead of write. A model step consists of all agents doing an "observe", then a "timestep". During the observe step, an agent can change its non-observable state (i.e. to store information about the observations) but should not change its observable state. During the "timestep" step any state can change. This is appropriate when the observations made depend on an agent's state, which would take 2 steps in the message passing paradigm. This is equivalent to POMDP.

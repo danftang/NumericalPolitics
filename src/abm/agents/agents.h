@@ -5,9 +5,9 @@
 #ifndef MULTIAGENTGOVERNMENT_AGENTS_H
 #define MULTIAGENTGOVERNMENT_AGENTS_H
 
-#include "ParallelPairingAgent.h"
+#include "ParallelPairingManager.h"
 #include "PrisonersDilemmaAgent.h"
-#include "SequentialPairingAgent.h"
+#include "SequentialPairingManager.h"
 #include "SimpleSugarSpiceAgent.h"
 #include "SugarSpiceAgentWithFriends.h"
 
