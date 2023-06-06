@@ -141,6 +141,7 @@ namespace abm {
             merge(std::move(newTasks));
         }
 
+        // Execute until no more tasks
         template<class ExecutionPolicy = const std::execution::parallel_policy &>
         void exec(ExecutionPolicy &&executionPolicy = std::execution::par) {
             while (!tasks.empty()) execFirstEntry(std::forward<ExecutionPolicy>(executionPolicy));

@@ -104,17 +104,17 @@ namespace abm {
 //            void trainOnInteractionHistory(InteractionHistory &forgottenAgentHistory) {
 //                std::cout << "Training on " << forgottenAgentHistory.agent << " " << forgottenAgentHistory.interactionHistory << std::endl;
 //                assert(forgottenAgentHistory.interactionHistory.size() >= 1);
-//                int lastState = STRANGER_STATE;
+//                int stateBeforeLastAction = STRANGER_STATE;
 //                while (forgottenAgentHistory.interactionHistory.size() > 1) {
 //                    const int newState = forgottenAgentHistory.interactionHistory.front();
 //                    const int myMove = newState >> 1;
-//                    policy.train(lastState, myMove, REWARD[newState], newState);
-//                    lastState = newState;
+//                    policy.train(stateBeforeLastAction, myMove, REWARD[newState], newState);
+//                    stateBeforeLastAction = newState;
 //                    forgottenAgentHistory.interactionHistory.pop_front();
 //                }
 //                const int lastInteraction = forgottenAgentHistory.interactionHistory.front();
 //                const int myMove = lastInteraction >> 1;
-//                policy.train(lastState, myMove, REWARD[lastInteraction], policy_type::ENDGAME_STATE);
+//                policy.train(stateBeforeLastAction, myMove, REWARD[lastInteraction], policy_type::ENDGAME_STATE);
 //                forgottenAgentHistory.interactionHistory.clear();
 //            }
 

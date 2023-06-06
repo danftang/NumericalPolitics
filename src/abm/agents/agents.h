@@ -10,5 +10,6 @@
 #include "SequentialPairingManager.h"
 #include "SimpleSugarSpiceAgent.h"
 #include "SugarSpiceAgentWithFriends.h"
+#include "SugarSpiceTradingAgent.h"
 
 #endif //MULTIAGENTGOVERNMENT_AGENTS_H

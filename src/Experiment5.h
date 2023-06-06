@@ -61,6 +61,10 @@
 #ifndef MULTIAGENTGOVERNMENT_EXPERIMENT5_H
 #define MULTIAGENTGOVERNMENT_EXPERIMENT5_H
 
+#include "DeselbyStd/random.h"
+#include "abm/abm.h"
+#include "abm/agents/agents.h"
+
 // Two agents that repeatedly have a sustained, turns-based interaction.
 // At the start of each interaction, resources of 1 unit of spice and 1 unit of sugar are randomly distributed
 // between them, and each agent is randomly assigned a preference of sugar or spice. At each turn an agent can:
@@ -76,6 +80,24 @@
 //  the game history.
 
 void experiment5a() {
+    const int NITERATIONS = 100000;
+    abm::agents::SugarSpiceTradingAgent agents[2];
+
+    agents[0].connectTo(agents[1]);
+    agents[1].connectTo(agents[0]);
+
+    for(int iterations = 0; iterations < NITERATIONS; ++iterations) {
+        // set random initial state
+        bool agent0HasSugar = deselby::Random::nextBool();
+        bool agent0HasSpice = deselby::Random::nextBool();
+        agents[0].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
+        agents[1].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+
+        // random agent starts
+        std::cout << "Starting game" << std::endl;
+        agents[deselby::Random::nextInt(0,2)].start().exec();
+        std::cout << std::endl;
+    }
 
 }
 

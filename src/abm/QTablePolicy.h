@@ -120,12 +120,12 @@ namespace abm {
 
 //        std::pair<int,bool> getActionAndTrain(int observation, double reward) {
 //            bool policyHasChanged = false;
-//            if(lastState != -1) policyHasChanged = train(lastState, lastAction, reward, observation);
+//            if(stateBeforeLastAction != -1) policyHasChanged = train(stateBeforeLastAction, myLastAction, reward, observation);
 //            return {getAction(observation), policyHasChanged};
 //        }
 
 //        bool train(double reward, int observation) {
-//            return train(lastState, lastAction, reward, observation);
+//            return train(stateBeforeLastAction, myLastAction, reward, observation);
 //        }
 
         // Single training step for one action.
