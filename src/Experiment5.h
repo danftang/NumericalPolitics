@@ -80,13 +80,15 @@
 //  the game history.
 
 void experiment5a() {
-    const int NITERATIONS = 100000;
+    const int NTRAININGITERATIONS = 200000;
+    const int NPERFORMINGITERATIONS = 100;
     abm::agents::SugarSpiceTradingAgent agents[2];
 
     agents[0].connectTo(agents[1]);
     agents[1].connectTo(agents[0]);
 
-    for(int iterations = 0; iterations < NITERATIONS; ++iterations) {
+    // train
+    for(int iterations = 0; iterations < NTRAININGITERATIONS; ++iterations) {
         // set random initial state
         bool agent0HasSugar = deselby::Random::nextBool();
         bool agent0HasSpice = deselby::Random::nextBool();
@@ -94,10 +96,28 @@ void experiment5a() {
         agents[1].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
 
         // random agent starts
-        std::cout << "Starting game" << std::endl;
-        agents[deselby::Random::nextInt(0,2)].start().exec();
+        int agentToStart = deselby::Random::nextInt(0,2);
+        agents[agentToStart].start().exec();
         std::cout << std::endl;
     }
+
+    // perform
+    abm::agents::SugarSpiceTradingAgent::verboseMode = true;
+    for(int iterations = 0; iterations < NPERFORMINGITERATIONS; ++iterations) {
+        // set random initial state
+        bool agent0HasSugar = deselby::Random::nextBool();
+        bool agent0HasSpice = deselby::Random::nextBool();
+        agents[0].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
+        agents[1].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+
+        // random agent starts
+        int agentToStart = deselby::Random::nextInt(0,2);
+        std::cout << "Starting game with agents " << std::endl << agents[agentToStart].state << agents[agentToStart^1].state;
+        agents[agentToStart].start().exec();
+        std::cout << "Ended game with agents    " << std::endl << agents[agentToStart].state << agents[agentToStart^1].state;
+        std::cout << std::endl;
+    }
+
 
 }
 

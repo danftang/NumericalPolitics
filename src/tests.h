@@ -47,7 +47,8 @@ void cartPoleDQNTest() {
     config.StepLimit() = 200;
 
     mlpack::SimpleDQN<> qNetwork(100,50,2);
-    mlpack::GreedyPolicy<Environment> policy(1.0, 100, 0.01, 0.97);
+//    mlpack::GreedyPolicy<Environment> policy(1.0, 100, 0.01, 0.97);
+    mlpack::GreedyPolicy<Environment> policy(0.1, 10000, 0.01, 0.5);
     mlpack::RandomReplay<Environment> replay(64,100000);
 //    mlpack::PrioritizedReplay<Environment> replay(10, 10000, 0.6);
     ens::AdamUpdate updater;
