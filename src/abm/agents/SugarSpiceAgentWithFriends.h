@@ -66,13 +66,13 @@ namespace abm {
                     ++currentFriendIndex;
                 }
                 if (currentFriendIndex == friends.size()) {
-                    // opponent is a stranger, so eldest friend history is in ENDGAME_STATE, and new acquaintance
+                    // opponent is a stranger, so eldest friend in history becomes a stanger and ends game, and new acquaintance
                     // is in STRANGER_STATE
                     if(friends[nextFriendIndexToForget].agent != nullptr) {
                         const int startState = friends[nextFriendIndexToForget].lastStartState;
                         const int lastInteraction = friends[nextFriendIndexToForget].lastInteraction;
                         const int myMove = lastInteraction>>1;
-                        policy.train(startState, myMove, REWARD[lastInteraction], policy_type::ENDGAME_STATE);
+                        policy.train(startState, myMove, REWARD[lastInteraction], STRANGER_STATE, true);
                     }
                     currentFriendIndex = nextFriendIndexToForget;
                     nextFriendIndexToForget = (nextFriendIndexToForget + 1) % NFRIENDS;

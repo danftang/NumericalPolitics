@@ -47,5 +47,6 @@
 #include "Schedule.h"
 #include "CommunicationChannel.h"
 #include "QTablePolicy.h"
+#include "DQNPolicy.h"
 
 #endif //MULTIAGENTGOVERNMENT_ABM_H

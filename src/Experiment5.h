@@ -80,7 +80,7 @@
 //  the game history.
 
 void experiment5a() {
-    const int NTRAININGITERATIONS = 200000;
+    const int NTRAININGITERATIONS = 2000000;
     const int NPERFORMINGITERATIONS = 100;
     abm::agents::SugarSpiceTradingAgent agents[2];
 

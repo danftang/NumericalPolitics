@@ -15,18 +15,28 @@ public:
     static constexpr double optimisationStepSize = 0.001;
     static constexpr int    targetNetworkSyncInterval = 10;
     static constexpr int    explorationSteps = 100;
+    static inline const arma::mat ENDGAME_STATE = arma::mat(0,0);
+
 
     class DummyEnvironment {
     public:
         class Action {
         public:
+            Action(int val): action(val) {}
+            Action(): action(0) {}
+
             int action;
             static constexpr int size=NACTIONS;
         };
 
-//        class State {
-//
-//        };
+        class State: public arma::mat {
+        public:
+            State(const arma::mat &matrix): arma::mat(matrix) {}
+            State(arma::mat &&matrix): arma::mat(std::move(matrix)) {}
+
+            arma::mat &Encode() { return *this; }
+            const arma::mat &Encode() const { return *this; }
+        };
     };
 
     mlpack::SimpleDQN<> learningNetwork;
@@ -38,11 +48,11 @@ public:
     int totalTrainingSteps;
     double discount;
 
-    DQNPolicy(int layer1size, int layer2size, int batchSize, int replayBufferSize, double discount):
+    DQNPolicy(int inputLayerSize, int layer1size, int layer2size, int batchSize, int replayBufferSize, double discount):
             totalTrainingSteps(0),
             learningNetwork(layer1size,layer2size, NACTIONS),
             targetNetwork(layer1size,layer2size, NACTIONS),
-            replayBuffer(batchSize, replayBufferSize),
+            replayBuffer(batchSize, replayBufferSize, 1, inputLayerSize),
             policy(0.2, 100000, 0.005, 0.5),
             optimisationStep(optimisation, learningNetwork.Parameters().n_rows, learningNetwork.Parameters().n_cols),
             discount(discount)
@@ -55,18 +65,18 @@ public:
         return policy.Sample(actionValue).action;
     }
 
-    void train(const arma::mat &startState, int action, double reward, const arma::mat &endState, bool isEnd) {
+    void train(const arma::mat &startState, int action, double reward, const arma::mat &endState) {
 //                std::cout << startState.netInput << std::endl;
 //                std::cout << action << std::endl;
 //                std::cout << reward << std::endl;
 //                std::cout << endState.netInput << std::endl;
 //                std::cout << isEnd << std::endl;
-        replayBuffer.Store(startState, action, reward, endState, isEnd, discount);
+        replayBuffer.Store(startState, action, reward, endState, endState == ENDGAME_STATE, discount);
 
         if(totalTrainingSteps < explorationSteps) return;
 
         arma::mat sampledStates;
-        std::vector<int> sampledActions;
+        std::vector<typename DummyEnvironment::Action> sampledActions;
         arma::rowvec sampledRewards;
         arma::mat sampledNextStates;
         arma::irowvec isTerminal;

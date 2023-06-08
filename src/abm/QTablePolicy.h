@@ -22,8 +22,8 @@ namespace abm {
         static constexpr double DEFAULT_EXPLORATION_MINIMUM = 0.0025;
         static constexpr double DEFAULT_INITIALQ = 1.0;
         static constexpr double DEFAULT_LEARNING_RATE = 0.01;
-        static constexpr long NPOLICIES = std::pow(NACTIONS, NSTATES);
-        static constexpr int ENDGAME_STATE = -1; // Inex of a state that has a fixed Q-value of 0 and no outgoing actions
+//        static constexpr long NPOLICIES = std::pow(NACTIONS, NSTATES);
+//        static constexpr int ENDGAME_STATE = -1; // Inex of a state that has a fixed Q-value of 0 and no outgoing actions
 
 
         std::array<std::array<double, NACTIONS>, NSTATES> Qtable;
@@ -133,11 +133,11 @@ namespace abm {
         // Q(s0,a) = reward(s0,a,s1) + discount * max_a'(Q(s1,a'))
         // so we relax the table to equilibrium by setting
         // Q(s0,a) <- (1-l)Q(s0,a) + l*(reward(s0,a,s1) + discount * max_a'(Q(s1,a')))
-        bool train(int startState, int action, double reward, int endState) {
+        bool train(int startState, int action, double reward, int endState, bool isEndgame=false) {
 //            std::cout << "training on " << startState << " " << action << " " << reward << " " << endState << std::endl;
             ++trainingStepsSinceLastPolicyChange;
             bool policyHasChanged = false;
-            const double endStateQValue = (endState == ENDGAME_STATE ? 0.0 : Qtable[endState][bestAction[endState]]);
+            const double endStateQValue = (isEndgame ? 0.0 : Qtable[endState][bestAction[endState]]);
             const double forwardQ = reward + discount * endStateQValue;
             Qtable[startState][action] = (1.0 - learningRate) * Qtable[startState][action] + learningRate * forwardQ;
             for (int a = 0; a < NACTIONS; ++a) {
