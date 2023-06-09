@@ -75,7 +75,7 @@ namespace abm {
                 }
 
                 void recordSpeechAct(double word, bool isOtherPlayer) {
-                    if(!isOtherPlayer) return; // TODO: TEST!!!
+//                    if(!isOtherPlayer) return; // TODO: TEST!!!
                     int bufferStart = isOtherPlayer?0:conversationHistoryLength;
                     arma::colvec truncatedHistory = netInput.subvec(bufferStart, bufferStart + conversationHistoryLength-2);
                     netInput.subvec(bufferStart + 1, bufferStart + conversationHistoryLength-1) = truncatedHistory;
@@ -109,13 +109,15 @@ namespace abm {
             };
 
 //            static constexpr double rewardForNegativeInventory = -25;
-            static constexpr double priceOfVerbosity = 0.75;
+            double costOfVerbosity = 0.0;
+            static constexpr double deltaCostOfVerbosity = 0.2; // change in cost of verbosity per agent action
+            static constexpr double costOfFighting = 1.5;
 
             State state;
             State stateBeforeLastAction;
             std::optional<ActionEnum> myLastAction;
 //            DQNPolicy<Action::size> policy = DQNPolicy<Action::size>(State::dimension, 100,50,64,100000,1.0);
-            QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.25, 0.99997, 0.01);
+            QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.25, std::pow(0.04, 1.0/100000.0), 0.01);
 
             CommunicationChannel<Schedule<time_type>, ActionEnum> otherPlayer;
 
@@ -134,6 +136,7 @@ namespace abm {
             void reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
                 state.reset(hasSugar, hasSpice, prefersSugar);
                 myLastAction.reset();
+                costOfVerbosity = 0.0;
             }
 
 
@@ -186,17 +189,19 @@ namespace abm {
                         }
                         break;
                     case Say0:
-                        if(verboseMode) std::cout << "Say 0" << std::endl;
+                        if(verboseMode) std::cout << "Say ogg" << std::endl;
                         state.recordSpeechAct(0, true);
                         break;
                     case Say1:
-                        if(verboseMode) std::cout << "Say 1" << std::endl;
+                        if(verboseMode) std::cout << "Say igg" << std::endl;
                         state.recordSpeechAct(1, true);
                         break;
                 }
 //                if(myForcedMove.has_value()) state.insertMove(myForcedMove.value()); // not strictly necessary as end state
                 if(myLastAction.has_value()) {
-                    double reward = state.utility() - stateBeforeLastAction.utility() - priceOfVerbosity;
+                    double reward = state.utility() - stateBeforeLastAction.utility() - costOfVerbosity;
+                    costOfVerbosity += deltaCostOfVerbosity;
+                    if(myLastAction == Fight || otherPlayerMove == Fight) reward -= costOfFighting;
 //                    if(verboseMode) std::cout << stateBeforeLastAction.Encode().t() << state.Encode().t() << myLastAction.value() << " " <<  reward << " " << isEnd << std::endl;
                     policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, isEnd);
                 }

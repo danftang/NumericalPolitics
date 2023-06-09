@@ -80,7 +80,7 @@
 //  the game history.
 
 void experiment5a() {
-    const int NTRAININGITERATIONS = 4000000;
+    const int NTRAININGITERATIONS = 6000000;
     const int NPERFORMINGITERATIONS = 100;
     abm::agents::SugarSpiceTradingAgent agents[2];
 
@@ -95,17 +95,25 @@ void experiment5a() {
         agents[0].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
         agents[1].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
 
+        if(deselby::Random::nextBool(1.0/250000.0) && iterations < NTRAININGITERATIONS*0.75) {
+            std::cout << "Resetting agent 0 exploration at " << iterations << std::endl;
+            agents[0].policy.pExplore = 0.1;
+        }
+        if(deselby::Random::nextBool(1.0/250000.0) && iterations < NTRAININGITERATIONS*0.75) {
+            std::cout << "Resetting agent 1 expoloration at " << iterations << std::endl;
+            agents[1].policy.pExplore = 0.1;
+        }
+
         // random agent starts
         int agentToStart = deselby::Random::nextInt(0,2);
         agents[agentToStart].start().exec();
-        std::cout << std::endl;
     }
 
     // perform
     abm::agents::SugarSpiceTradingAgent::verboseMode = true;
     agents[0].policy.pExplore = 0.0;
     agents[1].policy.pExplore = 0.0;
-    for(int state = 0; state < 16; ++state) {
+    for(int state = 0; state < 32; ++state) {
         // set random initial state
         int agentToStart = state & 1;
         bool otherAgentPrefersSugar = (state >> 1) & 1;
