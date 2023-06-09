@@ -80,7 +80,7 @@
 //  the game history.
 
 void experiment5a() {
-    const int NTRAININGITERATIONS = 2000000;
+    const int NTRAININGITERATIONS = 4000000;
     const int NPERFORMINGITERATIONS = 100;
     abm::agents::SugarSpiceTradingAgent agents[2];
 
@@ -103,19 +103,23 @@ void experiment5a() {
 
     // perform
     abm::agents::SugarSpiceTradingAgent::verboseMode = true;
-    for(int iterations = 0; iterations < NPERFORMINGITERATIONS; ++iterations) {
+    agents[0].policy.pExplore = 0.0;
+    agents[1].policy.pExplore = 0.0;
+    for(int state = 0; state < 16; ++state) {
         // set random initial state
-        bool agent0HasSugar = deselby::Random::nextBool();
-        bool agent0HasSpice = deselby::Random::nextBool();
-        agents[0].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
-        agents[1].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+        int agentToStart = state & 1;
+        bool otherAgentPrefersSugar = (state >> 1) & 1;
+        bool startAgentPrefersSugar = (state >> 2) & 1;
+        bool startAgentHasSugar = (state >> 3) & 1;
+        bool startAgentHasSpice = (state >> 4) & 1;
+        agents[agentToStart].reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
+        agents[agentToStart^1].reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
 
         // random agent starts
-        int agentToStart = deselby::Random::nextInt(0,2);
-        std::cout << "Starting game with agents " << std::endl << agents[agentToStart].state << agents[agentToStart^1].state;
+        std::cout << "------- Starting game -------" << std::endl << agents[agentToStart].state << agents[agentToStart^1].state;
         agents[agentToStart].start().exec();
-        std::cout << "Ended game with agents    " << std::endl << agents[agentToStart].state << agents[agentToStart^1].state;
-        std::cout << std::endl;
+        std::cout << agents[agentToStart].state << agents[agentToStart^1].state;
+        std::cout << std::endl << std::endl;
     }
 
 

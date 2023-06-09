@@ -41,7 +41,7 @@ namespace abm {
 
         class State {
             public:
-                static const int conversationHistoryLength = 3; // including conversation end tag
+                static const int conversationHistoryLength = 2; // including conversation end tag
                 static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
                 static const int utilityOfNonPreferred = 1;
 
@@ -75,6 +75,7 @@ namespace abm {
                 }
 
                 void recordSpeechAct(double word, bool isOtherPlayer) {
+                    if(!isOtherPlayer) return; // TODO: TEST!!!
                     int bufferStart = isOtherPlayer?0:conversationHistoryLength;
                     arma::colvec truncatedHistory = netInput.subvec(bufferStart, bufferStart + conversationHistoryLength-2);
                     netInput.subvec(bufferStart + 1, bufferStart + conversationHistoryLength-1) = truncatedHistory;
@@ -114,7 +115,7 @@ namespace abm {
             State stateBeforeLastAction;
             std::optional<ActionEnum> myLastAction;
 //            DQNPolicy<Action::size> policy = DQNPolicy<Action::size>(State::dimension, 100,50,64,100000,1.0);
-            QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.2, 0.9999, 0.01);
+            QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.25, 0.99997, 0.01);
 
             CommunicationChannel<Schedule<time_type>, ActionEnum> otherPlayer;
 
