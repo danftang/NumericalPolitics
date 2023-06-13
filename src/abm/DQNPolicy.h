@@ -13,9 +13,13 @@ public:
     static constexpr bool   doubleQLearning = false;
     static constexpr bool   noisyQLearning = false;
     static constexpr double optimisationStepSize = 0.001;
-    static constexpr int    targetNetworkSyncInterval = 10;
-    static constexpr int    explorationSteps = 100;
-    static inline const arma::mat ENDGAME_STATE = arma::mat(0,0);
+    static constexpr int    targetNetworkSyncInterval = 5;
+    static constexpr int    explorationSteps = 128;
+
+    static constexpr double initialExploration = 0.5;
+    static constexpr size_t explorationDecayInterval = 1;
+    static constexpr double minExploration = 0.005;
+    static constexpr double explorationDecayRate = (1.0 - 4.605e-4);; // (1.0 - 4.605e-6);// std::pow(0.01,1.0/1000000.0);
 
 
     class DummyEnvironment {
@@ -49,14 +53,23 @@ public:
     double discount;
 
     DQNPolicy(int inputLayerSize, int layer1size, int layer2size, int batchSize, int replayBufferSize, double discount):
-            totalTrainingSteps(0),
             learningNetwork(layer1size,layer2size, NACTIONS),
             targetNetwork(layer1size,layer2size, NACTIONS),
             replayBuffer(batchSize, replayBufferSize, 1, inputLayerSize),
-            policy(0.2, 100000, 0.005, 0.5),
-            optimisationStep(optimisation, learningNetwork.Parameters().n_rows, learningNetwork.Parameters().n_cols),
+            policy(initialExploration, explorationDecayInterval, minExploration, explorationDecayRate),
+            optimisation(),
+            optimisationStep(std::move(getOptPolicy(inputLayerSize))),
+            totalTrainingSteps(0),
             discount(discount)
-            {}
+            { }
+
+
+    ens::AdamUpdate::Policy<arma::mat, arma::mat> getOptPolicy(int inputLayerSize) {
+        learningNetwork.Reset(inputLayerSize);
+        targetNetwork.Reset(inputLayerSize);
+        targetNetwork.Parameters() = learningNetwork.Parameters();
+        return {optimisation, learningNetwork.Parameters().n_rows, learningNetwork.Parameters().n_cols};
+    }
 
 
     int getAction(const arma::mat &state) {
@@ -65,15 +78,22 @@ public:
         return policy.Sample(actionValue).action;
     }
 
-    void train(const arma::mat &startState, int action, double reward, const arma::mat &endState) {
-//                std::cout << startState.netInput << std::endl;
+
+    void setExploration(double epsilon) {
+        policy = mlpack::GreedyPolicy<DummyEnvironment>(epsilon, explorationDecayInterval, std::min(minExploration, epsilon), explorationDecayRate);
+    }
+
+
+    void train(const arma::mat &startState, int action, double reward, const arma::mat &endState, bool isEnd) {
+//                std::cout << startState << std::endl;
 //                std::cout << action << std::endl;
 //                std::cout << reward << std::endl;
-//                std::cout << endState.netInput << std::endl;
-//                std::cout << isEnd << std::endl;
-        replayBuffer.Store(startState, action, reward, endState, endState == ENDGAME_STATE, discount);
-
+//                std::cout << endState  << std::endl;
+//                std::cout << isEnd << std::endl << std::endl;
+        replayBuffer.Store(startState, action, reward, endState, isEnd, discount);
+        ++totalTrainingSteps;
         if(totalTrainingSteps < explorationSteps) return;
+
 
         arma::mat sampledStates;
         std::vector<typename DummyEnvironment::Action> sampledActions;
@@ -83,7 +103,6 @@ public:
 
         replayBuffer.Sample(sampledStates, sampledActions, sampledRewards,
                             sampledNextStates, isTerminal);
-
         // Compute action value for next state with target network.
 
         arma::mat nextActionValues;
@@ -105,7 +124,6 @@ public:
         // Compute the update target.
         arma::mat target;
         learningNetwork.Forward(sampledStates, target);
-
 //                double discount = std::pow(, replayMethod.NSteps());
 
         /**
@@ -123,10 +141,13 @@ public:
         arma::mat gradients;
         learningNetwork.Backward(sampledStates, target, gradients);
 
+
         replayBuffer.Update(target, sampledActions, nextActionValues, gradients);
+
 
         optimisationStep.Update(learningNetwork.Parameters(), optimisationStepSize,
                                 gradients);
+
 
         if (noisyQLearning == true)
         {
@@ -137,9 +158,10 @@ public:
         if (totalTrainingSteps % targetNetworkSyncInterval == 0)
             targetNetwork.Parameters() = learningNetwork.Parameters();
 
+
         if (totalTrainingSteps > explorationSteps)
             policy.Anneal();
-        ++totalTrainingSteps;
+
     }
 
     static arma::Col<size_t> BestAction(const arma::mat& actionValues)

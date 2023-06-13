@@ -16,25 +16,31 @@ namespace abm {
         class SugarSpiceTradingAgent {
         public:
             typedef uint time_type;
+            typedef abm::Schedule<time_type> schedule_type;
             static inline bool verboseMode = false;
 
-            enum ActionEnum {
+            enum MessageEnum {
+                // Agent actions
                 GiveSugar,
                 GiveSpice,
                 Fight,
                 WalkAway,
                 Say0,
-                Say1
-
+                Say1,
+                // Out of band comms
+                YouLostFight,
+                YouWonFight,
+                Bandits,
+                EndByMutualConsent
             };
 
             // Action class so that this is a valid mlpack Environment
             class Action {
             public:
-                Action(ActionEnum act): action(act) {}
+                Action(MessageEnum act): action(act) {}
                 Action() {}
 
-                ActionEnum action;
+                MessageEnum action;
                 static const int size = 6;
             };
 
@@ -109,17 +115,22 @@ namespace abm {
             };
 
 //            static constexpr double rewardForNegativeInventory = -25;
-            double costOfVerbosity = 0.0;
-            static constexpr double deltaCostOfVerbosity = 0.2; // change in cost of verbosity per agent action
+            static constexpr double initialCostOfVerbosity = 0.05;
+            static constexpr double deltaCostOfVerbosity = 0.25; // change in cost of verbosity per agent action
+            static constexpr double kappaCostOfVerbosity = 1.13; // change in cost of verbosity per agent action
             static constexpr double costOfFighting = 1.5;
+            static constexpr double pBanditAttack = 0.02; // probability of a bandit attack per message received
+
+
+            double costOfVerbosity = initialCostOfVerbosity;
 
             State state;
             State stateBeforeLastAction;
-            std::optional<ActionEnum> myLastAction;
-//            DQNPolicy<Action::size> policy = DQNPolicy<Action::size>(State::dimension, 100,50,64,100000,1.0);
-            QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.25, std::pow(0.04, 1.0/100000.0), 0.01);
+            std::optional<MessageEnum> myLastAction;
+//            DQNPolicy<Action::size> policy = DQNPolicy<Action::size>(State::dimension, 100,50,64,1024,1.0);
+            QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.5, std::pow(0.02, 1.0/1000000.0), 0.01);
 
-            CommunicationChannel<Schedule<time_type>, ActionEnum> otherPlayer;
+            CommunicationChannel<Schedule<time_type>, MessageEnum> otherPlayer;
 
 //            SugarSpiceTradingAgent():
 //                    policy(State::dimension, 100,50,64,100000,1.0) {}
@@ -128,24 +139,24 @@ namespace abm {
                 otherPlayer.connectTo(otherAgent, &SugarSpiceTradingAgent::handleTradingAct, 1);
             }
 
+
+
             Schedule<time_type> start(time_type time=0) {
-                makeMove();
-                return otherPlayer.send(myLastAction.value(), time);
+                MessageEnum message = makeMove(false);
+                return otherPlayer.send(message, time);
             }
 
             void reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
                 state.reset(hasSugar, hasSpice, prefersSugar);
                 myLastAction.reset();
-                costOfVerbosity = 0.0;
+                costOfVerbosity = initialCostOfVerbosity;
             }
 
 
-            Schedule<time_type> handleTradingAct(ActionEnum otherPlayerMove, time_type time) {
-//                std::cout << "Starting handler with state " << state << std::endl;
-  //              state.insertMove(otherPlayerMove);
+
+            Schedule<time_type> handleTradingAct(MessageEnum opponentMessage, time_type time) {
                 bool isEnd = false;
-                std::optional<ActionEnum> myForcedMove;
-                switch(otherPlayerMove) {
+                switch (opponentMessage) {
                     case GiveSugar:
                         if (verboseMode) std::cout << "Give sugar" << std::endl;
                         state.sugar() += 1;
@@ -154,85 +165,90 @@ namespace abm {
                         if (verboseMode) std::cout << "Give spice" << std::endl;
                         state.spice() += 1;
                         break;
-                    case Fight:
-                        isEnd = true;
-                        if (myLastAction == Fight) {
-                            // I started fight but lost
-                            if (verboseMode) std::cout << "Agressor loses" << std::endl;
-                            if (state.sugar() > 0) state.sugar() = 0;
-                            if (state.spice() > 0) state.spice() = 0;
-                        } else {
-                            if (verboseMode) std::cout << "Start fight" << std::endl;
-                            if (deselby::Random::nextBool(0.5)) {
-                                // other agent started fight and won
-                                if (state.sugar() > 0) state.sugar() = 0;
-                                if (state.spice() > 0) state.spice() = 0;
-                                myForcedMove = WalkAway;
-                            } else {
-                                // other agent started fight but I won
-                                state.sugar() = 1;
-                                state.spice() = 1;
-                                myForcedMove = Fight;
-                            }
-                        }
-                        break;
                     case WalkAway:
-                        if(myLastAction == WalkAway) isEnd = true;
-                        if(myLastAction == Fight) {
-                            // I started fight and won
-                            if(verboseMode) std::cout << "Agressor wins" << std::endl;
-                            state.sugar() = 1;
-                            state.spice() = 1;
-                            isEnd = true;
-                        } else {
-                            if(verboseMode) std::cout << "Walk away" << std::endl;
-                        }
+                        if (verboseMode) std::cout << "Walk away" << std::endl;
                         break;
                     case Say0:
-                        if(verboseMode) std::cout << "Say ogg" << std::endl;
+                        if (verboseMode) std::cout << "Say ogg" << std::endl;
                         state.recordSpeechAct(0, true);
                         break;
                     case Say1:
-                        if(verboseMode) std::cout << "Say igg" << std::endl;
+                        if (verboseMode) std::cout << "Say igg" << std::endl;
                         state.recordSpeechAct(1, true);
+                        break;
+
+                    case YouLostFight:
+                        if (verboseMode) std::cout << "Fight, agressor wins" << std::endl;
+                        if (state.sugar() > 0) state.sugar() = 0;
+                        if (state.spice() > 0) state.spice() = 0;
+                        isEnd = true;
+                        break;
+                    case YouWonFight:
+                        if (verboseMode) std::cout << "Fight, agressor loses" << std::endl;
+                        state.sugar() = 1;
+                        state.spice() = 1;
+                        isEnd = true;
+                        break;
+                    case Bandits:
+                        if (verboseMode) std::cout << "Bandits!" << std::endl;
+                        if (state.sugar() > 0) state.sugar() = 0;
+                        if (state.spice() > 0) state.spice() = 0;
+                        isEnd = true;
+                        break;
+                    case EndByMutualConsent:
+                        if (verboseMode) std::cout << "Walk away" << std::endl;
+                        isEnd = true;
                         break;
                 }
 //                if(myForcedMove.has_value()) state.insertMove(myForcedMove.value()); // not strictly necessary as end state
-                if(myLastAction.has_value()) {
-                    double reward = state.utility() - stateBeforeLastAction.utility() - costOfVerbosity;
-                    costOfVerbosity += deltaCostOfVerbosity;
-                    if(myLastAction == Fight || otherPlayerMove == Fight) reward -= costOfFighting;
+                if(myLastAction.has_value()) { // train on time from immediately before last action to immediately before next action
+                    double reward = state.utility() - stateBeforeLastAction.utility();// - costOfVerbosity;
+//                    costOfVerbosity += deltaCostOfVerbosity;
+//                    costOfVerbosity *= kappaCostOfVerbosity;
+                    if(opponentMessage == YouWonFight || opponentMessage == YouLostFight) reward -= costOfFighting;
 //                    if(verboseMode) std::cout << stateBeforeLastAction.Encode().t() << state.Encode().t() << myLastAction.value() << " " <<  reward << " " << isEnd << std::endl;
                     policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, isEnd);
                 }
 
-                if(isEnd) {
-                    return myForcedMove.has_value() ? otherPlayer.send(myForcedMove.value(), time) : Schedule<time_type>();
-                }
+                if(isEnd) return Schedule<time_type>();
 
-                makeMove();
+                MessageEnum myMessage = makeMove(opponentMessage == WalkAway);
 
-                if(myLastAction == WalkAway && otherPlayerMove == WalkAway) { // end of game
-//                    state.insertMove(WalkAway); // not strictly necessary
+                if(myMessage == EndByMutualConsent) { // I'm returning a WalkAway, which ends the game
                     policy.train(stateBeforeLastAction, WalkAway, 0.0, state, true);
                 }
-//                std::cout << "Agent " << this << "\tsending message " << myLastAction << std::endl;
-                return otherPlayer.send(myLastAction.value(), time);
+                if(myMessage == YouLostFight || myMessage == YouWonFight) {
+                    double reward = state.utility() - stateBeforeLastAction.utility() - costOfFighting;
+                    policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
+                }
+                if(myMessage == Bandits) {
+                    double reward = state.utility() - stateBeforeLastAction.utility();
+                    policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
+                }
+
+                return otherPlayer.send(myMessage, time);
             }
 
-            void makeMove() {
-                stateBeforeLastAction = state;
-//                arma::mat actionValue;
-//                learningNetwork.Predict(state.Encode(), actionValue);
-//                myLastAction = policy.Sample(actionValue).action;
-                myLastAction = static_cast<ActionEnum>(policy.getAction(state));
 
-                // giving something one doesn't have is interpreted as WalkAway
-                if((state.sugar() < 1.0 && myLastAction == GiveSugar) || (state.spice() < 1.0 && myLastAction == GiveSpice)) {
-                    myLastAction = WalkAway;
+            MessageEnum makeMove(bool opponentMessageIsWalkaway) {
+                MessageEnum message;
+                stateBeforeLastAction = state;
+                myLastAction = static_cast<MessageEnum>(policy.getAction(state));
+                if(deselby::Random::nextBool(pBanditAttack)) {
+                    message = Bandits;
+                } else if((state.sugar() < 1.0 && myLastAction == GiveSugar) || (state.spice() < 1.0 && myLastAction == GiveSpice)) {
+                    message = WalkAway;
+                } else if(myLastAction == Fight) {
+                    message = deselby::Random::nextBool(0.5)?YouWonFight:YouLostFight;
+                } else {
+                    message = myLastAction.value();
+                }
+
+                if(opponentMessageIsWalkaway && message == WalkAway) {
+                    message = EndByMutualConsent;
                 }
 //                state.insertMove(myLastAction.value());
-                switch(myLastAction.value()) {
+                switch(message) {
                     case GiveSugar:
                         state.sugar() -= 1;
                         break;
@@ -244,9 +260,25 @@ namespace abm {
                         break;
                     case Say1:
                         state.recordSpeechAct(1, false);
+                        break;
+                    case YouWonFight:
+                        // I started fight and other won
+                        if (state.sugar() > 0) state.sugar() = 0;
+                        if (state.spice() > 0) state.spice() = 0;
+                        break;
+                    case YouLostFight:
+                        // I started fight and other lost
+                        state.sugar() = 1;
+                        state.spice() = 1;
+                        break;
+                    case Bandits:
+                        if (state.sugar() > 0) state.sugar() = 0;
+                        if (state.spice() > 0) state.spice() = 0;
+                        break;
                     default:
                         break;
                 }
+                return message;
             };
         };
 

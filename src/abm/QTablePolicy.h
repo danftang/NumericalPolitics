@@ -96,11 +96,15 @@ namespace abm {
                 id += pow(NACTIONS, state) * bestAction[state];
             }
             return id;
-
         }
 
         static long nPolicies() {
             return std::pow(NACTIONS, NSTATES);
+        }
+
+
+        void setExploration(double epsilon) {
+            pExplore = epsilon;
         }
 
         // version that doesn't require interface
