@@ -23,11 +23,11 @@ namespace abm {
                 // Agent actions
                 GiveSugar,
                 GiveSpice,
-                Fight,
                 WalkAway,
                 Say0,
                 Say1,
-                // Out of band comms
+                Fight,
+                // Out of band comms: terminal states
                 YouLostFight,
                 YouWonFight,
                 Bandits,
@@ -47,7 +47,7 @@ namespace abm {
 
         class State {
             public:
-                static const int conversationHistoryLength = 2; // including conversation end tag
+//                static const int conversationHistoryLength = 1;
                 static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
                 static const int utilityOfNonPreferred = 1;
 
@@ -56,13 +56,13 @@ namespace abm {
 
                 State(): netInput(dimension) { }
 
-                double &sugar() { return netInput[2*conversationHistoryLength]; }
-                double &spice() { return netInput[2*conversationHistoryLength+1]; }
-                double &prefersSugar() { return netInput[2*conversationHistoryLength+2]; }
+                double &sugar() { return netInput[0]; }
+                double &spice() { return netInput[1]; }
+                double &prefersSugar() { return netInput[2]; }
 
-                double sugar() const { return netInput[2*conversationHistoryLength]; }
-                double spice() const { return netInput[2*conversationHistoryLength+1]; }
-                double prefersSugar() const { return netInput[2*conversationHistoryLength+2]; }
+                double sugar() const { return netInput[0]; }
+                double spice() const { return netInput[1]; }
+                double prefersSugar() const { return netInput[2]; }
 
                 const arma::colvec &Encode() const {
                     return netInput;
@@ -72,26 +72,51 @@ namespace abm {
                     return netInput;
                 }
 
+                // convert to integer giving the ordinal of this state
                operator int() const {
-                    int ordinal = 0;
-                    for(int i=0; i<netInput.size(); ++i) {
-                        if(netInput[i] > 0.5) ordinal += 1<<i;
-                    }
-                    return ordinal;
+//                    int ordinal = 0;
+//                    for(int i=0; i<netInput.size(); ++i) {
+//                        if(netInput[i] > 0.5) ordinal += 1<<i;
+//                    }
+//                    return ordinal;
+                    return netInput[0] + 2*netInput[1] + 4*netInput[2] + 8*(getIncomingMessage() + Action::size*getOutgoingMessage());
                 }
 
-                void recordSpeechAct(double word, bool isOtherPlayer) {
-//                    if(!isOtherPlayer) return; // TODO: TEST!!!
-                    int bufferStart = isOtherPlayer?0:conversationHistoryLength;
-                    arma::colvec truncatedHistory = netInput.subvec(bufferStart, bufferStart + conversationHistoryLength-2);
-                    netInput.subvec(bufferStart + 1, bufferStart + conversationHistoryLength-1) = truncatedHistory;
-                    netInput[bufferStart] = word;
+//                void recordSpeechAct(double word, bool isOtherPlayer) {
+//                    int bufferStart = isOtherPlayer?0:conversationHistoryLength;
+//                    arma::colvec truncatedHistory = netInput.subvec(bufferStart, bufferStart + conversationHistoryLength-2);
+//                    netInput.subvec(bufferStart + 1, bufferStart + conversationHistoryLength-1) = truncatedHistory;
+//                    netInput[bufferStart] = word;
+//                }
+
+                void recordIncomingMessage(MessageEnum message) {
+//                    message = Fight; // TODO: test
+                    for(int i = 3; i < 3 + Action::size; ++i) netInput[i] = 0.0;
+                    netInput[3 + message] = 1.0;
                 }
+
+                void recordOutgoingMessage(MessageEnum message) {
+//                    message = Fight; // TODO: test
+                    for(int i = 3+Action::size; i < 3 + 2*Action::size; ++i) netInput[i] = 0.0;
+                    netInput[3 + Action::size + message] = 1.0;
+                }
+
+                MessageEnum getIncomingMessage() const {
+                    int m=0;
+                    while(netInput[3+m] == 0.0) ++m;
+                    return static_cast<MessageEnum>(m);
+                }
+
+                MessageEnum getOutgoingMessage() const {
+                    int m=0;
+                    while(netInput[3+Action::size+m] == 0.0) ++m;
+                    return static_cast<MessageEnum>(m);
+                }
+
 
                 void reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
-                    netInput.subvec(0, 2*conversationHistoryLength-1).fill(0.0); // reset conversation
-                    netInput[0] = 1.0; // add end-of-conversation tags
-                    netInput[conversationHistoryLength] = 1.0;
+                    recordIncomingMessage(Fight); // use Fight to mean Empty as we don't use this
+                    recordOutgoingMessage(Fight);
                     sugar() = hasSugar;
                     spice() = hasSpice;
                     this->prefersSugar() = prefersSugar;
@@ -109,8 +134,8 @@ namespace abm {
                     return out;
                 }
 
-                static constexpr size_t dimension = 2*conversationHistoryLength+3;
-                static constexpr size_t nstates = 1<<dimension;
+                static constexpr size_t dimension = 2*Action::size+3;
+                static constexpr size_t nstates = 8 * Action::size * Action::size;
 
             };
 
@@ -160,21 +185,24 @@ namespace abm {
                     case GiveSugar:
                         if (verboseMode) std::cout << "Give sugar" << std::endl;
                         state.sugar() += 1;
+                        state.recordIncomingMessage(GiveSugar);
                         break;
                     case GiveSpice:
                         if (verboseMode) std::cout << "Give spice" << std::endl;
                         state.spice() += 1;
+                        state.recordIncomingMessage(GiveSpice);
                         break;
                     case WalkAway:
                         if (verboseMode) std::cout << "Walk away" << std::endl;
+                        state.recordIncomingMessage(WalkAway);
                         break;
                     case Say0:
                         if (verboseMode) std::cout << "Say ogg" << std::endl;
-                        state.recordSpeechAct(0, true);
+                        state.recordIncomingMessage(Say0);
                         break;
                     case Say1:
                         if (verboseMode) std::cout << "Say igg" << std::endl;
-                        state.recordSpeechAct(1, true);
+                        state.recordIncomingMessage(Say1);
                         break;
 
                     case YouLostFight:
@@ -213,19 +241,6 @@ namespace abm {
                 if(isEnd) return Schedule<time_type>();
 
                 MessageEnum myMessage = makeMove(opponentMessage == WalkAway);
-
-                if(myMessage == EndByMutualConsent) { // I'm returning a WalkAway, which ends the game
-                    policy.train(stateBeforeLastAction, WalkAway, 0.0, state, true);
-                }
-                if(myMessage == YouLostFight || myMessage == YouWonFight) {
-                    double reward = state.utility() - stateBeforeLastAction.utility() - costOfFighting;
-                    policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
-                }
-                if(myMessage == Bandits) {
-                    double reward = state.utility() - stateBeforeLastAction.utility();
-                    policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
-                }
-
                 return otherPlayer.send(myMessage, time);
             }
 
@@ -248,6 +263,7 @@ namespace abm {
                     message = EndByMutualConsent;
                 }
 //                state.insertMove(myLastAction.value());
+                double reward;
                 switch(message) {
                     case GiveSugar:
                         state.sugar() -= 1;
@@ -256,28 +272,37 @@ namespace abm {
                         state.spice() -= 1;
                         break;
                     case Say0:
-                        state.recordSpeechAct(0, false);
                         break;
                     case Say1:
-                        state.recordSpeechAct(1, false);
                         break;
                     case YouWonFight:
                         // I started fight and other won
-                        if (state.sugar() > 0) state.sugar() = 0;
-                        if (state.spice() > 0) state.spice() = 0;
+                        state.sugar() = 0;
+                        state.spice() = 0;
+                        reward = state.utility() - stateBeforeLastAction.utility() - costOfFighting;
+                        policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
                         break;
                     case YouLostFight:
                         // I started fight and other lost
                         state.sugar() = 1;
                         state.spice() = 1;
+                        reward = state.utility() - stateBeforeLastAction.utility() - costOfFighting;
+                        policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
                         break;
                     case Bandits:
-                        if (state.sugar() > 0) state.sugar() = 0;
-                        if (state.spice() > 0) state.spice() = 0;
+                        state.sugar() = 0;
+                        state.spice() = 0;
+                        reward = state.utility() - stateBeforeLastAction.utility();
+                        policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
+                        break;
+                    case EndByMutualConsent:
+                        assert(state.getIncomingMessage() == WalkAway);
+                        policy.train(stateBeforeLastAction, myLastAction.value(), 0.0, state, true);
                         break;
                     default:
                         break;
                 }
+                state.recordOutgoingMessage(myLastAction.value());
                 return message;
             };
         };

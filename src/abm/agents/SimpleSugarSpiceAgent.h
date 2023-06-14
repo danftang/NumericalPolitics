@@ -55,7 +55,7 @@ namespace abm {
 //        std::cout << this << " Handling " << myLastMove << ", " << opponentsMove << std::endl;
                 int newGameOutcome = 2 * myLastMove + opponentsMove;
                 double reward = REWARD[myLastMove][opponentsMove];
-                policy.train(lastGameOutcome, myLastMove, reward, newGameOutcome);
+                policy.train(lastGameOutcome, myLastMove, reward, newGameOutcome, false);
                 lastGameOutcome = newGameOutcome;
                 return Schedule<time_type>();
             }

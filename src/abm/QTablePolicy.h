@@ -20,13 +20,15 @@ namespace abm {
         static constexpr double DEFAULT_INITIAL_EXPLORATION = 0.25;
         static constexpr double DEFAULT_EXPLORATION_DECAY = 0.9999999;
         static constexpr double DEFAULT_EXPLORATION_MINIMUM = 0.0025;
-        static constexpr double DEFAULT_INITIALQ = 1.0;
-        static constexpr double DEFAULT_LEARNING_RATE = 0.01;
+//        static constexpr double DEFAULT_INITIALQ = 1.0;
+        static constexpr double DEFAULT_LEARNING_RATE = 0.001;
 //        static constexpr long NPOLICIES = std::pow(NACTIONS, NSTATES);
 //        static constexpr int ENDGAME_STATE = -1; // Inex of a state that has a fixed Q-value of 0 and no outgoing actions
 
+        inline static bool verbose = false;
 
-        std::array<std::array<double, NACTIONS>, NSTATES> Qtable;
+        std::array<std::array<double, NACTIONS>, NSTATES>   Qtable;
+        std::array<std::array<uint, NACTIONS>, NSTATES>      nSamples;
         std::array<int, NSTATES> bestAction;
         double discount;     // exponential decay factor of future reward
         double learningRate;
@@ -47,7 +49,7 @@ namespace abm {
                 double exploration = DEFAULT_INITIAL_EXPLORATION, // probability of not taking the best action
                 double explorationDecay = DEFAULT_EXPLORATION_DECAY,
                 double explorationMinimum = DEFAULT_EXPLORATION_MINIMUM,
-                double initialQ = DEFAULT_INITIALQ,
+  //              double initialQ = DEFAULT_INITIALQ,
                 double learningRate = DEFAULT_LEARNING_RATE
         ) :
                 discount(discount), learningRate(learningRate),
@@ -58,7 +60,10 @@ namespace abm {
 
             // initialise Q values and set random bestAction
             for (int state = 0; state < NSTATES; ++state) {
-                for (int action = 0; action < NACTIONS; ++action) Qtable[state][action] = initialQ;
+                for (int action = 0; action < NACTIONS; ++action) {
+                    Qtable[state][action] = 0.0;
+                    nSamples[state][action] = 0;
+                }
                 bestAction[state] = actionDist(deselby::Random::gen);
             }
         }
@@ -109,7 +114,7 @@ namespace abm {
 
         // version that doesn't require interface
         int getActionAndTrain(int newState, double reward) {
-            if (lastState != -1) train(lastState, lastAction, reward, newState);
+            if (lastState != -1) train(lastState, lastAction, reward, newState, false);
             lastState = newState;
             lastAction = getAction(newState);
             return lastAction;
@@ -117,6 +122,14 @@ namespace abm {
 
 
         int getAction(int state) {
+            if(verbose) {
+                std::cout << state << ": ";
+                for (int a = 0; a < NACTIONS; ++a) {
+                    std::cout << Qtable[state][a] << ":" << nSamples[state][a];
+                    if (a == bestAction[state]) std::cout << "* "; else std::cout << "  ";
+                }
+                std::cout << std::endl;
+            }
             if (pExplore > exploreMin) pExplore *= exploreDecay;
             return (uniformReal(deselby::Random::gen) <= pExplore) ? randomActionChooser(deselby::Random::gen)
                                                                    : bestAction[state];
@@ -137,22 +150,39 @@ namespace abm {
         // Q(s0,a) = reward(s0,a,s1) + discount * max_a'(Q(s1,a'))
         // so we relax the table to equilibrium by setting
         // Q(s0,a) <- (1-l)Q(s0,a) + l*(reward(s0,a,s1) + discount * max_a'(Q(s1,a')))
-        bool train(int startState, int action, double reward, int endState, bool isEndgame=false) {
+        //
+        // If we weight the samples with the weights:
+        // a_n, a_n r, a_n r^2, a_n r^3 ... a_n r^(n-1)
+        //
+        // The sum of the weights must be 1 so
+        // S_n = a_n(1-r^n)/(1-r) = 1
+        // so
+        // a_n = (1-r)/(1-r^n)
+        // so
+        // a_{n+1} = a_n(1-r^n)/(1-r^{n+1})
+        //
+        // so we multiply the current Q value by (r-r^{n+1})/(1-r^{n+1}) and weight the current sample by (1-r)/(1-r^{n+1})
+        //
+        // But 1-((1-r)/(1-r^{n+1})) = (r-r^{n+1})/(1-r^{n+1})
+        bool train(int startState, int action, double reward, int endState, bool isEndgame) {
 //            std::cout << "training on " << startState << " " << action << " " << reward << " " << endState << std::endl;
             ++trainingStepsSinceLastPolicyChange;
             bool policyHasChanged = false;
+
+            ++nSamples[startState][action];
+            const double rrn = std::pow(1.0 - learningRate,nSamples[startState][action]);
+            double sampleWeight = learningRate/(1.0-rrn);
+
             const double endStateQValue = (isEndgame ? 0.0 : Qtable[endState][bestAction[endState]]);
             const double forwardQ = reward + discount * endStateQValue;
-            Qtable[startState][action] = (1.0 - learningRate) * Qtable[startState][action] + learningRate * forwardQ;
-            for (int a = 0; a < NACTIONS; ++a) {
+            Qtable[startState][action] = (1.0-sampleWeight) * Qtable[startState][action] + sampleWeight * forwardQ;
+            for (int a = 0; a < NACTIONS; ++a) { // TODO: optimise this
                 if (Qtable[startState][a] > Qtable[startState][bestAction[startState]]) {
                     policyHasChanged = true;
                     trainingStepsSinceLastPolicyChange = 0;
-//                    std::cout << "New policy " << policyID() << std::endl;
                     bestAction[startState] = a;
                 }
             }
-//            if(policyHasChanged) policyChangeHook(*this);
             totalReward += reward;
             ++nTrainingSteps;
             return policyHasChanged;

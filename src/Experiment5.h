@@ -80,7 +80,7 @@
 //  the game history.
 
 void experiment5a() {
-    const int NTRAININGITERATIONS = 200000; //2000000;
+    const int NTRAININGITERATIONS = 2000000; //2000000;
     const int NPERFORMINGITERATIONS = 100;
     abm::agents::SugarSpiceTradingAgent agents[2];
 
@@ -103,6 +103,7 @@ void experiment5a() {
 
     // perform
     abm::agents::SugarSpiceTradingAgent::verboseMode = true;
+    abm::QTablePolicy<abm::agents::SugarSpiceTradingAgent::State::nstates, abm::agents::SugarSpiceTradingAgent::Action::size>::verbose = true;
     agents[0].policy.setExploration(0.0);
     agents[1].policy.setExploration(0.0);
     for(int state = 0; state < 32; ++state) {

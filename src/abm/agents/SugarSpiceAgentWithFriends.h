@@ -84,7 +84,7 @@ namespace abm {
                     const int startState = friends[currentFriendIndex].lastStartState;
                     const int endState = friends[currentFriendIndex].lastInteraction;
                     const int myMove = endState>>1;
-                    policy.train(startState, myMove, REWARD[endState], endState);
+                    policy.train(startState, myMove, REWARD[endState], endState, false);
                     friends[currentFriendIndex].lastStartState = endState;
                     myLastMove = policy.getAction(endState);
                 }
