@@ -80,9 +80,10 @@
 //  the game history.
 
 void experiment5a() {
-    const int NTRAININGITERATIONS = 2000000; //2000000;
+    const int NTRAININGITERATIONS = 4000000; //2000000;
     const int NPERFORMINGITERATIONS = 100;
-    abm::agents::SugarSpiceTradingAgent agents[2];
+    const bool HASLANGUAGE = true;
+    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE> agents[2];
 
     agents[0].connectTo(agents[1]);
     agents[1].connectTo(agents[0]);
@@ -102,8 +103,10 @@ void experiment5a() {
     }
 
     // perform
-    abm::agents::SugarSpiceTradingAgent::verboseMode = true;
-    abm::QTablePolicy<abm::agents::SugarSpiceTradingAgent::State::nstates, abm::agents::SugarSpiceTradingAgent::Action::size>::verbose = true;
+    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::verboseMode = true;
+    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::pBanditAttack = 0.0;
+    abm::QTablePolicy<abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::State::nstates, abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::Action::size>::verbose = true;
+
     agents[0].policy.setExploration(0.0);
     agents[1].policy.setExploration(0.0);
     for(int state = 0; state < 32; ++state) {
@@ -127,9 +130,10 @@ void experiment5a() {
 
 // Can 4 agents with no way to distinguish between each other generate a shared langauge?
 void experiment5b() {
-    const int NTRAININGITERATIONS = 2000000;
+    const int NTRAININGITERATIONS = 8000000;
     const int NPERFORMINGITERATIONS = 100;
-    abm::agents::SugarSpiceTradingAgent agents[4];
+    const bool HASLANGUAGE = true;
+    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE> agents[4];
 
     // train
     for(int iterations = 0; iterations < NTRAININGITERATIONS; ++iterations) {
@@ -151,7 +155,8 @@ void experiment5b() {
     }
 
     // perform
-    abm::agents::SugarSpiceTradingAgent::verboseMode = true;
+    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::verboseMode = true;
+    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::pBanditAttack = 0.0;
     for(int agent = 0; agent<4; ++agent) {
         agents[agent].policy.setExploration(0.0);
     }

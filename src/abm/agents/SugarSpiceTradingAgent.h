@@ -13,6 +13,7 @@
 namespace abm {
     namespace agents {
 
+        template<bool HASLANGUAGE>
         class SugarSpiceTradingAgent {
         public:
             typedef uint time_type;
@@ -24,9 +25,9 @@ namespace abm {
                 GiveSugar,
                 GiveSpice,
                 WalkAway,
+                Fight,
                 Say0,
                 Say1,
-                Fight,
                 // Out of band comms: terminal states
                 YouLostFight,
                 YouWonFight,
@@ -41,7 +42,7 @@ namespace abm {
                 Action() {}
 
                 MessageEnum action;
-                static const int size = 6;
+                static const int size = 4 + 2*HASLANGUAGE;
             };
 
 
@@ -144,8 +145,8 @@ namespace abm {
             static constexpr double deltaCostOfVerbosity = 0.25; // change in cost of verbosity per agent action
             static constexpr double kappaCostOfVerbosity = 1.13; // change in cost of verbosity per agent action
             static constexpr double costOfFighting = 1.5;
-            static constexpr double pBanditAttack = 0.02; // probability of a bandit attack per message received
-
+            static constexpr double costOfBanditAttack = 15.0;
+            inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
 
             double costOfVerbosity = initialCostOfVerbosity;
 
@@ -181,6 +182,7 @@ namespace abm {
 
             Schedule<time_type> handleTradingAct(MessageEnum opponentMessage, time_type time) {
                 bool isEnd = false;
+                double costs = 0.0;
                 switch (opponentMessage) {
                     case GiveSugar:
                         if (verboseMode) std::cout << "Give sugar" << std::endl;
@@ -210,31 +212,29 @@ namespace abm {
                         if (state.sugar() > 0) state.sugar() = 0;
                         if (state.spice() > 0) state.spice() = 0;
                         isEnd = true;
+                        costs = costOfFighting;
                         break;
                     case YouWonFight:
                         if (verboseMode) std::cout << "Fight, agressor loses" << std::endl;
                         state.sugar() = 1;
                         state.spice() = 1;
                         isEnd = true;
+                        costs = costOfFighting;
                         break;
                     case Bandits:
                         if (verboseMode) std::cout << "Bandits!" << std::endl;
                         if (state.sugar() > 0) state.sugar() = 0;
                         if (state.spice() > 0) state.spice() = 0;
                         isEnd = true;
+                        costs = costOfBanditAttack;
                         break;
                     case EndByMutualConsent:
                         if (verboseMode) std::cout << "Walk away" << std::endl;
                         isEnd = true;
                         break;
                 }
-//                if(myForcedMove.has_value()) state.insertMove(myForcedMove.value()); // not strictly necessary as end state
                 if(myLastAction.has_value()) { // train on time from immediately before last action to immediately before next action
-                    double reward = state.utility() - stateBeforeLastAction.utility();// - costOfVerbosity;
-//                    costOfVerbosity += deltaCostOfVerbosity;
-//                    costOfVerbosity *= kappaCostOfVerbosity;
-                    if(opponentMessage == YouWonFight || opponentMessage == YouLostFight) reward -= costOfFighting;
-//                    if(verboseMode) std::cout << stateBeforeLastAction.Encode().t() << state.Encode().t() << myLastAction.value() << " " <<  reward << " " << isEnd << std::endl;
+                    double reward = state.utility() - stateBeforeLastAction.utility() - costs;
                     policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, isEnd);
                 }
 
@@ -259,11 +259,10 @@ namespace abm {
                     message = myLastAction.value();
                 }
 
-                if(opponentMessageIsWalkaway && message == WalkAway) {
-                    message = EndByMutualConsent;
-                }
-//                state.insertMove(myLastAction.value());
-                double reward;
+                if(opponentMessageIsWalkaway && message == WalkAway) message = EndByMutualConsent;
+
+                double costs = 0.0;
+                bool isEnd = false;
                 switch(message) {
                     case GiveSugar:
                         state.sugar() -= 1;
@@ -279,28 +278,31 @@ namespace abm {
                         // I started fight and other won
                         state.sugar() = 0;
                         state.spice() = 0;
-                        reward = state.utility() - stateBeforeLastAction.utility() - costOfFighting;
-                        policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
+                        isEnd = true;
+                        costs = costOfFighting;
                         break;
                     case YouLostFight:
                         // I started fight and other lost
                         state.sugar() = 1;
                         state.spice() = 1;
-                        reward = state.utility() - stateBeforeLastAction.utility() - costOfFighting;
-                        policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
+                        isEnd = true;
+                        costs = costOfFighting;
                         break;
                     case Bandits:
                         state.sugar() = 0;
                         state.spice() = 0;
-                        reward = state.utility() - stateBeforeLastAction.utility();
-                        policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
+                        isEnd = true;
+                        costs = costOfBanditAttack;
                         break;
                     case EndByMutualConsent:
-                        assert(state.getIncomingMessage() == WalkAway);
-                        policy.train(stateBeforeLastAction, myLastAction.value(), 0.0, state, true);
+                        isEnd = true;
                         break;
                     default:
                         break;
+                }
+                if(isEnd) {
+                    double reward = state.utility() - stateBeforeLastAction.utility() - costs;
+                    policy.train(stateBeforeLastAction, myLastAction.value(), reward, state, true);
                 }
                 state.recordOutgoingMessage(myLastAction.value());
                 return message;
