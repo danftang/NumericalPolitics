@@ -80,9 +80,9 @@
 //  the game history.
 
 void experiment5a() {
-    const int NTRAININGITERATIONS = 4000000; //2000000;
+    const int NTRAININGITERATIONS = 100000; // 4000000;
     const int NPERFORMINGITERATIONS = 100;
-    const bool HASLANGUAGE = true;
+    const bool HASLANGUAGE = false;
     abm::agents::SugarSpiceTradingAgent<HASLANGUAGE> agents[2];
 
     agents[0].connectTo(agents[1]);
@@ -90,7 +90,7 @@ void experiment5a() {
 
     // train
     for(int iterations = 0; iterations < NTRAININGITERATIONS; ++iterations) {
-        if(iterations%10000 == 0) std::cout << iterations << std::endl;
+        if(iterations%100 == 0) std::cout << iterations << std::endl;
         // set random initial state
         bool agent0HasSugar = deselby::Random::nextBool();
         bool agent0HasSpice = deselby::Random::nextBool();

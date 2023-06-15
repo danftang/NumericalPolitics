@@ -26,6 +26,7 @@ namespace abm {
                 GiveSpice,
                 WalkAway,
                 Fight,
+                // optional verbal acts
                 Say0,
                 Say1,
                 // Out of band comms: terminal states
@@ -75,11 +76,6 @@ namespace abm {
 
                 // convert to integer giving the ordinal of this state
                operator int() const {
-//                    int ordinal = 0;
-//                    for(int i=0; i<netInput.size(); ++i) {
-//                        if(netInput[i] > 0.5) ordinal += 1<<i;
-//                    }
-//                    return ordinal;
                     return netInput[0] + 2*netInput[1] + 4*netInput[2] + 8*(getIncomingMessage() + Action::size*getOutgoingMessage());
                 }
 
@@ -91,13 +87,11 @@ namespace abm {
 //                }
 
                 void recordIncomingMessage(MessageEnum message) {
-//                    message = Fight; // TODO: test
                     for(int i = 3; i < 3 + Action::size; ++i) netInput[i] = 0.0;
                     netInput[3 + message] = 1.0;
                 }
 
                 void recordOutgoingMessage(MessageEnum message) {
-//                    message = Fight; // TODO: test
                     for(int i = 3+Action::size; i < 3 + 2*Action::size; ++i) netInput[i] = 0.0;
                     netInput[3 + Action::size + message] = 1.0;
                 }
@@ -153,8 +147,8 @@ namespace abm {
             State state;
             State stateBeforeLastAction;
             std::optional<MessageEnum> myLastAction;
-//            DQNPolicy<Action::size> policy = DQNPolicy<Action::size>(State::dimension, 100,50,64,1024,1.0);
-            QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.5, std::pow(0.02, 1.0/1000000.0), 0.01);
+            DQNPolicy<Action::size> policy = DQNPolicy<Action::size>(State::dimension, 100,50,32,10000,1.0);
+ //          QTablePolicy<State::nstates, Action::size> policy = QTablePolicy<State::nstates, Action::size>(1.0, 0.5, std::pow(0.02, 1.0/1000000.0), 0.01);
 
             CommunicationChannel<Schedule<time_type>, MessageEnum> otherPlayer;
 

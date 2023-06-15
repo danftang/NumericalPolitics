@@ -13,13 +13,13 @@ public:
     static constexpr bool   doubleQLearning = false;
     static constexpr bool   noisyQLearning = false;
     static constexpr double optimisationStepSize = 0.001;
-    static constexpr int    targetNetworkSyncInterval = 5;
+    static constexpr int    targetNetworkSyncInterval = 100;
     static constexpr int    explorationSteps = 128;
 
     static constexpr double initialExploration = 0.5;
     static constexpr size_t explorationDecayInterval = 1;
-    static constexpr double minExploration = 0.005;
-    static constexpr double explorationDecayRate = (1.0 - 4.605e-4);; // (1.0 - 4.605e-6);// std::pow(0.01,1.0/1000000.0);
+    static constexpr double minExploration = 0.01;
+    static constexpr double explorationDecayRate = (1.0 - 7.8e-5); // 0.02 in 50000 steps // (1.0 - 4.605e-6);// std::pow(0.01,1.0/1000000.0);
 
 
     class DummyEnvironment {
@@ -43,8 +43,10 @@ public:
         };
     };
 
-    mlpack::SimpleDQN<> learningNetwork;
-    mlpack::SimpleDQN<> targetNetwork;
+//    mlpack::SimpleDQN<mlpack::HuberLoss,mlpack::HeInitialization> learningNetwork;
+//    mlpack::SimpleDQN<mlpack::HuberLoss,mlpack::HeInitialization> targetNetwork;
+    mlpack::SimpleDQN<mlpack::MeanSquaredError,mlpack::HeInitialization> learningNetwork;
+    mlpack::SimpleDQN<mlpack::MeanSquaredError,mlpack::HeInitialization> targetNetwork;
     mlpack::RandomReplay<DummyEnvironment> replayBuffer;
     mlpack::GreedyPolicy<DummyEnvironment> policy;
     ens::AdamUpdate optimisation;

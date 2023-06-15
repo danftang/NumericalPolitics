@@ -12,8 +12,8 @@ int main() {
 ////    experiment1();
 //    experiment2a();
 ////    experiment2b();
-//    experiment5a();
-    experiment5b();
+    experiment5a();
+//    experiment5b();
 
 
     return 0;
