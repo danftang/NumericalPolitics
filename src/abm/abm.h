@@ -48,5 +48,6 @@
 #include "CommunicationChannel.h"
 #include "QTablePolicy.h"
 #include "DQNPolicy.h"
+#include "MlPackAction.h"
 
 #endif //MULTIAGENTGOVERNMENT_ABM_H

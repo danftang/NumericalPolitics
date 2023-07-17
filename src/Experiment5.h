@@ -105,7 +105,7 @@ void experiment5a() {
     // perform
     abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::verboseMode = true;
     abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::pBanditAttack = 0.0;
-    abm::QTablePolicy<abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::State::nstates, abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::Action::size>::verbose = true;
+    decltype(agents[0].policy)::verbose = true;
 
     agents[0].policy.setExploration(0.0);
     agents[1].policy.setExploration(0.0);

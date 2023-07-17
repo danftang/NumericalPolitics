@@ -154,7 +154,7 @@ inline void experiment3() {
 //            } else {
 //                std::cout << "did not converge. Current population: " << std::hex << sentinel.getPopulationByPolicy() << std::endl;
 //            }
-        rootAgent.addAgent();
+        rootAgent.addQEntry();
     }
 
 }

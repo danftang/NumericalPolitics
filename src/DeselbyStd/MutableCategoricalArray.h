@@ -10,7 +10,7 @@
 // and pop_back().
 //
 // A random draw from the distribution can be taken using the call operator () with
-// a random number generator (e.g. std::mt19937). This also runs in O(log(N)) time.
+// a random number randomGenerator (e.g. std::mt19937). This also runs in O(log(N)) time.
 //
 // The sum of all weights can be accessed in O(1) time using sum()
 //

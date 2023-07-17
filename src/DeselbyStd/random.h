@@ -20,7 +20,7 @@ namespace deselby {
         thread_local static std::mt19937 gen;
 
 
-        // thread-safe seed generator.
+        // thread-safe seed randomGenerator.
         // This can be used to uniquely seed different thread local instances of gen.
         static std::mt19937::result_type nextRandomSeed() {
             seedMutex.lock();
