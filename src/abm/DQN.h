@@ -8,6 +8,7 @@
 
 #include "mlpack.hpp"
 #include "MlPackAction.h"
+#include "mlpack.hpp"
 
 class DQN {
 public:
@@ -17,15 +18,16 @@ public:
     class TrainingBatch {
     public:
         arma::mat startStates;
-        std::vector<int> actions;
+        std::vector<int> intents;
         arma::rowvec rewards;
         arma::mat endStates;
         arma::irowvec isTerminal;
         arma::mat learningStartStateQValues;
         arma::mat targetEndStateQValues;
 
-        size_t size() const { return actions.size(); }
+        size_t size() const { return intents.size(); }
     };
+
 
     // Dummy environment for the mlpack replay
     class MatrixEnvironment {
@@ -37,14 +39,17 @@ public:
         };
     };
 
-    mlpack::SimpleDQN<mlpack::MeanSquaredError,mlpack::HeInitialization> learningNetwork;
-    mlpack::SimpleDQN<mlpack::MeanSquaredError,mlpack::HeInitialization> targetNetwork;
+    typedef mlpack::SimpleDQN<mlpack::MeanSquaredError,mlpack::HeInitialization> network_type;
+    typedef arma::mat input_type;
+
+    network_type learningNetwork;
+    network_type targetNetwork;
     mlpack::RandomReplay<MatrixEnvironment> replayBuffer;
-    ens::AdamUpdate optimisation;
-    ens::AdamUpdate::Policy<arma::mat, arma::mat> optimisationStep;
     uint totalTrainingSteps;
     double discount;
     int batchSize;
+    ens::AdamUpdate adamParameters;
+    ens::AdamUpdate::Policy<arma::mat, arma::mat> optimisationStep;
 
     template<class AGENTBODY>
     DQN(int layer1size, int layer2size, int batchSize, int replayBufferSize, double discount):
@@ -56,12 +61,20 @@ public:
             learningNetwork(layer1size, layer2size, outputLayerSize),
             targetNetwork(layer1size, layer2size, outputLayerSize),
             replayBuffer(batchSize, replayBufferSize, 1, inputLayerSize),
-            optimisation(),
-            optimisationStep(std::move(getOptimisationPolicy(inputLayerSize))),
+            adamParameters(),
             totalTrainingSteps(0),
             discount(discount),
-            batchSize(batchSize)
-    { }
+            batchSize(batchSize),
+            optimisationStep(
+                    getAdemUpdatePolicy(
+                            adamParameters,
+                            resetNetwork(learningNetwork, inputLayerSize).Parameters()
+                            )
+                            )
+    {
+        resetNetwork(targetNetwork, inputLayerSize);
+        targetNetwork.Parameters() = learningNetwork.Parameters();
+    }
 
 
     // get the predicted Q-values for actions given agent state
@@ -72,14 +85,15 @@ public:
     }
 
 
-    void train(const arma::mat &startState, int action, double reward, const arma::mat &endState, bool isEnd) {
-        replayBuffer.Store(reinterpret_cast<const MatrixEnvironment::State &>(startState), action, reward, reinterpret_cast<const MatrixEnvironment::State &>(endState), isEnd, discount);
+    void train(const arma::mat &startState, int intent, double reward, const arma::mat &endState, bool isEnd) {
+//        std::cout << "Training on " << std::endl << startState.t() << endState.t() << intent << " " << reward  << " " << isEnd << std::endl << std::endl;
+        replayBuffer.Store(reinterpret_cast<const MatrixEnvironment::State &>(startState), intent, reward, reinterpret_cast<const MatrixEnvironment::State &>(endState), isEnd, discount);
         ++totalTrainingSteps;
         if(totalTrainingSteps < batchSize) return;
 
         // sample from training data and calculate predicted Q-values
         TrainingBatch trainingData;
-        replayBuffer.Sample(trainingData.startStates, trainingData.actions, trainingData.rewards,
+        replayBuffer.Sample(trainingData.startStates, trainingData.intents, trainingData.rewards,
                             trainingData.endStates, trainingData.isTerminal);
         learningNetwork.Forward(trainingData.startStates,trainingData.learningStartStateQValues);
         targetNetwork.Forward(trainingData.endStates, trainingData.targetEndStateQValues);
@@ -92,7 +106,7 @@ public:
 
         // calculate Q-values for the learning network to learn from
         for (size_t i = 0; i < trainingData.size(); ++i) {
-            trainingData.learningStartStateQValues(trainingData.actions[i], i) = trainingData.rewards(i) + discount * nextStateMaxQ(i);
+            trainingData.learningStartStateQValues(trainingData.intents[i], i) = trainingData.rewards(i) + discount * nextStateMaxQ(i);
         }
 
         // Update network parameters towards the calculated Q-values.
@@ -108,12 +122,14 @@ public:
 
 
 private:
-    // generates an optimisation step object during construction
-    ens::AdamUpdate::Policy<arma::mat, arma::mat> getOptimisationPolicy(int inputLayerSize) {
-        learningNetwork.Reset(inputLayerSize);
-        targetNetwork.Reset(inputLayerSize);
-        targetNetwork.Parameters() = learningNetwork.Parameters();
-        return {optimisation, learningNetwork.Parameters().n_rows, learningNetwork.Parameters().n_cols};
+    // generates an adamParameters step object during construction
+    static network_type &resetNetwork (network_type &network, int inputLayerSize) {
+        network.Reset(inputLayerSize);
+        return network;
+    }
+
+    static ens::AdamUpdate::Policy<arma::mat, arma::mat> getAdemUpdatePolicy(ens::AdamUpdate &parent, const arma::mat &parameters) {
+        return {parent, parameters.n_rows, parameters.n_cols};
     }
 
 };

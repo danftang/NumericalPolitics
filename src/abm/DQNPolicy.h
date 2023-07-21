@@ -159,7 +159,7 @@ namespace abm {
         };
 
     private:
-        // generates an optimisation step object during construction
+        // generates an adamParameters step object during construction
         ens::AdamUpdate::Policy <arma::mat, arma::mat> getOptPolicy(int inputLayerSize) {
             learningNetwork.Reset(inputLayerSize);
             targetNetwork.Reset(inputLayerSize);

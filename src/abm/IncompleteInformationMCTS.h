@@ -131,7 +131,7 @@ public:
 
 //        // add a uniform qEntry in the given child, adding a new TreeNode if necessary
 //        void addChildQEntry(int treeNodeActId, AGENT qEntryState) {
-//            if(children.empty()) children.resize(AGENT::Action::size, nullptr);
+//            if(children.empty()) children.resize(AGENT::message_type::size, nullptr);
 //            TreeNode *childNode = children[treeNodeActId];
 //            if(childNode == nullptr) {
 //                childNode = new TreeNode(this);

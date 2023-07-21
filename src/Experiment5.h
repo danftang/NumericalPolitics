@@ -79,36 +79,42 @@
 //  An agent state consists of the inventory of self and other, one's own preference (but not that of the other) and
 //  the game history.
 
+#include "abm/societies/RandomEncounterSociety.h"
+//#include "abm/agents/SugarSpiceTradingBody.h"
+
 void experiment5a() {
-    const int NTRAININGITERATIONS = 100000; // 4000000;
+    const int NTRAININGEPISODES = 200000; // 4000000;
     const int NPERFORMINGITERATIONS = 100;
     const bool HASLANGUAGE = false;
-    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE> agents[2];
 
-    agents[0].connectTo(agents[1]);
-    agents[1].connectTo(agents[0]);
+//    typedef abm::QAgent<abm::agents::SugarSpiceTradingBody<HASLANGUAGE>, DQN> SugarSpiceTradingAgent;
+    typedef abm::QAgent<abm::agents::SugarSpiceTradingBody<HASLANGUAGE>, abm::QTable<
+            abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::nstates,
+            abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::intent_type::size
+            >> SugarSpiceTradingAgent;
+
+
+
+    abm::societies::RandomEncounterSociety<SugarSpiceTradingAgent> soc(2);
 
     // train
-    for(int iterations = 0; iterations < NTRAININGITERATIONS; ++iterations) {
+//    soc.verbose = true;
+    for(int iterations = 0; iterations < NTRAININGEPISODES; ++iterations) {
         if(iterations%100 == 0) std::cout << iterations << std::endl;
         // set random initial state
         bool agent0HasSugar = deselby::Random::nextBool();
         bool agent0HasSpice = deselby::Random::nextBool();
-        agents[0].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
-        agents[1].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
-
-        // random agent starts
-        int agentToStart = deselby::Random::nextInt(0,2);
-        agents[agentToStart].start().exec();
+        soc.agents[0].body.reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
+        soc.agents[1].body.reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+        soc.episode();
     }
 
     // perform
-    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::verboseMode = true;
-    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::pBanditAttack = 0.0;
-    decltype(agents[0].policy)::verbose = true;
+    abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::pBanditAttack = 0.0;
+    soc.verbose = true;
 
-    agents[0].policy.setExploration(0.0);
-    agents[1].policy.setExploration(0.0);
+    soc.agents[0].policy.pExplore = 0.0;
+    soc.agents[1].policy.pExplore = 0.0;
     for(int state = 0; state < 32; ++state) {
         // set random initial state
         int agentToStart = state & 1;
@@ -116,75 +122,72 @@ void experiment5a() {
         bool startAgentPrefersSugar = (state >> 2) & 1;
         bool startAgentHasSugar = (state >> 3) & 1;
         bool startAgentHasSpice = (state >> 4) & 1;
-        agents[agentToStart].reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
-        agents[agentToStart^1].reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
+        soc.agents[agentToStart].body.reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
+        soc.agents[agentToStart^1].body.reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
 
         // random agent starts
-        std::cout << "------- Starting game -------" << std::endl << agents[agentToStart].state << agents[agentToStart^1].state;
-        agents[agentToStart].start().exec();
-        std::cout << agents[agentToStart].state << agents[agentToStart^1].state;
-        std::cout << std::endl << std::endl;
+        soc.episode({&soc.agents[agentToStart], &soc.agents[agentToStart^1]});
     }
 }
 
 
 // Can 4 agents with no way to distinguish between each other generate a shared langauge?
-void experiment5b() {
-    const int NTRAININGITERATIONS = 8000000;
-    const int NPERFORMINGITERATIONS = 100;
-    const bool HASLANGUAGE = true;
-    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE> agents[4];
-
-    // train
-    for(int iterations = 0; iterations < NTRAININGITERATIONS; ++iterations) {
-        if(iterations%10000 == 0) std::cout << iterations << std::endl;
-        // Choose agents to play
-        int agent0Index = deselby::Random::nextInt(0, 4);
-        int agent1Index = deselby::Random::nextInt(0, 3);
-        if (agent1Index >= agent0Index) agent1Index += 1;
-        agents[agent0Index].connectTo(agents[agent1Index]);
-        agents[agent1Index].connectTo(agents[agent0Index]);
-
-        // set initial state
-        bool agent0HasSugar = deselby::Random::nextBool();
-        bool agent0HasSpice = deselby::Random::nextBool();
-        agents[agent0Index].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
-        agents[agent1Index].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
-
-        agents[agent0Index].start().exec();
-    }
-
-    // perform
-    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::verboseMode = true;
-    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::pBanditAttack = 0.0;
-    for(int agent = 0; agent<4; ++agent) {
-        agents[agent].policy.setExploration(0.0);
-    }
-    for(int state = 0; state < 32; ++state) {
-        bool agent0PrefersSugar = (state >> 1) & 1;
-        bool agent1PrefersSugar = (state >> 2) & 1;
-        bool agent0HasSugar = (state >> 3) & 1;
-        bool agent0HasSpice = (state >> 4) & 1;
-        for(int agent0Index = 0; agent0Index < 4; agent0Index++) {
-            for(int r=0; r<3; ++r) {
-                int agent1Index = r;
-                if (agent1Index >= agent0Index) agent1Index += 1;
-                agents[agent0Index].connectTo(agents[agent1Index]);
-                agents[agent1Index].connectTo(agents[agent0Index]);
-
-                agents[agent0Index].reset(agent0HasSugar, agent0HasSpice, agent0PrefersSugar);
-                agents[agent1Index].reset(!agent0HasSugar, !agent0HasSpice, agent1PrefersSugar);
-
-                std::cout << "------- Starting game -------" << std::endl << agents[agent0Index].state << agents[agent1Index].state;
-                agents[agent0Index].start().exec();
-                std::cout << agents[agent0Index].state << agents[agent1Index].state;
-                std::cout << std::endl << std::endl;
-
-            }
-        }
-
-
-    }
-}
+//void experiment5b() {
+//    const int NTRAININGITERATIONS = 8000000;
+//    const int NPERFORMINGITERATIONS = 100;
+//    const bool HASLANGUAGE = true;
+//    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE> agents[4];
+//
+//    // train
+//    for(int iterations = 0; iterations < NTRAININGITERATIONS; ++iterations) {
+//        if(iterations%10000 == 0) std::cout << iterations << std::endl;
+//        // Choose agents to play
+//        int agent0Index = deselby::Random::nextInt(0, 4);
+//        int agent1Index = deselby::Random::nextInt(0, 3);
+//        if (agent1Index >= agent0Index) agent1Index += 1;
+//        agents[agent0Index].connectTo(agents[agent1Index]);
+//        agents[agent1Index].connectTo(agents[agent0Index]);
+//
+//        // set initial state
+//        bool agent0HasSugar = deselby::Random::nextBool();
+//        bool agent0HasSpice = deselby::Random::nextBool();
+//        agents[agent0Index].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
+//        agents[agent1Index].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+//
+//        agents[agent0Index].start().exec();
+//    }
+//
+//    // perform
+//    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::verboseMode = true;
+//    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::pBanditAttack = 0.0;
+//    for(int agent = 0; agent<4; ++agent) {
+//        agents[agent].policy.setExploration(0.0);
+//    }
+//    for(int state = 0; state < 32; ++state) {
+//        bool agent0PrefersSugar = (state >> 1) & 1;
+//        bool agent1PrefersSugar = (state >> 2) & 1;
+//        bool agent0HasSugar = (state >> 3) & 1;
+//        bool agent0HasSpice = (state >> 4) & 1;
+//        for(int agent0Index = 0; agent0Index < 4; agent0Index++) {
+//            for(int r=0; r<3; ++r) {
+//                int agent1Index = r;
+//                if (agent1Index >= agent0Index) agent1Index += 1;
+//                agents[agent0Index].connectTo(agents[agent1Index]);
+//                agents[agent1Index].connectTo(agents[agent0Index]);
+//
+//                agents[agent0Index].reset(agent0HasSugar, agent0HasSpice, agent0PrefersSugar);
+//                agents[agent1Index].reset(!agent0HasSugar, !agent0HasSpice, agent1PrefersSugar);
+//
+//                std::cout << "------- Starting game -------" << std::endl << agents[agent0Index].state << agents[agent1Index].state;
+//                agents[agent0Index].start().exec();
+//                std::cout << agents[agent0Index].state << agents[agent1Index].state;
+//                std::cout << std::endl << std::endl;
+//
+//            }
+//        }
+//
+//
+//    }
+//}
 
 #endif //MULTIAGENTGOVERNMENT_EXPERIMENT5_H

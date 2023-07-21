@@ -2,10 +2,10 @@
 // Created by daniel on 01/06/23.
 //
 
-#ifndef MULTIAGENTGOVERNMENT_TESTS_H
-#define MULTIAGENTGOVERNMENT_TESTS_H
+#ifndef MULTIAGENTGOVERNMENT_MLPACKTESTS_CPP
+#define MULTIAGENTGOVERNMENT_MLPACKTESTS_CPP
 
-#include <mlpack.hpp>
+#include "mlpack.hpp"
 
 void feedForwardNeuralNetTest() {
     arma::mat trainData = {{1,1,0,0},
@@ -87,7 +87,7 @@ arma::Col<size_t> BestAction(const arma::mat& actionValues)
 };
 
 
-// given a set of replay data, a network and an optimisation algorithm, we
+// given a set of replay data, a network and an adamParameters algorithm, we
 // can train the network.
 // The learningNetwork is the one that should be updated, while the targetNetwork
 // is the one from which we approximate future expected rewards from the end state
@@ -174,4 +174,4 @@ void QTrainAgent(const ReplayType &replayMethod, ConfigType config, UpdatePolicy
 }
 
 
-#endif //MULTIAGENTGOVERNMENT_TESTS_H
+#endif //MULTIAGENTGOVERNMENT_MLPACKTESTS_CPP

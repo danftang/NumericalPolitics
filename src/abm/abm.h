@@ -49,5 +49,6 @@
 #include "QTablePolicy.h"
 #include "DQNPolicy.h"
 #include "MlPackAction.h"
+#include "QTable.h"
 
 #endif //MULTIAGENTGOVERNMENT_ABM_H
