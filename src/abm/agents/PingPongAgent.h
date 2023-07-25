@@ -17,15 +17,18 @@ namespace abm::agents {
             close = -1
         };
 
-        message_type startDialogue() {
+        message_type startEpisode() {
             return ping;
         }
 
-        static constexpr char *body = "";
+        static constexpr char body[] = "";
 
-        message_type reactTo(message_type message) {
+
+        message_type handleMessage(message_type message) {
             return message == ping ? pong : close;
         }
+
+        void endEpisode() {}
     };
 }
 

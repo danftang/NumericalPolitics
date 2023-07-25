@@ -44,11 +44,9 @@
 #ifndef MULTIAGENTGOVERNMENT_ABM_H
 #define MULTIAGENTGOVERNMENT_ABM_H
 
+#include "mlpack.hpp"
 #include "Schedule.h"
 #include "CommunicationChannel.h"
-#include "QTablePolicy.h"
-#include "DQNPolicy.h"
-#include "MlPackAction.h"
 #include "QTable.h"
 
 #endif //MULTIAGENTGOVERNMENT_ABM_H

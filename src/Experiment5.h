@@ -81,21 +81,40 @@
 
 #include "abm/societies/RandomEncounterSociety.h"
 //#include "abm/agents/SugarSpiceTradingBody.h"
+#include "abm/Agent.h"
+#include "abm/QMind.h"
 
 void experiment5a() {
     const int NTRAININGEPISODES = 200000; // 4000000;
     const int NPERFORMINGITERATIONS = 100;
     const bool HASLANGUAGE = false;
 
-//    typedef abm::QAgent<abm::agents::SugarSpiceTradingBody<HASLANGUAGE>, DQN> SugarSpiceTradingAgent;
-    typedef abm::QAgent<abm::agents::SugarSpiceTradingBody<HASLANGUAGE>, abm::QTable<
-            abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::nstates,
-            abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::intent_type::size
-            >> SugarSpiceTradingAgent;
+    typedef abm::agents::SugarSpiceTradingBody<HASLANGUAGE> body_type;
+
+    auto mind = abm::QMind {
+
+//            abm::DQN<body_type::dimension, body_type::action_type::size>(
+//                    100,
+//                    50,
+//                    32,
+//                    256,
+//                    1.0),
+
+            abm::QTable<body_type::nstates, body_type::action_type::size>(),
+
+            abm::GreedyPolicy(
+                    0.5,
+                    0.9999,
+                    0.01)
+    };
+
+    auto agent = abm::Agent(body_type(), mind);
+
+    abm::societies::RandomEncounterSociety soc({agent, agent});
 
 
-
-    abm::societies::RandomEncounterSociety<SugarSpiceTradingAgent> soc(2);
+//    typedef abm::QAgent<body_type, abm::QTable<body_type::nstates,body_type::action_type::size>> SugarSpiceTradingAgent;
+//    abm::societies::RandomEncounterSociety<SugarSpiceTradingAgent> soc(2);
 
     // train
 //    soc.verbose = true;
@@ -106,6 +125,8 @@ void experiment5a() {
         bool agent0HasSpice = deselby::Random::nextBool();
         soc.agents[0].body.reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
         soc.agents[1].body.reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+        assert(!soc.agents[0].body.isTerminal);
+        assert(!soc.agents[1].body.isTerminal);
         soc.episode();
     }
 
@@ -113,8 +134,8 @@ void experiment5a() {
     abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::pBanditAttack = 0.0;
     soc.verbose = true;
 
-    soc.agents[0].policy.pExplore = 0.0;
-    soc.agents[1].policy.pExplore = 0.0;
+    soc.agents[0].mind.policy.pExplore = 0.0;
+    soc.agents[1].mind.policy.pExplore = 0.0;
     for(int state = 0; state < 32; ++state) {
         // set random initial state
         int agentToStart = state & 1;

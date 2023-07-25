@@ -17,6 +17,7 @@ namespace abm::societies {
         bool verbose;
 
         RandomEncounterSociety(int nAgents): agents(nAgents), verbose(false) { }
+        RandomEncounterSociety(std::initializer_list<AGENT> agents): agents(agents), verbose(false) { }
 
         // execute one episode between randomly chosen agents
         // returns the total number of messages passed (not including close) in the episode
@@ -31,17 +32,16 @@ namespace abm::societies {
             }
             int nextPlayerIndex = 1;
             int nMessages = 0;
-            typename AGENT::message_type lastMessage = players[0]->startDialogue();
+            typename AGENT::message_type lastMessage = players[0]->startEpisode();
             if(verbose) std::cout << lastMessage << std::endl;
             while(lastMessage != AGENT::message_type::close) {
-                lastMessage = players[nextPlayerIndex]->reactTo(lastMessage);
+                lastMessage = players[nextPlayerIndex]->handleMessage(lastMessage);
                 if(verbose) std::cout << lastMessage << std::endl;
                 nextPlayerIndex ^= 1;
                 ++nMessages;
             }
-            lastMessage = players[nextPlayerIndex]->reactTo(lastMessage); // let the other player know it's end of game
+            players[nextPlayerIndex]->endEpisode(); // let the other player know it's end of game
             if(verbose) {
-                std::cout << lastMessage << std::endl;
                 std::cout << std::endl << players[0]->body << players[1]->body;
             }
             return nMessages;
@@ -65,6 +65,7 @@ namespace abm::societies {
             int firstAgentIndex = deselby::Random::nextInt(0, agents.size());
             int secondAgentIndex = deselby::Random::nextInt(0, agents.size()-1);
             if(secondAgentIndex >= firstAgentIndex) ++secondAgentIndex;
+            if(verbose) std::cout << "Playing agent " << firstAgentIndex << " against " << secondAgentIndex << std::endl;
             return { &agents[firstAgentIndex], &agents[secondAgentIndex] };
         }
     };

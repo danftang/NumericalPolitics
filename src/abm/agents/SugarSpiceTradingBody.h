@@ -17,7 +17,7 @@ namespace abm::agents {
     class SugarSpiceTradingBody {
     public:
         // The intent of the agent, these are the decisions the brain can take
-        enum intent_type {
+        enum action_type {
             iGiveSugar,
             iGiveSpice,
             iWalkAway,
@@ -29,20 +29,121 @@ namespace abm::agents {
 
         // the tyoe of message passed between agents in response to an agent's intent
         enum message_type {
+            close = -1,
             // Agent actions
             GiveSugar,
             GiveSpice,
             WalkAway,
             Say0,
             Say1,
-            Bandits,
+            Bandits, // Terminal messages should all be at the end
             YouWonFight,
             YouLostFight,
-            close = -1
+            IndeterminateTerminalMessage = Bandits
         };
 
-//        template<bool HasLanguage>
-        friend std::ostream &operator <<(std::ostream &out, const typename abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::message_type &message) {
+        static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
+        static const int utilityOfNonPreferred = 1;
+        static constexpr double costOfFighting = 1.5;
+        static constexpr double costOfBanditAttack = 15.0;
+        inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
+        static const bool encodeOutgoingMessage = false;
+        static const int nOneHotBitsForMessageEncode = 6;
+        static constexpr size_t dimension = nOneHotBitsForMessageEncode * (1 + encodeOutgoingMessage) + 3;
+        static constexpr size_t nstates =
+                8 * nOneHotBitsForMessageEncode * (encodeOutgoingMessage ? nOneHotBitsForMessageEncode : 1);
+
+        // Agent state
+        arma::mat::fixed<dimension, 1> netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
+        bool isTerminal = false;
+        double utilityBeforeLastAct = NAN;
+        message_type lastOutgoingMessage;
+
+        message_type handleAct(int action);
+
+        double handleMessage(message_type incomingMessage);
+
+        std::bitset<action_type::size> legalActs();
+
+        double endEpisode() {
+            isTerminal = false;
+            return utility() - utilityBeforeLastAct;
+        }
+
+        double &sugar() { return netInput[0]; }
+
+        double &spice() { return netInput[1]; }
+
+        double &prefersSugar() { return netInput[2]; }
+
+        double sugar() const { return netInput[0]; }
+
+        double spice() const { return netInput[1]; }
+
+        double prefersSugar() const { return netInput[2]; }
+
+        //const arma::mat &Encode() const { return netInput; }
+
+        operator const arma::mat::fixed<dimension,1> &() const {
+            return netInput;
+        }
+
+        // convert to integer giving the ordinal of this state
+        operator int() const {
+            return netInput[0] + 2 * netInput[1] + 4 * netInput[2] + 8 * (getLastIncomingMessage() +
+                                                                          (encodeOutgoingMessage ?
+                                                                           nOneHotBitsForMessageEncode *
+                                                                           getLastOutgoingMessage()
+                                                                                                 : 0));
+        }
+
+        void recordIncomingMessage(message_type message) {
+            assert(message >= 0);
+            if(message > IndeterminateTerminalMessage) message = IndeterminateTerminalMessage; // don't record type of terminal messages
+            for (int i = 3; i < 3 + nOneHotBitsForMessageEncode; ++i) netInput[i] = 0.0;
+            netInput[3 + message] = 1.0;
+        }
+
+        void recordOutgoingMessage(message_type message) {
+            if (encodeOutgoingMessage) {
+                assert(message >= 0);
+                if(message > IndeterminateTerminalMessage) message = IndeterminateTerminalMessage;
+                for (int i = 3 + nOneHotBitsForMessageEncode; i < 3 + 2 * nOneHotBitsForMessageEncode; ++i)
+                    netInput[i] = 0.0;
+                netInput[3 + nOneHotBitsForMessageEncode + message] = 1.0;
+            } else {
+                lastOutgoingMessage = message;
+            }
+        }
+
+        message_type getLastIncomingMessage() const {
+            int m = 0;
+            while (netInput[3 + m] == 0.0) ++m;
+            return static_cast<message_type>(m);
+        }
+
+        message_type getLastOutgoingMessage() const {
+            if(encodeOutgoingMessage) {
+                int m = 0;
+                while (netInput[3 + nOneHotBitsForMessageEncode + m] == 0.0) ++m;
+                return static_cast<message_type>(m);
+            }
+            return lastOutgoingMessage;
+        }
+
+        void reset(bool hasSugar, bool hasSpice, bool prefersSugar);
+
+        double utility() const;
+
+//        friend std::ostream &operator <<(std::ostream &out, const typename abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::message_type &message);
+
+        friend std::ostream &operator<<(std::ostream &out, const SugarSpiceTradingBody &state) {
+//                    out << state.sugar() << state.spice() << state.prefersSugar();
+            out << state.netInput.t();
+            return out;
+        }
+
+        friend std::ostream &operator<<(std::ostream &out, const typename SugarSpiceTradingBody<HASLANGUAGE>::message_type &message) {
             static const std::string messageNames[] = {
                     "GiveSugar",
                     "GiveSpice",
@@ -61,129 +162,13 @@ namespace abm::agents {
             return out;
         }
 
-
-        //                static const int conversationHistoryLength = 1;
-        static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
-        static const int utilityOfNonPreferred = 1;
-        static constexpr double costOfFighting = 1.5;
-        static constexpr double costOfBanditAttack = 15.0;
-        inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
-        static const bool rememberOutgoingMessage = false;
-        static const int nOneHotBitsForMessageEncode = 6;
-
-        // Agent state
-        arma::colvec netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
-        bool isTerminal;
-
-        SugarSpiceTradingBody() : netInput(dimension), isTerminal(false) {}
-
-        void reset(int nSugar, int nSpice, bool agentPrefersSugar) {
-            netInput.zeros();
-            isTerminal = false;
-            sugar() = nSugar;
-            spice() = nSpice;
-            prefersSugar() = agentPrefersSugar;
-        }
-
-        // perform a state transition given an act/response pair
-        // in a binary transaction
-        double transition(message_type myLastAction, message_type yourResponse);
-
-        static message_type intentToMessage(int intent) {
-            if (deselby::Random::nextBool(pBanditAttack)) return Bandits;
-            switch (intent) {
-                case iGiveSugar:
-                    return GiveSugar;
-                case iGiveSpice:
-                    return GiveSpice;
-                case iWalkAway:
-                    return WalkAway;
-                case iFight:
-                    return deselby::Random::nextBool() ? YouWonFight : YouLostFight;
-                case iSay0:
-                    return Say0;
-                case iSay1:
-                    return Say1;
-            }
-            throw("Unrecognized intent");
-        }
-
-        std::bitset<intent_type::size> legalIntents();
-
-        double &sugar() { return netInput[0]; }
-
-        double &spice() { return netInput[1]; }
-
-        double &prefersSugar() { return netInput[2]; }
-
-        double sugar() const { return netInput[0]; }
-
-        double spice() const { return netInput[1]; }
-
-        double prefersSugar() const { return netInput[2]; }
-
-        //const arma::mat &Encode() const { return netInput; }
-
-        operator const arma::mat &() const {
-            return netInput;
-        }
-
-        // convert to integer giving the ordinal of this state
-        operator int() const {
-            return netInput[0] + 2 * netInput[1] + 4 * netInput[2] + 8 * (getLastIncomingMessage() +
-                                                                          (rememberOutgoingMessage ?
-                                                                           nOneHotBitsForMessageEncode *
-                                                                           getLastOutgoingMessage()
-                                                                                                   : 0));
-        }
-
-        void recordIncomingMessage(message_type message) {
-            assert(message <= nOneHotBitsForMessageEncode);
-            for (int i = 3; i < 3 + nOneHotBitsForMessageEncode; ++i) netInput[i] = 0.0;
-            netInput[3 + message] = 1.0;
-        }
-
-        void recordOutgoingMessage(message_type message) {
-            if (rememberOutgoingMessage) {
-                assert(message <= nOneHotBitsForMessageEncode);
-                for (int i = 3 + nOneHotBitsForMessageEncode; i < 3 + 2 * nOneHotBitsForMessageEncode; ++i)
-                    netInput[i] = 0.0;
-                netInput[3 + nOneHotBitsForMessageEncode + message] = 1.0;
-            }
-        }
-
-        message_type getLastIncomingMessage() const {
-            int m = 0;
-            while (netInput[3 + m] == 0.0) ++m;
-            return static_cast<message_type>(m);
-        }
-
-        message_type getLastOutgoingMessage() const {
-            assert(rememberOutgoingMessage);
-            int m = 0;
-            while (netInput[3 + nOneHotBitsForMessageEncode + m] == 0.0) ++m;
-            return static_cast<message_type>(m);
-        }
-
-        void reset(bool hasSugar, bool hasSpice, bool prefersSugar);
-
-        double utility() const;
-
-        friend std::ostream &operator<<(std::ostream &out, const SugarSpiceTradingBody &state) {
-//                    out << state.sugar() << state.spice() << state.prefersSugar();
-            out << state.netInput.t();
-            return out;
-        }
-
-        static constexpr size_t dimension = nOneHotBitsForMessageEncode * (1 + rememberOutgoingMessage) + 3;
-        static constexpr size_t nstates =
-                8 * nOneHotBitsForMessageEncode * (rememberOutgoingMessage ? nOneHotBitsForMessageEncode : 1);
     };
 
+
     template<bool HASLANGUAGE>
-    std::bitset<SugarSpiceTradingBody<HASLANGUAGE>::intent_type::size>
-    SugarSpiceTradingBody<HASLANGUAGE>::legalIntents() {
-        std::bitset<SugarSpiceTradingBody<HASLANGUAGE>::intent_type::size> legalActs;
+    std::bitset<SugarSpiceTradingBody<HASLANGUAGE>::action_type::size>
+    SugarSpiceTradingBody<HASLANGUAGE>::legalActs() {
+        std::bitset<SugarSpiceTradingBody<HASLANGUAGE>::action_type::size> legalActs;
         if (isTerminal) {
             legalActs = 0;
         } else {
@@ -205,62 +190,164 @@ namespace abm::agents {
 
     template<bool HASLANGUAGE>
     void SugarSpiceTradingBody<HASLANGUAGE>::reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
-        recordIncomingMessage(Bandits); // use first terminal state to mean Empty as we don't use this
-        recordOutgoingMessage(Bandits);
+        recordIncomingMessage(IndeterminateTerminalMessage); // use first terminal state to mean Empty as we don't use this
+        recordOutgoingMessage(IndeterminateTerminalMessage);
         sugar() = hasSugar;
         spice() = hasSpice;
         this->prefersSugar() = prefersSugar;
+        isTerminal = false;
+        utilityBeforeLastAct = utility();
+    }
+
+
+
+//    template<bool HASLANGUAGE>
+//    double SugarSpiceTradingBody<HASLANGUAGE>::transition(message_type myLastAction, message_type yourResponse) {
+//        if (myLastAction == close && yourResponse == close) {
+//            // must be start of episode, reward will be ignored
+//            isTerminal = false;
+//            return 0.0;
+//        }
+//        isTerminal = (
+//                yourResponse == Bandits ||
+//                yourResponse == YouWonFight ||
+//                yourResponse == YouLostFight ||
+//                yourResponse == close ||
+//                (myLastAction == WalkAway && yourResponse == WalkAway)
+//        );
+//        double utilityBeforeLastAct = utility();
+//        double costs = 0.0;
+//        if (!isTerminal) {
+//            recordOutgoingMessage(myLastAction);
+//            recordIncomingMessage(yourResponse);
+//        }
+//        switch (myLastAction) {
+//            case GiveSugar:
+//                sugar() -= 1;
+//                break;
+//            case GiveSpice:
+//                spice() -= 1;
+//                break;
+//            case YouWonFight:
+//                // I started fight but lost
+//                costs = costOfFighting;
+//                sugar() = 0;
+//                spice() = 0;
+//                break;
+//            case YouLostFight:
+//                // I started fight but won
+//                costs = costOfFighting;
+//                sugar() = 1;
+//                spice() = 1;
+//                break;
+//            case Bandits:
+//                costs += costOfBanditAttack;
+//                sugar() = 0;
+//                spice() = 0;
+//                break;
+//            default:
+//                break;
+//        }
+//
+//        switch (yourResponse) {
+//            case GiveSugar:
+//                sugar() += 1;
+//                break;
+//            case GiveSpice:
+//                spice() += 1;
+//                break;
+//            case YouWonFight:
+//                // You started fight and I won
+//                costs = costOfFighting;
+//                sugar() = 1;
+//                spice() = 1;
+//                break;
+//            case YouLostFight:
+//                // You started fight and I lost
+//                costs = costOfFighting;
+//                sugar() = 0;
+//                spice() = 0;
+//                break;
+//            case Bandits:
+//                costs += costOfBanditAttack;
+//                sugar() = 0;
+//                spice() = 0;
+//                break;
+//            default:
+//                break;
+//        }
+//        double reward = utility() - utilityBeforeLastAct - costs;
+//        return reward;
+//    }
+
+    template<bool HASLANGUAGE>
+    SugarSpiceTradingBody<HASLANGUAGE>::message_type SugarSpiceTradingBody<HASLANGUAGE>::handleAct(int action) {
+//        if (myLastAction == close && yourResponse == close) {
+//            // must be start of episode, reward will be ignored
+//            isTerminal = false;
+//            return 0.0;
+//        }
+//        isTerminal = (
+//                yourResponse == Bandits ||
+//                yourResponse == YouWonFight ||
+//                yourResponse == YouLostFight ||
+//                yourResponse == close ||
+//                (myLastAction == WalkAway && yourResponse == WalkAway)
+//        );
+        utilityBeforeLastAct = utility();
+        if (deselby::Random::nextBool(pBanditAttack)) {
+            utilityBeforeLastAct += costOfBanditAttack;
+            sugar() = 0;
+            spice() = 0;
+            return Bandits;
+        }
+        message_type outgoingMessage;
+        switch (action) {
+            case iGiveSugar:
+                sugar() -= 1;
+                outgoingMessage = GiveSugar;
+                break;
+            case iGiveSpice:
+                spice() -= 1;
+                outgoingMessage = GiveSpice;
+                break;
+            case iWalkAway:
+                outgoingMessage = WalkAway;
+                break;
+            case iFight:
+                // I started fight but lost
+                utilityBeforeLastAct += costOfFighting;
+                if(deselby::Random::nextBool()) {
+                    outgoingMessage = YouWonFight;
+                    sugar() = 0;
+                    spice() = 0;
+                } else {
+                    outgoingMessage = YouLostFight;
+                    sugar() = 1;
+                    spice() = 1;
+                }
+                break;
+            case iSay0:
+                outgoingMessage = Say0;
+                break;
+            case iSay1:
+                outgoingMessage = Say1;
+            default:
+                throw("Unrecognized act while handling act");
+        }
+        if (!isTerminal) recordOutgoingMessage(outgoingMessage);
+        return outgoingMessage;
     }
 
     template<bool HASLANGUAGE>
-    double SugarSpiceTradingBody<HASLANGUAGE>::transition(message_type myLastAction, message_type yourResponse) {
-        if (myLastAction == close && yourResponse == close) {
-            // must be start of episode, reward will be ignored
-            isTerminal = false;
-            return 0.0;
-        }
+    double SugarSpiceTradingBody<HASLANGUAGE>::handleMessage(SugarSpiceTradingBody::message_type incomingMessage) {
         isTerminal = (
-                yourResponse == Bandits ||
-                yourResponse == YouWonFight ||
-                yourResponse == YouLostFight ||
-                yourResponse == close ||
-                (myLastAction == WalkAway && yourResponse == WalkAway)
-        );
-        double initialUtility = utility();
-        double costs = 0.0;
-        if (!isTerminal) {
-            recordOutgoingMessage(myLastAction);
-            recordIncomingMessage(yourResponse);
-        }
-        switch (myLastAction) {
-            case GiveSugar:
-                sugar() -= 1;
-                break;
-            case GiveSpice:
-                spice() -= 1;
-                break;
-            case YouWonFight:
-                // I started fight but lost
-                costs = costOfFighting;
-                sugar() = 0;
-                spice() = 0;
-                break;
-            case YouLostFight:
-                // I started fight but won
-                costs = costOfFighting;
-                sugar() = 1;
-                spice() = 1;
-                break;
-            case Bandits:
-                costs += costOfBanditAttack;
-                sugar() = 0;
-                spice() = 0;
-                break;
-            default:
-                break;
-        }
-
-        switch (yourResponse) {
+                incomingMessage == Bandits ||
+                incomingMessage == YouWonFight ||
+                incomingMessage == YouLostFight ||
+                incomingMessage == close ||
+                (getLastOutgoingMessage() == WalkAway && incomingMessage == WalkAway));
+        switch (incomingMessage) {
             case GiveSugar:
                 sugar() += 1;
                 break;
@@ -269,25 +356,26 @@ namespace abm::agents {
                 break;
             case YouWonFight:
                 // You started fight and I won
-                costs = costOfFighting;
+                utilityBeforeLastAct += costOfFighting;
                 sugar() = 1;
                 spice() = 1;
                 break;
             case YouLostFight:
                 // You started fight and I lost
-                costs = costOfFighting;
+                utilityBeforeLastAct += costOfFighting;
                 sugar() = 0;
                 spice() = 0;
                 break;
             case Bandits:
-                costs += costOfBanditAttack;
+                utilityBeforeLastAct += costOfBanditAttack;
                 sugar() = 0;
                 spice() = 0;
                 break;
             default:
                 break;
         }
-        double reward = utility() - initialUtility - costs;
+        recordIncomingMessage(incomingMessage);
+        double reward = utility() - utilityBeforeLastAct;
         return reward;
     }
 

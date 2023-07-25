@@ -22,13 +22,13 @@ namespace abm::agents {
 //    class SugarSpiceTradingAgent: public QAgent<SugarSpiceTradingBody<HASLANGUAGE>, SugarSpiceQFunction> {
 //    public:
 //        typedef QAgent<SugarSpiceTradingBody<HASLANGUAGE>, SugarSpiceQFunction>::body_type      body_type;
-//        typedef QAgent<SugarSpiceTradingBody<HASLANGUAGE>, SugarSpiceQFunction>::intent_type   intent_type;
+//        typedef QAgent<SugarSpiceTradingBody<HASLANGUAGE>, SugarSpiceQFunction>::action_type   action_type;
 //
 //
 ////        SugarSpiceTradingAgent():
-////        QAgent<SugarSpiceTradingBody<HASLANGUAGE>, DQN>(DQN(body_type::dimension, 64, 32, intent_type::size,  32, 256, 1.0)) {}
+////        QAgent<SugarSpiceTradingBody<HASLANGUAGE>, DQN>(DQN(body_type::dimension, 64, 32, action_type::size,  32, 256, 1.0)) {}
 //        SugarSpiceTradingAgent():
-//                QAgent<SugarSpiceTradingBody<HASLANGUAGE>, QTable<body_type::nstates, intent_type::size>>(QTable<body_type::nstates, intent_type::size>()) {}
+//                QAgent<SugarSpiceTradingBody<HASLANGUAGE>, QTable<body_type::nstates, action_type::size>>(QTable<body_type::nstates, action_type::size>()) {}
 //    };
 
 //        template<bool HASLANGUAGE>
@@ -63,7 +63,7 @@ namespace abm::agents {
 ////                static const int conversationHistoryLength = 1;
 //                static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
 //                static const int utilityOfNonPreferred = 1;
-//                static const bool rememberOutgoingMessage = false;
+//                static const bool encodeOutgoingMessage = false;
 //
 //                // Agent state
 //                arma::colvec netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
@@ -74,7 +74,7 @@ namespace abm::agents {
 //                // in a binary transaction
 //                double transition(message_type myLastAction, message_type yourResponse);
 //
-//                std::bitset<message_type::size> legalIntents();
+//                std::bitset<message_type::size> legalActs();
 //
 //                double &sugar() { return netInput[0]; }
 //
@@ -93,7 +93,7 @@ namespace abm::agents {
 //                // convert to integer giving the ordinal of this state
 //                operator int() const {
 //                    return netInput[0] + 2 * netInput[1] + 4 * netInput[2] + 8 * (getLastIncomingMessage() +
-//                                                                                  (rememberOutgoingMessage ?
+//                                                                                  (encodeOutgoingMessage ?
 //                                                                                   message_type::size *
 //                                                                                           getLastOutgoingMessage()
 //                                                                                                           : 0));
@@ -112,7 +112,7 @@ namespace abm::agents {
 //                }
 //
 //                void recordOutgoingMessage(MessageEnum message) {
-//                    if (rememberOutgoingMessage) {
+//                    if (encodeOutgoingMessage) {
 //                        for (int i = 3 + message_type::size; i < 3 + 2 * message_type::size; ++i) netInput[i] = 0.0;
 //                        netInput[3 + message_type::size + message] = 1.0;
 //                    }
@@ -125,7 +125,7 @@ namespace abm::agents {
 //                }
 //
 //                MessageEnum getLastOutgoingMessage() const {
-//                    assert(rememberOutgoingMessage);
+//                    assert(encodeOutgoingMessage);
 //                    int m = 0;
 //                    while (netInput[3 + message_type::size + m] == 0.0) ++m;
 //                    return static_cast<MessageEnum>(m);
@@ -142,8 +142,8 @@ namespace abm::agents {
 //                    return out;
 //                }
 //
-//                static constexpr size_t dimension = message_type::size * (1 + rememberOutgoingMessage) + 3;
-//                static constexpr size_t nstates = 8 * message_type::size * (rememberOutgoingMessage ? message_type::size : 1);
+//                static constexpr size_t dimension = message_type::size * (1 + encodeOutgoingMessage) + 3;
+//                static constexpr size_t nstates = 8 * message_type::size * (encodeOutgoingMessage ? message_type::size : 1);
 //
 //            };
 //
@@ -340,7 +340,7 @@ namespace abm::agents {
 //        };
 //
 //        template<bool HASLANGUAGE>
-//        std::bitset<SugarSpiceTradingAgent<HASLANGUAGE>::message_type::size> SugarSpiceTradingAgent<HASLANGUAGE>::State::legalIntents() {
+//        std::bitset<SugarSpiceTradingAgent<HASLANGUAGE>::message_type::size> SugarSpiceTradingAgent<HASLANGUAGE>::State::legalActs() {
 //            std::bitset<SugarSpiceTradingAgent<HASLANGUAGE>::message_type::size> legalActs;
 //            if(sugar() == 0) legalActs[GiveSugar] = false;
 //            if(spice() == 0) legalActs[GiveSpice] = false;
@@ -371,7 +371,7 @@ namespace abm::agents {
 //        template<bool HASLANGUAGE>
 //        double SugarSpiceTradingAgent<HASLANGUAGE>::State::transition(SugarSpiceTradingAgent::message_type myLastAction,
 //                                                                      SugarSpiceTradingAgent::message_type yourResponse) {
-//            double initialUtility = utility();
+//            double utilityBeforeLastAct = utility();
 //            double costs = 0.0;
 //            recordOutgoingMessage(myLastAction);
 //            switch (myLastAction) {
@@ -432,7 +432,7 @@ namespace abm::agents {
 //                default:
 //                    break;
 //            }
-//            double reward = utility() - initialUtility - costs;
+//            double reward = utility() - utilityBeforeLastAct - costs;
 //            return reward;
 //        }
 

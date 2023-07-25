@@ -8,7 +8,7 @@
 #include <array>
 #include <cmath>
 #include <random>
-#include "../DeselbyStd/random.h"
+#include "../../DeselbyStd/random.h"
 
 namespace abm {
 

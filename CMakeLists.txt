@@ -7,5 +7,5 @@ include_directories(include/mlpack-4.2.0)
 # link_libraries(tbb armadillo)
 link_libraries(armadillo)
 
-add_executable(multiAgentGovernment src/main.cpp src/tests/randomEncounterSocietyTest.cpp src/tests/mlpacktests.cpp)
-# add_executable(multiAgentGovernment src/main.cpp)
+# add_executable(multiAgentGovernment src/main.cpp src/tests/randomEncounterSocietyTest.cpp src/tests/mlpacktests.cpp)
+add_executable(multiAgentGovernment src/main.cpp)

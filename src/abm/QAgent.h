@@ -11,7 +11,7 @@
 #include "GreedyPolicy.h"
 
 namespace abm {
-    template<class BODY, class QFUNCTION, class POLICY = GreedyPolicy>
+    template<class BODY, class QFUNCTION, class POLICY>  requires(std::is_convertible_v<BODY, typename QFUNCTION::input_type>)
     class QAgent {
     public:
         typedef BODY body_type;
@@ -27,6 +27,11 @@ namespace abm {
         message_type    lastMessage;
 
         // qPolicy is a function from a vector of qValues and a legal-move mask to an action index
+        QAgent(BODY body, QFUNCTION qfunction, POLICY qPolicy) {
+
+        }
+
+
         QAgent(QFUNCTION qfunction, POLICY qPolicy = GreedyPolicy(0.5, 0.99997, 0.01)):
                 qFunction(std::move(qfunction)),
                 policy(std::move(qPolicy)),
@@ -35,6 +40,8 @@ namespace abm {
         QAgent(POLICY qPolicy = GreedyPolicy(0.5, 0.99997, 0.01)):
                 policy(std::move(qPolicy)),
                 lastMessage(message_type::close) { }
+
+
 
         // --- Agent interface
 
@@ -64,13 +71,13 @@ namespace abm {
         // and we've received the given reward
         // At the beginning of an episode, reward is ignored
         message_type chooseMessage(const double &reward) {
-            std::bitset<intent_type::size> legalIntentMask = body.legalIntents();
+            std::bitset<intent_type::size> legalIntentMask = body.legalActs();
             message_type nextMessage;
             if(legalIntentMask != 0) {
                 // make a decision
                 typename QFUNCTION::input_type newState = body;
-                int nextIntent = policy.sample(qFunction.predict(newState), body.legalIntents());
-//                std::cout << "Sampled intent " << nextIntent << " nLegal moves = " << body.legalIntents().count() << " qValues = " << qValues << " state = " << newStateMatrix <<  std::endl;
+                int nextIntent = policy.sample(qFunction.predict(newState), body.legalActs());
+//                std::cout << "Sampled intent " << nextIntent << " nLegal moves = " << body.legalActs().count() << " qValues = " << qValues << " state = " << newStateMatrix <<  std::endl;
                 nextMessage = body_type::intentToMessage(nextIntent);
                 if(lastMessage != message_type::close) qFunction.train(lastState, lastIntent, reward, newState, false);
                 lastState = std::move(newState);

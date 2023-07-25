@@ -21,7 +21,7 @@
 
 #include <cstdlib>
 #include <deque>
-#include "../QTablePolicy.h"
+#include "../V0.1/QTablePolicy.h"
 #include "../Schedule.h"
 #include "../CommunicationChannel.h"
 #include "../../DeselbyStd/stlstream.h"

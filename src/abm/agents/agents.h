@@ -9,7 +9,7 @@
 //                                              performs the transition and returns the reward,
 //                                              if myMessage is null (open channel), must be first move of second mover.
 //                                              If both messages are null, I am the first mover on a newly opened channel.
-//      std::bitset legalIntents()           actions that can legally be performed from the current agent state.
+//      std::bitset legalActs()           actions that can legally be performed from the current agent state.
 //    }
 //    class message_type {
 //      static bool isTerminal(message_type act, message_type response) does the act/response pair terminate the episode (assumes episodic comms)?
