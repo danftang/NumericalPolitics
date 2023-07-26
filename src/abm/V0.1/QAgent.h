@@ -6,9 +6,9 @@
 #ifndef MULTIAGENTGOVERNMENT_QAGENT_H
 #define MULTIAGENTGOVERNMENT_QAGENT_H
 
-#include "DQN.h"
+#include "../DQN.h"
 #include <bitset>
-#include "GreedyPolicy.h"
+#include "../GreedyPolicy.h"
 
 namespace abm {
     template<class BODY, class QFUNCTION, class POLICY>  requires(std::is_convertible_v<BODY, typename QFUNCTION::input_type>)

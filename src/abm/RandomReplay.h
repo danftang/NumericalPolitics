@@ -123,9 +123,9 @@ namespace abm {
         //! Get the number of steps for n-step agent.
         const size_t &NSteps() const { return nSteps; }
 
-    private:
         //! Locally-stored number of examples of each sample.
         size_t batchSize;
+    private:
 
         //! Locally-stored total memory limit.
         size_t capacity;

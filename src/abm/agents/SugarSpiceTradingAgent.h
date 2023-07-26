@@ -11,8 +11,8 @@
 #include "../../DeselbyStd/random.h"
 #include "mlpack.hpp"
 
-#include "SugarSpiceTradingBody.h"
-#include "../QAgent.h"
+#include "../bodies/SugarSpiceTradingBody.h"
+#include "../V0.1/QAgent.h"
 #include "../DQN.h"
 #include "../QTable.h"
 

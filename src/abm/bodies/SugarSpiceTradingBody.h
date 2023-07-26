@@ -24,7 +24,7 @@ namespace abm::agents {
             iFight,
             iSay0,
             iSay1,
-            size,  // marker for number of actions
+            size  // marker for number of actions
         };
 
         // the tyoe of message passed between agents in response to an agent's intent
@@ -59,16 +59,21 @@ namespace abm::agents {
         double utilityBeforeLastAct = NAN;
         message_type lastOutgoingMessage;
 
-        message_type handleAct(int action);
 
-        double handleMessage(message_type incomingMessage);
+        // ----- Body interface -----
+
+        message_type actToMessage(int action);
+
+        double messageToReward(message_type incomingMessage);
 
         std::bitset<action_type::size> legalActs();
 
-        double endEpisode() {
-            isTerminal = false;
-            return utility() - utilityBeforeLastAct;
-        }
+        // ---- End of Body interface
+
+//        double endEpisode() {
+//            isTerminal = false;
+//            return utility() - utilityBeforeLastAct;
+//        }
 
         double &sugar() { return netInput[0]; }
 
@@ -200,88 +205,8 @@ namespace abm::agents {
     }
 
 
-
-//    template<bool HASLANGUAGE>
-//    double SugarSpiceTradingBody<HASLANGUAGE>::transition(message_type myLastAction, message_type yourResponse) {
-//        if (myLastAction == close && yourResponse == close) {
-//            // must be start of episode, reward will be ignored
-//            isTerminal = false;
-//            return 0.0;
-//        }
-//        isTerminal = (
-//                yourResponse == Bandits ||
-//                yourResponse == YouWonFight ||
-//                yourResponse == YouLostFight ||
-//                yourResponse == close ||
-//                (myLastAction == WalkAway && yourResponse == WalkAway)
-//        );
-//        double utilityBeforeLastAct = utility();
-//        double costs = 0.0;
-//        if (!isTerminal) {
-//            recordOutgoingMessage(myLastAction);
-//            recordIncomingMessage(yourResponse);
-//        }
-//        switch (myLastAction) {
-//            case GiveSugar:
-//                sugar() -= 1;
-//                break;
-//            case GiveSpice:
-//                spice() -= 1;
-//                break;
-//            case YouWonFight:
-//                // I started fight but lost
-//                costs = costOfFighting;
-//                sugar() = 0;
-//                spice() = 0;
-//                break;
-//            case YouLostFight:
-//                // I started fight but won
-//                costs = costOfFighting;
-//                sugar() = 1;
-//                spice() = 1;
-//                break;
-//            case Bandits:
-//                costs += costOfBanditAttack;
-//                sugar() = 0;
-//                spice() = 0;
-//                break;
-//            default:
-//                break;
-//        }
-//
-//        switch (yourResponse) {
-//            case GiveSugar:
-//                sugar() += 1;
-//                break;
-//            case GiveSpice:
-//                spice() += 1;
-//                break;
-//            case YouWonFight:
-//                // You started fight and I won
-//                costs = costOfFighting;
-//                sugar() = 1;
-//                spice() = 1;
-//                break;
-//            case YouLostFight:
-//                // You started fight and I lost
-//                costs = costOfFighting;
-//                sugar() = 0;
-//                spice() = 0;
-//                break;
-//            case Bandits:
-//                costs += costOfBanditAttack;
-//                sugar() = 0;
-//                spice() = 0;
-//                break;
-//            default:
-//                break;
-//        }
-//        double reward = utility() - utilityBeforeLastAct - costs;
-//        return reward;
-//    }
-
     template<bool HASLANGUAGE>
-    SugarSpiceTradingBody<HASLANGUAGE>::message_type SugarSpiceTradingBody<HASLANGUAGE>::handleAct(int action) {
+    SugarSpiceTradingBody<HASLANGUAGE>::message_type SugarSpiceTradingBody<HASLANGUAGE>::actToMessage(int action) {
 //        if (myLastAction == close && yourResponse == close) {
 //            // must be start of episode, reward will be ignored
 //            isTerminal = false;
@@ -340,7 +265,7 @@ namespace abm::agents {
     }
 
     template<bool HASLANGUAGE>
-    double SugarSpiceTradingBody<HASLANGUAGE>::handleMessage(SugarSpiceTradingBody::message_type incomingMessage) {
+    double SugarSpiceTradingBody<HASLANGUAGE>::messageToReward(SugarSpiceTradingBody::message_type incomingMessage) {
         isTerminal = (
                 incomingMessage == Bandits ||
                 incomingMessage == YouWonFight ||

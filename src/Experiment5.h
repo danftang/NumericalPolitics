@@ -82,22 +82,19 @@
 #include "abm/societies/RandomEncounterSociety.h"
 //#include "abm/agents/SugarSpiceTradingBody.h"
 #include "abm/Agent.h"
-#include "abm/QMind.h"
+#include "abm/minds/QMind.h"
 
 void experiment5a() {
-    const int NTRAININGEPISODES = 200000; // 4000000;
-    const int NPERFORMINGITERATIONS = 100;
+    const int NTRAININGEPISODES = 100000; // 4000000;
     const bool HASLANGUAGE = false;
 
     typedef abm::agents::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
-    auto mind = abm::QMind {
+    auto mind = abm::minds::QMind {
 
 //            abm::DQN<body_type::dimension, body_type::action_type::size>(
-//                    100,
-//                    50,
-//                    32,
-//                    256,
+//                    mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(64,32, body_type::action_type::size),
+//                    abm::RandomReplay(16, 128, body_type::dimension),
 //                    1.0),
 
             abm::QTable<body_type::nstates, body_type::action_type::size>(),
@@ -107,6 +104,10 @@ void experiment5a() {
                     0.9999,
                     0.01)
     };
+
+//    decltype(mind)::observation_type x;
+//    abm::DQN<9,6>::input_type x;
+//    mind.train(x,1,1.0,x,true);
 
     auto agent = abm::Agent(body_type(), mind);
 

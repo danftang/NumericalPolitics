@@ -42,7 +42,7 @@ namespace abm {
                 // choose the legal move with highest Q
                 double bestQ = -std::numeric_limits<double>::infinity();
                 for (int i = 0; i < legalMoves.size(); ++i) {
-                    if (legalMoves[i] && qValues(i) > bestQ) {
+                    if (legalMoves[i] && qValues[i] > bestQ) {
                         bestQ = qValues[i];
                         chosenMove = i;
                     }

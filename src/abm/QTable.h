@@ -7,6 +7,7 @@
 
 #include <array>
 #include "../DeselbyStd/random.h"
+#include "../DeselbyStd/BoundedInteger.h"
 
 namespace abm {
     template<int NSTATES, int NACTIONS>
@@ -14,9 +15,11 @@ namespace abm {
     public:
         static constexpr double DEFAULT_DISCOUNT = 1.0;
         static constexpr double DEFAULT_LEARNING_RATE = 0.001;
+        static constexpr int output_dimension = NACTIONS;
 
-        typedef int                             input_type;
-        typedef const std::array<double, NACTIONS> &output_type;
+        typedef int                                 input_type;
+        typedef const arma::mat::fixed<NACTIONS,1> &output_type;
+        typedef deselby::BoundedInteger<int,0,NACTIONS-1> action_type;
 
         inline static bool verbose = false;
 
@@ -74,7 +77,7 @@ namespace abm {
          * @param endState
          * @param isEndgame
          */
-        void train(int startState, int action, double reward, int endState, bool isEndgame) {
+        void train(int startState, action_type action, double reward, int endState, bool isEndgame) {
 //            std::cout << "training on " << startState << " " << action << " " << reward << " " << endState << std::endl;
 
             ++nSamples[startState][action];
@@ -86,7 +89,7 @@ namespace abm {
             Qtable[startState][action] = (1.0-sampleWeight) * Qtable[startState][action] + sampleWeight * forwardQ;
         }
 
-        const arma::mat::fixed<NACTIONS,1> &predict(int state) {
+        output_type predict(int state) {
             return Qtable[state];
         }
     };

@@ -40,7 +40,7 @@ namespace abm::societies {
                 nextPlayerIndex ^= 1;
                 ++nMessages;
             }
-            players[nextPlayerIndex]->endEpisode(); // let the other player know it's end of game
+            players[nextPlayerIndex]->handleMessage(AGENT::message_type::close); // deliver the final close message
             if(verbose) {
                 std::cout << std::endl << players[0]->body << players[1]->body;
             }

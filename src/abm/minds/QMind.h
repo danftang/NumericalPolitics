@@ -7,7 +7,13 @@
 
 #include <bitset>
 
-namespace abm {
+namespace abm::minds {
+
+    template<class T>
+    concept QFunction = requires(T qFunction, T::input_type input, T::action_type act) {
+        { qFunction.predict(input) } -> std::same_as<typename T::output_type>;
+        { qFunction.train(input, act, 1.0, input, true) };
+    };
 
     /**
      *
@@ -15,15 +21,15 @@ namespace abm {
      *                      and implements a train function
      * @tparam POLICY       class that converts a vector of Q-values and a legal-act mask to an act to perform.
      */
-    template<class QFUNCTION, class POLICY>
+    template<QFunction QFUNCTION, class POLICY>
     class QMind {
     public:
 
-        typedef int action_type;
-        typedef QFUNCTION::input_type body_type;
+        typedef QFUNCTION::input_type   observation_type;
+        typedef QFUNCTION::action_type  action_type;
 
-        QFUNCTION qFunction;
-        POLICY policy;
+        QFUNCTION   qFunction;
+        POLICY      policy;
 
         QMind(QFUNCTION qfunction, POLICY policy): qFunction(std::move(qfunction)), policy(std::move(policy)) { }
 
@@ -35,12 +41,12 @@ namespace abm {
          * @param reward reward since the last decision point
          * @return decision how to act in the current situation
          **/
-        template<size_t action_size>
-        action_type act(body_type body, const std::bitset<action_size> &legalActs) {
-            return policy.sample(qFunction.predict(body), legalActs);
+        action_type act(observation_type observation, const std::bitset<action_type::size> &legalActs) {
+            return policy.sample(qFunction.predict(observation), legalActs);
         }
 
-        void train(body_type startState, action_type action, const double &reward, body_type endState, bool isEnd) {
+        template<class STATE> requires(std::is_convertible_v<STATE,observation_type>)
+        void train(const STATE &startState, action_type action, const double &reward, const STATE &endState, bool isEnd) {
             qFunction.train(startState, action, reward, endState, isEnd);
         }
 
