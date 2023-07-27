@@ -32,14 +32,14 @@ namespace abm {
         }
 
 
-        QAgent(QFUNCTION qfunction, POLICY qPolicy = GreedyPolicy(0.5, 0.99997, 0.01)):
+        QAgent(QFUNCTION qfunction, POLICY qPolicy):
                 qFunction(std::move(qfunction)),
                 policy(std::move(qPolicy)),
                 lastMessage(message_type::close) { }
 
-        QAgent(POLICY qPolicy = GreedyPolicy(0.5, 0.99997, 0.01)):
-                policy(std::move(qPolicy)),
-                lastMessage(message_type::close) { }
+//        QAgent(POLICY qPolicy):
+//                policy(std::move(qPolicy)),
+//                lastMessage(message_type::close) { }
 
 
 

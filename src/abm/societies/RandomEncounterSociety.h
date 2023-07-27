@@ -65,7 +65,7 @@ namespace abm::societies {
             int firstAgentIndex = deselby::Random::nextInt(0, agents.size());
             int secondAgentIndex = deselby::Random::nextInt(0, agents.size()-1);
             if(secondAgentIndex >= firstAgentIndex) ++secondAgentIndex;
-            if(verbose) std::cout << "Playing agent " << firstAgentIndex << " against " << secondAgentIndex << std::endl;
+//            if(verbose) std::cout << "Playing agent " << firstAgentIndex << " against " << secondAgentIndex << std::endl;
             return { &agents[firstAgentIndex], &agents[secondAgentIndex] };
         }
     };

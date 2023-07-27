@@ -20,8 +20,6 @@ namespace abm {
 
     class DQN {
     public:
-        static constexpr double optimisationStepSize = 0.001;
-        static constexpr int targetNetworkSyncInterval = 100;
         static constexpr int output_dimension = OUTPUT_DIMENSION;
 
         typedef arma::mat::fixed<INPUT_DIMENSION,1>     input_type;  // fixed size column vector
@@ -36,7 +34,7 @@ namespace abm {
             arma::mat endStates;
             arma::irowvec isTerminal;
 
-            size_t size() const { return actions.size(); }
+            [[nodiscard]] size_t size() const { return actions.size(); }
         };
 
         network_type learningNetwork; // Don't change the ordering of these!!
@@ -47,6 +45,8 @@ namespace abm {
 //        int batchSize;
         ens::AdamUpdate adamParameters;
         ens::AdamUpdate::Policy<arma::mat, arma::mat> optimisationStep;
+        int targetNetworkSyncInterval;
+        double adamStepSize;
 
 //        template<class AGENTBODY>
 //        DQN(int layer1size, int layer2size, int batchSize, int replayBufferSize, double discount):
@@ -67,15 +67,18 @@ namespace abm {
          * @param replayBufferSize
          * @param discount
          */
-        DQN(network_type network, replay_buffer_type replayBuffer, double discount):
-        learningNetwork(std::move(network)),
+        DQN(network_type network, replay_buffer_type replayBuffer, int targetNetworkSyncInterval, double discount,
+            ens::AdamUpdate adamParams = ens::AdamUpdate(), double adamStepSize = 0.001):
+        learningNetwork(std::move(setInputDimension(network))),
         targetNetwork(learningNetwork),
         replayBuffer(std::move(replayBuffer)),
-        adamParameters(),
+        adamParameters(adamParams),
         totalTrainingSteps(0),
         discount(discount),
-//        batchSize(batchSize),
-        optimisationStep(adamParameters,learningNetwork.Parameters().n_rows, learningNetwork.Parameters().n_cols)  {}
+        targetNetworkSyncInterval(targetNetworkSyncInterval),
+        adamStepSize(adamStepSize),
+        optimisationStep(adamParameters,learningNetwork.Parameters().n_rows, learningNetwork.Parameters().n_cols)  {
+        }
 
 //        DQN(int layer1size, int layer2size, int batchSize, int replayBufferSize, double discount)
 //        requires(std::is_same_v<network_type,mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>>) :
@@ -124,7 +127,7 @@ namespace abm {
             arma::mat gradients;
             learningNetwork.Backward(trainingData.startStates, learningStartStateQValues, gradients);
 //        replayBuffer.Update(trainingData.learningStartStateQValues, trainingData.actions, trainingData.targetEndStateQValues, gradients);
-            optimisationStep.Update(learningNetwork.Parameters(), optimisationStepSize, gradients);
+            optimisationStep.Update(learningNetwork.Parameters(), adamStepSize, gradients);
 
             // Periodically copy learning network params to target network params.
             if (totalTrainingSteps % targetNetworkSyncInterval == 0)
@@ -134,10 +137,10 @@ namespace abm {
 
     private:
         // generates an adamParameters step object during construction
-//        static network_type &resetNetwork(network_type &network, int inputLayerSize) {
-//            network.Reset(inputLayerSize);
-//            return network;
-//        }
+        static network_type &setInputDimension(network_type &network) {
+            network.Reset(INPUT_DIMENSION);
+            return network;
+        }
 
 
         static mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization> makeSimpleDQN(int layer1Size, int layer2Size) {

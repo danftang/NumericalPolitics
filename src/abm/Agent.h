@@ -49,6 +49,13 @@ namespace abm {
         typedef BODY::message_type  message_type;
         typedef MIND::action_type   action_type;
 
+        BODY body;
+        std::optional<BODY> lastState;
+        action_type lastAct;
+        MIND mind;
+        double rewardSinceLastChoice = 0.0;
+        double rewardSinceLastEpisodeStart = 0.0;
+
 
         Agent(BODY body, MIND mind): body(std::move(body)), mind(std::move(mind)) { }
 
@@ -61,6 +68,8 @@ namespace abm {
         message_type startEpisode() {
             lastAct = mind.act(body, body.legalActs());
             lastState = body;
+            rewardSinceLastEpisodeStart = 0.0;
+            rewardSinceLastChoice = 0.0;
             return body.actToMessage(lastAct);
         }
 
@@ -70,16 +79,29 @@ namespace abm {
          * @return response to incoming message
          */
         message_type handleMessage(message_type incomingMessage) {
-            rewardSinceLastChoice += body.messageToReward(incomingMessage);
+            double reward = body.messageToReward(incomingMessage);
+            rewardSinceLastChoice += reward;
+            rewardSinceLastEpisodeStart += reward;
+            if(incomingMessage == message_type::close) {
+                // Episode ended with my last move, other agent closed
+                train(true);
+                lastState.reset();
+                return message_type::close; // This close formally ends the episode and should never be sent.
+            }
             std::bitset<BODY::action_type::size> legalActMask = body.legalActs();
             int nLegalActs = legalActMask.count();
-            if (nLegalActs == 0) return message_type::close;
+            if (nLegalActs == 0) {
+                // Episode has ended, close
+                train(true);
+                lastState.reset();
+                return message_type::close; // N.B. this close will be sent to the other agent
+            }
             if (nLegalActs == 1) {
                 int act = 0;
                 while(legalActMask[act] == false) ++act;
                 return body.actToMessage(act);
             }
-            mind.train(lastState, lastAct, rewardSinceLastChoice, body, false);
+            train(false);
             lastAct = mind.act(body, legalActMask);
             lastState = body;
             rewardSinceLastChoice = 0.0;
@@ -87,20 +109,17 @@ namespace abm {
             return body.actToMessage(lastAct);
         }
 
-        /**
-         * at the end of an episode, if we're not the agent that terminates,
-         * we need to train on the remaining reward and maybe do some clean-up.
-         */
-//        void endEpisode() {
-//            rewardSinceLastChoice += body.endEpisode();
-//            mind.train(lastState, lastAct, rewardSinceLastChoice, lastState, true);
-//        }
+    protected:
 
-        BODY body;
-        BODY lastState;
-        action_type lastAct;
-        MIND mind;
-        double rewardSinceLastChoice = 0.0;
+        void train(bool endEpisode) {
+            if(lastState.has_value()) {
+//                std::cout << "training on " << lastState.value() << " " << lastAct << " " << rewardSinceLastChoice << " " << body << std::endl;
+                mind.train(lastState.value(), lastAct, rewardSinceLastChoice, body, endEpisode);
+            } else {
+                // must be start of episode, but we didn't initiate
+                rewardSinceLastEpisodeStart = 0.0;
+            }
+        }
 
     };
 }

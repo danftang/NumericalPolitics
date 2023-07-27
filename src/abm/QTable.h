@@ -78,7 +78,7 @@ namespace abm {
          * @param isEndgame
          */
         void train(int startState, action_type action, double reward, int endState, bool isEndgame) {
-//            std::cout << "training on " << startState << " " << action << " " << reward << " " << endState << std::endl;
+//            std::cout << "training on " << std::oct << startState << " " << action << " " << reward << " " << std::oct << endState << std::endl;
 
             ++nSamples[startState][action];
             const double rrn = std::pow(1.0 - learningRate,nSamples[startState][action]);

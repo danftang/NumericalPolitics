@@ -107,8 +107,9 @@ namespace abm::bodies {
             velocity + tau * xAcc,
             angle + tau * angularVelocity,
             angularVelocity + tau * thetaAcc;
-            bool ifEndOfEpisode =
-            return isTerminal()?close:step;
+            bool isEndOfEpisode = isTerminal();
+            if(isEndOfEpisode) reset();
+            return isEndOfEpisode?close:step;
         }
 
         double messageToReward(message_type message) {

@@ -17,9 +17,10 @@ namespace abm {
         double exploreDeay;
         double pExploreMin;
 
-        GreedyPolicy(double initialExploration, double explorationDecay, double minimumExploration) :
+        //  d^steps = (minimum/initialExp)^{1/steps}
+        GreedyPolicy(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
                 pExplore(initialExploration),
-                exploreDeay(explorationDecay),
+                exploreDeay(pow(minimumExploration/initialExploration, 1.0/stepsToDecayToMinimum)),
                 pExploreMin(minimumExploration) {}
 
 

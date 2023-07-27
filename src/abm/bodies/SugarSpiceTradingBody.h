@@ -48,7 +48,7 @@ namespace abm::agents {
         static constexpr double costOfBanditAttack = 15.0;
         inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
         static const bool encodeOutgoingMessage = false;
-        static const int nOneHotBitsForMessageEncode = 6;
+        static const int nOneHotBitsForMessageEncode = IndeterminateTerminalMessage + 1;
         static constexpr size_t dimension = nOneHotBitsForMessageEncode * (1 + encodeOutgoingMessage) + 3;
         static constexpr size_t nstates =
                 8 * nOneHotBitsForMessageEncode * (encodeOutgoingMessage ? nOneHotBitsForMessageEncode : 1);
@@ -106,6 +106,7 @@ namespace abm::agents {
             assert(message >= 0);
             if(message > IndeterminateTerminalMessage) message = IndeterminateTerminalMessage; // don't record type of terminal messages
             for (int i = 3; i < 3 + nOneHotBitsForMessageEncode; ++i) netInput[i] = 0.0;
+            assert(3 + message < dimension);
             netInput[3 + message] = 1.0;
         }
 
@@ -207,18 +208,6 @@ namespace abm::agents {
 
     template<bool HASLANGUAGE>
     SugarSpiceTradingBody<HASLANGUAGE>::message_type SugarSpiceTradingBody<HASLANGUAGE>::actToMessage(int action) {
-//        if (myLastAction == close && yourResponse == close) {
-//            // must be start of episode, reward will be ignored
-//            isTerminal = false;
-//            return 0.0;
-//        }
-//        isTerminal = (
-//                yourResponse == Bandits ||
-//                yourResponse == YouWonFight ||
-//                yourResponse == YouLostFight ||
-//                yourResponse == close ||
-//                (myLastAction == WalkAway && yourResponse == WalkAway)
-//        );
         utilityBeforeLastAct = utility();
         if (deselby::Random::nextBool(pBanditAttack)) {
             utilityBeforeLastAct += costOfBanditAttack;
@@ -229,10 +218,12 @@ namespace abm::agents {
         message_type outgoingMessage;
         switch (action) {
             case iGiveSugar:
+                assert(sugar() >= 1);
                 sugar() -= 1;
                 outgoingMessage = GiveSugar;
                 break;
             case iGiveSpice:
+                assert(spice() >= 1);
                 spice() -= 1;
                 outgoingMessage = GiveSpice;
                 break;
@@ -240,7 +231,7 @@ namespace abm::agents {
                 outgoingMessage = WalkAway;
                 break;
             case iFight:
-                // I started fight but lost
+                // I started fight
                 utilityBeforeLastAct += costOfFighting;
                 if(deselby::Random::nextBool()) {
                     outgoingMessage = YouWonFight;
@@ -260,7 +251,7 @@ namespace abm::agents {
             default:
                 throw("Unrecognized act while handling act");
         }
-        if (!isTerminal) recordOutgoingMessage(outgoingMessage);
+        if (outgoingMessage != close) recordOutgoingMessage(outgoingMessage);
         return outgoingMessage;
     }
 
@@ -299,8 +290,9 @@ namespace abm::agents {
             default:
                 break;
         }
-        recordIncomingMessage(incomingMessage);
+        if(incomingMessage != close) recordIncomingMessage(incomingMessage);
         double reward = utility() - utilityBeforeLastAct;
+//        std::cout << "sending reward " << reward << std::endl;
         return reward;
     }
 
