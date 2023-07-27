@@ -17,8 +17,9 @@ namespace abm {
                 batchSize(0),
                 capacity(0),
                 position(0),
-                full(false),
-                nSteps(0) { /* Nothing to do here. */ }
+                full(false)
+//                nSteps(0)
+                { /* Nothing to do here. */ }
 
         /**
          * Construct an instance of random experience replay class.
@@ -105,23 +106,23 @@ namespace abm {
             return full ? capacity : position;
         }
 
-        /**
-         * Update the priorities of transitions and Update the gradients.
-         *
-         * @param * (target) The learned value
-         * @param * (sampledActions) Agent's sampled action
-         * @param * (nextActionValues) Agent's next action
-         * @param * (gradients) The model's gradients
-         */
-        void Update(arma::mat /* target */,
-                    std::vector<ActionType> /* sampledActions */,
-                    arma::mat /* nextActionValues */,
-                    arma::mat & /* gradients */) {
-            /* Do nothing for random replay. */
-        }
+//        /**
+//         * Update the priorities of transitions and Update the gradients.
+//         *
+//         * @param * (target) The learned value
+//         * @param * (sampledActions) Agent's sampled action
+//         * @param * (nextActionValues) Agent's next action
+//         * @param * (gradients) The model's gradients
+//         */
+//        void Update(arma::mat /* target */,
+//                    std::vector<ActionType> /* sampledActions */,
+//                    arma::mat /* nextActionValues */,
+//                    arma::mat & /* gradients */) {
+//            /* Do nothing for random replay. */
+//        }
 
-        //! Get the number of steps for n-step agent.
-        const size_t &NSteps() const { return nSteps; }
+//        //! Get the number of steps for n-step agent.
+//        const size_t &NSteps() const { return nSteps; }
 
         //! Locally-stored number of examples of each sample.
         size_t batchSize;
@@ -136,8 +137,10 @@ namespace abm {
         //! Locally-stored indicator that whether the memory is full or not
         bool full;
 
+
         //! Locally-stored number of steps to look into the future.
-        size_t nSteps;
+//        size_t nSteps;
+
 
         //! Locally-stored buffer containing n consecutive steps.
 //    std::deque<Transition> nStepBuffer;

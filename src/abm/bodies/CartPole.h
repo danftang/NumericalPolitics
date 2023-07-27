@@ -103,14 +103,15 @@ namespace abm::bodies {
             double xAcc = temp - poleMassLength * thetaAcc * cosTheta / totalMass;
 
             // Update states.
-            position + tau * velocity,
-            velocity + tau * xAcc,
-            angle + tau * angularVelocity,
-            angularVelocity + tau * thetaAcc;
+            position += tau * velocity,
+            velocity += tau * xAcc,
+            angle += tau * angularVelocity,
+            angularVelocity += tau * thetaAcc;
             bool isEndOfEpisode = isTerminal();
             if(isEndOfEpisode) reset();
             return isEndOfEpisode?close:step;
         }
+
 
         double messageToReward(message_type message) {
             double reward = 1.0;
@@ -125,8 +126,8 @@ namespace abm::bodies {
          * All actions are always possible
          * @return bitset with all bits set to true
          */
-        static std::bitset<action_type::size> legalActs() {
-            return (1<<action_type::size) - 1;
+        std::bitset<action_type::size> legalActs() {
+            return 3; //((1<<action_type::size) - 1);
         }
 
 
@@ -141,6 +142,7 @@ namespace abm::bodies {
          */
         bool isTerminal() const
         {
+//            std::cout << position << " " << angle << std::endl;
             if (maxSteps != 0 && stepsPerformed >= maxSteps) return true;
             if (std::abs(position) > xThreshold ||
                 std::abs(angle) > thetaThresholdRadians) return true;
@@ -155,6 +157,11 @@ namespace abm::bodies {
         size_t MaxSteps() const { return maxSteps; }
         //! Set the maximum number of steps allowed.
         size_t& MaxSteps() { return maxSteps; }
+
+        friend std::ostream &operator <<(std::ostream &out, const CartPoleEnvironment &cartPole) {
+            out << "{" << cartPole.position << ", " << cartPole.angle << ", " << cartPole.velocity << ", " << cartPole.angularVelocity << "}";
+            return out;
+        }
 
     private:
         double position;

@@ -83,7 +83,7 @@ namespace abm {
             rewardSinceLastChoice += reward;
             rewardSinceLastEpisodeStart += reward;
             if(incomingMessage == message_type::close) {
-                // Episode ended with my last move, other agent closed
+                // Other agent closed
                 train(true);
                 lastState.reset();
                 return message_type::close; // This close formally ends the episode and should never be sent.
@@ -91,7 +91,7 @@ namespace abm {
             std::bitset<BODY::action_type::size> legalActMask = body.legalActs();
             int nLegalActs = legalActMask.count();
             if (nLegalActs == 0) {
-                // Episode has ended, close
+                // No acts available so end the episode.
                 train(true);
                 lastState.reset();
                 return message_type::close; // N.B. this close will be sent to the other agent
@@ -105,15 +105,19 @@ namespace abm {
             lastAct = mind.act(body, legalActMask);
             lastState = body;
             rewardSinceLastChoice = 0.0;
-
-            return body.actToMessage(lastAct);
+            message_type response = body.actToMessage(lastAct);
+            if(response == message_type::close) {
+                // last act has caused a close, so train on the last step
+                train(true);
+            }
+            return response;
         }
 
     protected:
 
         void train(bool endEpisode) {
             if(lastState.has_value()) {
-//                std::cout << "training on " << lastState.value() << " " << lastAct << " " << rewardSinceLastChoice << " " << body << std::endl;
+//                std::cout << "training on " << lastState.value() << " " << lastAct << " " << rewardSinceLastChoice << " " << body << " " << endEpisode << std::endl;
                 mind.train(lastState.value(), lastAct, rewardSinceLastChoice, body, endEpisode);
             } else {
                 // must be start of episode, but we didn't initiate

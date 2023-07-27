@@ -85,20 +85,20 @@
 #include "abm/minds/QMind.h"
 
 void experiment5a() {
-    const int NTRAININGEPISODES = 200000; // 4000000;
+    const int NTRAININGEPISODES = 100000; // 4000000;
     const bool HASLANGUAGE = false;
 
     typedef abm::agents::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
     auto mind = abm::minds::QMind {
 
-//            abm::DQN<body_type::dimension, body_type::action_type::size>(
-//                    mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(64,32, body_type::action_type::size),
-//                    abm::RandomReplay(16, 128, body_type::dimension),
-//                    10,
-//                    1.0),
+            abm::DQN<body_type::dimension, body_type::action_type::size>(
+                    mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(64,32, body_type::action_type::size),
+                    abm::RandomReplay(16, 128, body_type::dimension),
+                    100,
+                    1.0),
 
-            abm::QTable<body_type::nstates, body_type::action_type::size>(),
+//            abm::QTable<body_type::nstates, body_type::action_type::size>(),
 
             abm::GreedyPolicy(
                     0.5,

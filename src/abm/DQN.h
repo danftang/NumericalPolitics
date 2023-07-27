@@ -88,6 +88,7 @@ namespace abm {
         // get the predicted Q-values for actions given agent state
         arma::mat::fixed<OUTPUT_DIMENSION,1> predict(const arma::mat &state) {
             arma::mat::fixed<OUTPUT_DIMENSION,1> actionValue;
+            actionValue.zeros();
             arma::mat mutableMatRef(actionValue.memptr(), OUTPUT_DIMENSION, 1, false, true);
             learningNetwork.Predict(state, mutableMatRef);
             return actionValue;
@@ -112,16 +113,20 @@ namespace abm {
 
             // calculate the Q values of the best action in the end state
             arma::rowvec nextStateMaxQ(trainingData.size());
+//            std::cout << "Terminal = " << trainingData.isTerminal << std::endl;
+//            std::cout << "Target end state Q vals = " << targetEndStateQValues << std::endl;
             for (size_t i = 0; i < trainingData.size(); ++i) {
                 nextStateMaxQ(i) =
                         trainingData.isTerminal[i] == 0 ? targetEndStateQValues.col(i).max() : 0.0;
             }
+//            std::cout << "nextStateMaxQ = " << nextStateMaxQ << std::endl;
 
             // calculate Q-values for the learning network to learn from
             for (size_t i = 0; i < trainingData.size(); ++i) {
                 learningStartStateQValues(trainingData.actions[i], i) =
                         trainingData.rewards(i) + discount * nextStateMaxQ(i);
             }
+//            std::cout << "target Q values = " << learningStartStateQValues << std::endl;
 
             // Update network parameters towards the calculated Q-values.
             arma::mat gradients;
@@ -130,8 +135,9 @@ namespace abm {
             optimisationStep.Update(learningNetwork.Parameters(), adamStepSize, gradients);
 
             // Periodically copy learning network params to target network params.
-            if (totalTrainingSteps % targetNetworkSyncInterval == 0)
+            if (totalTrainingSteps % targetNetworkSyncInterval == 0) {
                 targetNetwork.Parameters() = learningNetwork.Parameters();
+            }
         }
 
 

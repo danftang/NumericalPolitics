@@ -46,7 +46,7 @@ namespace abm::agents {
         static const int utilityOfNonPreferred = 1;
         static constexpr double costOfFighting = 1.5;
         static constexpr double costOfBanditAttack = 15.0;
-        inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
+        inline static double pBanditAttack = 0.05; // probability of a bandit attack per message received
         static const bool encodeOutgoingMessage = false;
         static const int nOneHotBitsForMessageEncode = IndeterminateTerminalMessage + 1;
         static constexpr size_t dimension = nOneHotBitsForMessageEncode * (1 + encodeOutgoingMessage) + 3;

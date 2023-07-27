@@ -56,6 +56,7 @@ namespace abm {
         void decayExploration() {
             if (pExplore > pExploreMin) {
                 pExplore *= exploreDeay;
+//                std::cout << "pExplore = " << pExplore << std::endl;
             }
         }
 

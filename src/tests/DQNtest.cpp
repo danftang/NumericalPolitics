@@ -23,21 +23,28 @@ namespace tests {
                         1.0),
 
                 abm::GreedyPolicy(
-                        0.5,
-                        5000,
+                        0.1,
+                        20000,
                         0.01)
         };
 
 
         auto agent = abm::Agent(body_type(),mind);
 
-        while(agent.rewardSinceLastEpisodeStart < 199.9) {
+        double smoothedReturn = 20.0;
+        int episodes = 0;
+        int steps = 0;
+        while(smoothedReturn < 198.99) {
             body_type::message_type message = agent.startEpisode();
             while(message != body_type::message_type::close) {
                 message = agent.handleMessage(message);
+                ++steps;
             }
-            agent.handleMessage(message); // send final close
+            smoothedReturn = 0.95*smoothedReturn + 0.05*agent.rewardSinceLastEpisodeStart;
+            std::cout << smoothedReturn << std::endl;
+            ++episodes;
         }
+        std::cout << "Learned to balance a pole in " << episodes << " episodes and " << steps << " steps" << std::endl;
     }
 }
 
