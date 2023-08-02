@@ -31,17 +31,20 @@ namespace tests {
 
         auto agent = abm::Agent(body_type(),mind);
 
-        double smoothedReturn = 20.0;
         int episodes = 0;
         int steps = 0;
-        while(smoothedReturn < 198.99) {
+        double meanEpisodeLength = 0.0;
+        double meanDecay = 0.995;
+        while(meanEpisodeLength < 198.99) {
             body_type::message_type message = agent.startEpisode();
+            int episodeLength = 0;
             while(message != body_type::message_type::close) {
                 message = agent.handleMessage(message);
                 ++steps;
+                ++episodeLength;
             }
-            smoothedReturn = 0.95*smoothedReturn + 0.05*agent.rewardSinceLastEpisodeStart;
-            std::cout << smoothedReturn << std::endl;
+            meanEpisodeLength = meanEpisodeLength*meanDecay + (1.0-meanDecay)*episodeLength;
+            std::cout << meanEpisodeLength << std::endl;
             ++episodes;
         }
         std::cout << "Learned to balance a pole in " << episodes << " episodes and " << steps << " steps" << std::endl;

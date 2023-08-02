@@ -6,6 +6,7 @@
 #define MULTIAGENTGOVERNMENT_QMIND_H
 
 #include <bitset>
+#include <optional>
 
 namespace abm::minds {
 
@@ -27,9 +28,12 @@ namespace abm::minds {
 
         typedef QFUNCTION::input_type   observation_type;
         typedef QFUNCTION::action_type  action_type;
+        typedef std::bitset<action_type::size> action_mask;
 
         QFUNCTION   qFunction;
         POLICY      policy;
+        std::optional<observation_type> lastState;
+        action_type lastAction;
 
         QMind(QFUNCTION qfunction, POLICY policy): qFunction(std::move(qfunction)), policy(std::move(policy)) { }
 
@@ -41,14 +45,23 @@ namespace abm::minds {
          * @param reward reward since the last decision point
          * @return decision how to act in the current situation
          **/
-        action_type act(observation_type observation, const std::bitset<action_type::size> &legalActs) {
-            return policy.sample(qFunction.predict(observation), legalActs);
+        action_type act(observation_type observation, const action_mask &legalActs, double rewardFromLastChoice) {
+            if(lastState.has_value()) qFunction.train(std::move(lastState.value()), lastAction, rewardFromLastChoice, observation, false);
+            lastAction = policy.sample(qFunction.predict(observation), legalActs);
+            lastState = std::move(observation);
+            return lastAction;
         }
 
-        template<class STATE> requires(std::is_convertible_v<STATE,observation_type>)
-        void train(const STATE &startState, action_type action, const double &reward, const STATE &endState, bool isEnd) {
-            qFunction.train(startState, action, reward, endState, isEnd);
+
+        void endEpisode(double finalReward) {
+            if(lastState.has_value()) qFunction.train(lastState.value(), lastAction, finalReward, lastState.value(), true);
+            lastState.reset();
         }
+
+//        template<class STATE> requires(std::is_convertible_v<STATE,observation_type>)
+//        void train(const STATE &startState, action_type action, const double &reward, const STATE &endState, bool isEnd) {
+//            qFunction.train(startState, action, reward, endState, isEnd);
+//        }
 
     };
 }

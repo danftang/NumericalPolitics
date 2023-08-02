@@ -23,8 +23,8 @@ namespace abm {
     template<class TIME>
     class Schedule;
 
-//    template<class AGENT, class TIME>
-//    concept HasStepFunction = requires(AGENT agent) {
+//    template<class BODY, class TIME>
+//    concept HasStepFunction = requires(BODY agent) {
 //        { agent.step() } -> std::convertible_to<Schedule<TIME>>;
 //    };
 
@@ -69,8 +69,8 @@ namespace abm {
 //            }
 //        }
 
-//        template<HasStepFunction<TIME> AGENT>
-//        Schedule(AGENT &agent, TIME time = 0) {
+//        template<HasStepFunction<TIME> BODY>
+//        Schedule(BODY &agent, TIME time = 0) {
 //            insert(agent, time);
 //        }
 //
@@ -93,8 +93,8 @@ namespace abm {
             }
         }
 
-//        template<HasStepFunction<TIME> AGENT>
-//        inline void insert(AGENT &agent, TIME time) {
+//        template<HasStepFunction<TIME> BODY>
+//        inline void insert(BODY &agent, TIME time) {
 //            insert([&agent]() { return agent.step(); }, time);
 //        }
 //

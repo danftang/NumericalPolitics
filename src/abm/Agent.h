@@ -1,5 +1,5 @@
 //
-// Created by daniel on 24/07/23.
+// Created by daniel on 02/08/23.
 //
 
 #ifndef MULTIAGENTGOVERNMENT_AGENT_H
@@ -8,27 +8,23 @@
 #include <concepts>
 #include <bitset>
 #include <algorithm>
+#include <cassert>
 
 namespace abm {
 
     template<class T>
-    concept Body = requires(T body,
-            T::action_type  actFromMind,
-            T::message_type messageFromEnvironment) {
+    concept Body = requires(T body, T::action_type actFromMind, T::message_type messageFromEnvironment) {
         { T::message_type::close };
+        typename T::action_mask;
         { body.actToMessage(actFromMind) } -> std::convertible_to<typename T::message_type>;
         { body.messageToReward(messageFromEnvironment) } -> std::convertible_to<double>;
-//        { body.endEpisode() } -> std::convertible_to<double>;
-        { body.legalActs() } -> std::convertible_to<std::bitset<T::action_type::size>>;
+        { body.legalActs() } -> std::convertible_to<typename T::action_mask>;
     };
 
     template<class T>
-    concept Mind = requires(T mind,
-            T::observation_type observation,
-            T::action_type      act) {
-        { T::action_type::size } -> std::convertible_to<int>;
-        { mind.act(observation, std::declval<std::bitset<T::action_type::size>>()) } -> std::same_as<typename T::action_type>;
-        { mind.train(observation, act, 0.0, observation, true) };
+    concept Mind = requires(T mind, T::observation_type observation, T::action_type act, T::action_mask actMask, double reward) {
+        { mind.act(observation, actMask, reward) } -> std::same_as<typename T::action_type>;
+        { mind.endEpisode(reward) };
     };
 
     /**
@@ -41,35 +37,31 @@ namespace abm {
      * @tparam BODY
      * @tparam MIND
      */
-    template<Body BODY, Mind MIND> requires(std::is_convertible_v<BODY, typename MIND::observation_type>)
+    template<Body BODY, Mind MIND> requires(
+            std::is_convertible_v<BODY, typename MIND::observation_type> &&
+                    std::is_convertible_v<typename BODY::action_mask, typename MIND::action_mask>)
     class Agent {
     public:
-        typedef BODY                body_type;
-        typedef MIND                mind_type;
-        typedef BODY::message_type  message_type;
-        typedef MIND::action_type   action_type;
+        typedef BODY body_type;
+        typedef MIND mind_type;
+        typedef BODY::message_type message_type;
+        typedef MIND::action_type action_type;
 
         BODY body;
-        std::optional<BODY> lastState;
-        action_type lastAct;
         MIND mind;
         double rewardSinceLastChoice = 0.0;
-        double rewardSinceLastEpisodeStart = 0.0;
 
+        Agent(BODY body, MIND mind) : body(std::move(body)), mind(std::move(mind)) {}
 
-        Agent(BODY body, MIND mind): body(std::move(body)), mind(std::move(mind)) { }
-
-        // ------ AGENT Interface ------
+        // ------ Agent Interface ------
 
         /**
          * Call this to nudge the agent to be the first mover in an episodic interaction
          * @return message that begins the episode
          */
         message_type startEpisode() {
-            lastAct = mind.act(body, body.legalActs());
-            lastState = body;
-            rewardSinceLastEpisodeStart = 0.0;
-            rewardSinceLastChoice = 0.0;
+            assert(rewardSinceLastChoice == 0.0);
+            action_type lastAct = mind.act(body, body.legalActs(), std::numeric_limits<double>::quiet_NaN());
             return body.actToMessage(lastAct);
         }
 
@@ -81,50 +73,36 @@ namespace abm {
         message_type handleMessage(message_type incomingMessage) {
             double reward = body.messageToReward(incomingMessage);
             rewardSinceLastChoice += reward;
-            rewardSinceLastEpisodeStart += reward;
-            if(incomingMessage == message_type::close) {
-                // Other agent closed
-                train(true);
-                lastState.reset();
-                return message_type::close; // This close formally ends the episode and should never be sent.
+            if (incomingMessage == message_type::close) {
+                mind.endEpisode(rewardSinceLastChoice);
+                rewardSinceLastChoice = 0.0;
+                return message_type::close; // this should end all comms
             }
-            std::bitset<BODY::action_type::size> legalActMask = body.legalActs();
+            auto legalActMask = body.legalActs();
             int nLegalActs = legalActMask.count();
             if (nLegalActs == 0) {
                 // No acts available so end the episode.
-                train(true);
-                lastState.reset();
+                mind.endEpisode(rewardSinceLastChoice);
+                rewardSinceLastChoice = 0.0;
                 return message_type::close; // N.B. this close will be sent to the other agent
             }
-            if (nLegalActs == 1) {
+            if (nLegalActs == 1) { // if only one option, don't class as choice point. NB: no discount either
                 int act = 0;
-                while(legalActMask[act] == false) ++act;
+                while (legalActMask[act] == false) ++act;
                 return body.actToMessage(act);
             }
-            train(false);
-            lastAct = mind.act(body, legalActMask);
-            lastState = body;
+            action_type lastAct = mind.act(body, legalActMask, rewardSinceLastChoice);
             rewardSinceLastChoice = 0.0;
             message_type response = body.actToMessage(lastAct);
-            if(response == message_type::close) {
+            if (response == message_type::close) {
                 // last act has caused a close, so train on the last step
-                train(true);
+                double finalReward = body.messageToReward(message_type::close); // get any final rewards from last act
+                mind.endEpisode(finalReward);
             }
             return response;
         }
-
-    protected:
-
-        void train(bool endEpisode) {
-            if(lastState.has_value()) {
-//                std::cout << "training on " << lastState.value() << " " << lastAct << " " << rewardSinceLastChoice << " " << body << " " << endEpisode << std::endl;
-                mind.train(lastState.value(), lastAct, rewardSinceLastChoice, body, endEpisode);
-            } else {
-                // must be start of episode, but we didn't initiate
-                rewardSinceLastEpisodeStart = 0.0;
-            }
-        }
-
     };
 }
+
+
 #endif //MULTIAGENTGOVERNMENT_AGENT_H

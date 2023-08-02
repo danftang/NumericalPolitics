@@ -11,7 +11,7 @@
 #include "../../DeselbyStd/random.h"
 #include "mlpack.hpp"
 
-namespace abm::agents {
+namespace abm::bodies {
 
     template<bool HASLANGUAGE>
     class SugarSpiceTradingBody {
@@ -26,6 +26,8 @@ namespace abm::agents {
             iSay1,
             size  // marker for number of actions
         };
+
+        typedef std::bitset<action_type::size> action_mask;
 
         // the tyoe of message passed between agents in response to an agent's intent
         enum message_type {
@@ -46,7 +48,7 @@ namespace abm::agents {
         static const int utilityOfNonPreferred = 1;
         static constexpr double costOfFighting = 1.5;
         static constexpr double costOfBanditAttack = 15.0;
-        inline static double pBanditAttack = 0.05; // probability of a bandit attack per message received
+        inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
         static const bool encodeOutgoingMessage = false;
         static const int nOneHotBitsForMessageEncode = IndeterminateTerminalMessage + 1;
         static constexpr size_t dimension = nOneHotBitsForMessageEncode * (1 + encodeOutgoingMessage) + 3;
@@ -58,6 +60,12 @@ namespace abm::agents {
         bool isTerminal = false;
         double utilityBeforeLastAct = NAN;
         message_type lastOutgoingMessage;
+
+        SugarSpiceTradingBody(): SugarSpiceTradingBody(false, false, false) { }
+
+        SugarSpiceTradingBody(bool hasSugar, bool hasSpice, bool prefersSugar) {
+            reset(hasSugar, hasSpice, prefersSugar);
+        }
 
 
         // ----- Body interface -----
@@ -81,11 +89,11 @@ namespace abm::agents {
 
         double &prefersSugar() { return netInput[2]; }
 
-        double sugar() const { return netInput[0]; }
+        [[nodiscard]] double sugar() const { return netInput[0]; }
 
-        double spice() const { return netInput[1]; }
+        [[nodiscard]] double spice() const { return netInput[1]; }
 
-        double prefersSugar() const { return netInput[2]; }
+        [[nodiscard]] double prefersSugar() const { return netInput[2]; }
 
         //const arma::mat &Encode() const { return netInput; }
 
@@ -139,7 +147,7 @@ namespace abm::agents {
 
         void reset(bool hasSugar, bool hasSpice, bool prefersSugar);
 
-        double utility() const;
+        [[nodiscard]] double utility() const;
 
 //        friend std::ostream &operator <<(std::ostream &out, const typename abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::message_type &message);
 
@@ -160,7 +168,7 @@ namespace abm::agents {
                     "YouWonFight",
                     "YouLostFight"
             };
-            if(message == abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::message_type::close) {
+            if(message == SugarSpiceTradingBody<HASLANGUAGE>::message_type::close) {
                 out << "close";
             } else {
                 out << messageNames[message];
@@ -172,9 +180,9 @@ namespace abm::agents {
 
 
     template<bool HASLANGUAGE>
-    std::bitset<SugarSpiceTradingBody<HASLANGUAGE>::action_type::size>
+    SugarSpiceTradingBody<HASLANGUAGE>::action_mask
     SugarSpiceTradingBody<HASLANGUAGE>::legalActs() {
-        std::bitset<SugarSpiceTradingBody<HASLANGUAGE>::action_type::size> legalActs;
+        action_mask legalActs;
         if (isTerminal) {
             legalActs = 0;
         } else {
@@ -249,7 +257,7 @@ namespace abm::agents {
             case iSay1:
                 outgoingMessage = Say1;
             default:
-                throw("Unrecognized act while handling act");
+                throw(std::out_of_range("Unrecognized act while handling act"));
         }
         if (outgoingMessage != close) recordOutgoingMessage(outgoingMessage);
         return outgoingMessage;

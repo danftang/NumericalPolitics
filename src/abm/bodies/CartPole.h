@@ -19,6 +19,8 @@ namespace abm::bodies {
             size
         };
 
+        typedef std::bitset<action_type::size> action_mask;
+
         enum message_type {
             close,
             step
@@ -126,7 +128,7 @@ namespace abm::bodies {
          * All actions are always possible
          * @return bitset with all bits set to true
          */
-        std::bitset<action_type::size> legalActs() {
+        action_mask legalActs() {
             return 3; //((1<<action_type::size) - 1);
         }
 

@@ -13,8 +13,6 @@ namespace abm {
     template<int NSTATES, int NACTIONS>
     class QTable {
     public:
-        static constexpr double DEFAULT_DISCOUNT = 1.0;
-        static constexpr double DEFAULT_LEARNING_RATE = 0.001;
         static constexpr int output_dimension = NACTIONS;
 
         typedef int                                 input_type;
@@ -26,7 +24,7 @@ namespace abm {
         std::array<arma::mat::fixed<NACTIONS,1>, NSTATES>   Qtable;
         std::array<std::array<uint, NACTIONS>, NSTATES>      nSamples;
         double discount;     // exponential decay factor of future reward
-        double learningRate;
+        double sampleDecay;
 //        uint trainingStepsSinceLastPolicyChange = 0;
 
         /**
@@ -35,10 +33,10 @@ namespace abm {
          * @param learningRate      The weight of temporal difference error when updating Q-values (see train)
          */
         QTable(
-                double discount = DEFAULT_DISCOUNT,
-                double learningRate = DEFAULT_LEARNING_RATE
+                double discount,
+                double sampleDecay = 0.999
         ) :
-                discount(discount), learningRate(learningRate) {
+                discount(discount), sampleDecay(sampleDecay) {
 
             // initialise Q values and set random bestAction
             for (int state = 0; state < NSTATES; ++state) {
@@ -52,24 +50,27 @@ namespace abm {
 
         /**
          * Single training step for one action.
+         *
          * At equilibrium we have
          * Q(s0,a) = reward(s0,a,s1) + discount * max_a'(Q(s1,a'))
-         * so we relax the table to equilibrium by setting
-         * Q(s0,a) <- (1-l)Q(s0,a) + l*(reward(s0,a,s1) + discount * max_a'(Q(s1,a')))
          *
-         * If we weight the samples with the weights:
-         * a_n, a_n r, a_n r^2, a_n r^3 ... a_n r^(n-1)
+         * We consider each forward Q(s0,a) value as a noisy sample of the real value
+         * and weight the samples exponentially with more recent samples having higher
+         * weight.
+         * So, after receiving n samples Q_1...Q_n, we have:
+         * Q(s0,a) = a_n Q_n + a_n r Q_{n-1} + a_n r^2 Q_{n-2} + ... + a_n r^{n-1} Q_1
          *
-         * The sum of the weights must be 1 so
+         * The sum of the weights should be 1 so
          * S_n = a_n(1-r^n)/(1-r) = 1
          * so
          * a_n = (1-r)/(1-r^n)
-         * so
+         * and
          * a_{n+1} = a_n(1-r^n)/(1-r^{n+1})
          *
-         * so we multiply the current Q value by (r-r^{n+1})/(1-r^{n+1}) and weight the current sample by (1-r)/(1-r^{n+1})
+         * so on receiving a new sample, we multiply the current estimate of Q by (r-r^{n+1})/(1-r^{n+1})
+         * and weight the current sample by (1-r)/(1-r^{n+1})
          *
-         * But 1-((1-r)/(1-r^{n+1})) = (r-r^{n+1})/(1-r^{n+1})
+         * But (r-r^{n+1})/(1-r^{n+1}) = 1-((1-r)/(1-r^{n+1})) so we only need to calculate one
          *
          * @param startState
          * @param action
@@ -81,8 +82,8 @@ namespace abm {
 //            std::cout << "training on " << std::oct << startState << " " << action << " " << reward << " " << std::oct << endState << std::endl;
 
             ++nSamples[startState][action];
-            const double rrn = std::pow(1.0 - learningRate,nSamples[startState][action]);
-            double sampleWeight = learningRate/(1.0-rrn);
+            const double rrn = std::pow(sampleDecay, nSamples[startState][action]);
+            double sampleWeight = (1.0-sampleDecay)/(1.0-rrn);
 
             const double endStateQValue = (isEndgame ? 0.0 : Qtable[endState].max());
             const double forwardQ = reward + discount * endStateQValue;

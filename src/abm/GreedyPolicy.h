@@ -31,14 +31,7 @@ namespace abm {
             assert(legalMoves.count() > 1);
             if (deselby::Random::nextBool(pExplore)) {
                 // choose a legal move at random
-                int nLegalMoves = legalMoves.count();
-                assert(nLegalMoves > 0);
-                int legalMovesToGo = deselby::Random::nextInt(1, nLegalMoves + 1);
-                do {
-                    ++chosenMove;
-                    while (legalMoves[chosenMove] == false) { ++chosenMove; }
-                    --legalMovesToGo;
-                } while (legalMovesToGo != 0);
+                chosenMove = sampleUniformly(legalMoves);
             } else {
                 // choose the legal move with highest Q
                 double bestQ = -std::numeric_limits<double>::infinity();
@@ -50,6 +43,20 @@ namespace abm {
                 }
             }
             if (decayExplore) decayExploration();
+            return chosenMove;
+        }
+
+        template<size_t SIZE>
+        static int sampleUniformly(const std::bitset<SIZE> &legalMoves) {
+            int chosenMove = -1;
+            int nLegalMoves = legalMoves.count();
+            assert(nLegalMoves > 0);
+            int legalMovesToGo = deselby::Random::nextInt(1, nLegalMoves + 1);
+            do {
+                ++chosenMove;
+                while (legalMoves[chosenMove] == false) { ++chosenMove; }
+                --legalMovesToGo;
+            } while (legalMovesToGo != 0);
             return chosenMove;
         }
 

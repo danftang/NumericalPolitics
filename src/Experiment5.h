@@ -85,25 +85,25 @@
 #include "abm/minds/QMind.h"
 
 void experiment5a() {
-    const int NTRAININGEPISODES = 100000; // 4000000;
+    const int NTRAININGEPISODES = 200000; // 4000000;
     const bool HASLANGUAGE = false;
 
-    typedef abm::agents::SugarSpiceTradingBody<HASLANGUAGE> body_type;
+    typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
     auto mind = abm::minds::QMind {
 
-            abm::DQN<body_type::dimension, body_type::action_type::size>(
-                    mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(64,32, body_type::action_type::size),
-                    abm::RandomReplay(16, 128, body_type::dimension),
-                    100,
-                    1.0),
+//            abm::DQN<body_type::dimension, body_type::action_type::size>(
+//                    mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(64,32, body_type::action_type::size),
+//                    abm::RandomReplay(16, 128, body_type::dimension),
+//                    5,
+//                    1.0),
 
-//            abm::QTable<body_type::nstates, body_type::action_type::size>(),
+            abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
 
             abm::GreedyPolicy(
                     0.5,
-                    (NTRAININGEPISODES*3)/4,
-                    0.01)
+                    NTRAININGEPISODES,
+                    0.005)
     };
 
 //    decltype(mind)::observation_type x;
@@ -121,7 +121,13 @@ void experiment5a() {
     // train
 //    soc.verbose = true;
     for(int iterations = 0; iterations < NTRAININGEPISODES; ++iterations) {
-        if(iterations%100 == 0) std::cout << iterations << std::endl;
+        if(iterations%100 == 0) {
+            std::cout << iterations << " "
+            << soc.agents[0].exponentialMeanReward << " "
+            << soc.agents[1].exponentialMeanReward << " "
+            << soc.agents[0].exponentialMeanReward + soc.agents[1].exponentialMeanReward
+            << std::endl;
+        }
         // set random initial state
         bool agent0HasSugar = deselby::Random::nextBool();
         bool agent0HasSpice = deselby::Random::nextBool();
@@ -133,7 +139,7 @@ void experiment5a() {
     }
 
     // perform
-    abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::pBanditAttack = 0.0;
+    abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>::pBanditAttack = 0.001;
     soc.verbose = true;
 
     soc.agents[0].mind.policy.pExplore = 0.0;

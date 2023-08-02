@@ -16,7 +16,7 @@ namespace abm::societies {
         std::vector<AGENT> agents;
         bool verbose;
 
-        RandomEncounterSociety(int nAgents): agents(nAgents), verbose(false) { }
+        explicit RandomEncounterSociety(int nAgents): agents(nAgents), verbose(false) { }
         RandomEncounterSociety(std::initializer_list<AGENT> agents): agents(agents), verbose(false) { }
 
         // execute one episode between randomly chosen agents
