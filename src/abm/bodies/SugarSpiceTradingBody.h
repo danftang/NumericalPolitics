@@ -44,6 +44,8 @@ namespace abm::bodies {
             IndeterminateTerminalMessage = Bandits
         };
 
+        typedef message_type in_message_type;
+
         static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
         static const int utilityOfNonPreferred = 1;
         static constexpr double costOfFighting = 1.5;
@@ -58,7 +60,7 @@ namespace abm::bodies {
         // Agent state
         arma::mat::fixed<dimension, 1> netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
         bool isTerminal = false;
-        double utilityBeforeLastAct = NAN;
+        double reward = 0.0;
         message_type lastOutgoingMessage;
 
         SugarSpiceTradingBody(): SugarSpiceTradingBody(false, false, false) { }
@@ -71,10 +73,10 @@ namespace abm::bodies {
         // ----- Body interface -----
 
         message_type actToMessage(int action);
-
         double messageToReward(message_type incomingMessage);
-
         std::bitset<action_type::size> legalActs();
+        bool isEndOfEpisode();
+        double endEpisode();
 
         // ---- End of Body interface
 
@@ -147,7 +149,7 @@ namespace abm::bodies {
 
         void reset(bool hasSugar, bool hasSpice, bool prefersSugar);
 
-        [[nodiscard]] double utility() const;
+        // [[nodiscard]] double utility() const;
 
 //        friend std::ostream &operator <<(std::ostream &out, const typename abm::agents::SugarSpiceTradingBody<HASLANGUAGE>::message_type &message);
 
@@ -178,29 +180,38 @@ namespace abm::bodies {
 
     };
 
+    template<bool HASLANGUAGE>
+    double SugarSpiceTradingBody<HASLANGUAGE>::endEpisode() {
+        double residualReward = reward;
+        reward = 0.0;
+        isTerminal = false;
+        return residualReward;
+    }
+
+    template<bool HASLANGUAGE>
+    bool SugarSpiceTradingBody<HASLANGUAGE>::isEndOfEpisode() {
+        return isTerminal;
+    }
+
 
     template<bool HASLANGUAGE>
     SugarSpiceTradingBody<HASLANGUAGE>::action_mask
     SugarSpiceTradingBody<HASLANGUAGE>::legalActs() {
         action_mask legalActs;
-        if (isTerminal) {
-            legalActs = 0;
-        } else {
-            for (int i = 0; i < legalActs.size(); ++i) legalActs[i] = true;
-            if (sugar() == 0) legalActs[iGiveSugar] = false;
-            if (spice() == 0) legalActs[iGiveSpice] = false;
-            legalActs[iSay0] = HASLANGUAGE;
-            legalActs[iSay1] = HASLANGUAGE;
-        }
+        for (int i = 0; i < legalActs.size(); ++i) legalActs[i] = true;
+        if (sugar() == 0) legalActs[iGiveSugar] = false;
+        if (spice() == 0) legalActs[iGiveSpice] = false;
+        legalActs[iSay0] = HASLANGUAGE;
+        legalActs[iSay1] = HASLANGUAGE;
         return legalActs;
     }
 
-    template<bool HASLANGUAGE>
-    double SugarSpiceTradingBody<HASLANGUAGE>::utility() const {
-        double utilityOfSugar = (prefersSugar() > 0.5 ? utilityOfPreferred : utilityOfNonPreferred);
-        double utilityOfSpice = (prefersSugar() > 0.5 ? utilityOfNonPreferred : utilityOfPreferred);
-        return sugar() * utilityOfSugar + spice() * utilityOfSpice;
-    }
+//    template<bool HASLANGUAGE>
+//    double SugarSpiceTradingBody<HASLANGUAGE>::utility() const {
+//        double utilityOfSugar = (prefersSugar() > 0.5 ? utilityOfPreferred : utilityOfNonPreferred);
+//        double utilityOfSpice = (prefersSugar() > 0.5 ? utilityOfNonPreferred : utilityOfPreferred);
+//        return sugar() * utilityOfSugar + spice() * utilityOfSpice;
+//    }
 
     template<bool HASLANGUAGE>
     void SugarSpiceTradingBody<HASLANGUAGE>::reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
@@ -209,18 +220,19 @@ namespace abm::bodies {
         sugar() = hasSugar;
         spice() = hasSpice;
         this->prefersSugar() = prefersSugar;
-        isTerminal = false;
-        utilityBeforeLastAct = utility();
+        reward = 0.0;
     }
 
 
     template<bool HASLANGUAGE>
     SugarSpiceTradingBody<HASLANGUAGE>::message_type SugarSpiceTradingBody<HASLANGUAGE>::actToMessage(int action) {
-        utilityBeforeLastAct = utility();
         if (deselby::Random::nextBool(pBanditAttack)) {
-            utilityBeforeLastAct += costOfBanditAttack;
+            reward -= costOfBanditAttack;
+            if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+            if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
             sugar() = 0;
             spice() = 0;
+            isTerminal = true;
             return Bandits;
         }
         message_type outgoingMessage;
@@ -229,24 +241,30 @@ namespace abm::bodies {
                 assert(sugar() >= 1);
                 sugar() -= 1;
                 outgoingMessage = GiveSugar;
+                reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
                 break;
             case iGiveSpice:
                 assert(spice() >= 1);
                 spice() -= 1;
                 outgoingMessage = GiveSpice;
+                reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
                 break;
             case iWalkAway:
                 outgoingMessage = WalkAway;
                 break;
             case iFight:
                 // I started fight
-                utilityBeforeLastAct += costOfFighting;
+                reward -= costOfFighting;
                 if(deselby::Random::nextBool()) {
                     outgoingMessage = YouWonFight;
+                    if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+                    if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
                     sugar() = 0;
                     spice() = 0;
                 } else {
                     outgoingMessage = YouLostFight;
+                    if(sugar() == 0.0) reward += prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+                    if(spice() == 0.0)  reward += prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
                     sugar() = 1;
                     spice() = 1;
                 }
@@ -259,39 +277,46 @@ namespace abm::bodies {
             default:
                 throw(std::out_of_range("Unrecognized act while handling act"));
         }
-        if (outgoingMessage != close) recordOutgoingMessage(outgoingMessage);
+        isTerminal =
+                (outgoingMessage == YouWonFight ||
+                outgoingMessage == YouLostFight ||
+                (outgoingMessage == WalkAway && getLastIncomingMessage() == WalkAway));
+        if (!isTerminal) recordOutgoingMessage(outgoingMessage);
         return outgoingMessage;
     }
 
+
     template<bool HASLANGUAGE>
     double SugarSpiceTradingBody<HASLANGUAGE>::messageToReward(SugarSpiceTradingBody::message_type incomingMessage) {
-        isTerminal = (
-                incomingMessage == Bandits ||
-                incomingMessage == YouWonFight ||
-                incomingMessage == YouLostFight ||
-                incomingMessage == close ||
-                (getLastOutgoingMessage() == WalkAway && incomingMessage == WalkAway));
         switch (incomingMessage) {
             case GiveSugar:
                 sugar() += 1;
+                reward += prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
                 break;
             case GiveSpice:
                 spice() += 1;
+                reward += prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
                 break;
             case YouWonFight:
                 // You started fight and I won
-                utilityBeforeLastAct += costOfFighting;
+                reward -= costOfFighting;
+                if(sugar() == 0.0) reward += prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+                if(spice() == 0.0)  reward += prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
                 sugar() = 1;
                 spice() = 1;
                 break;
             case YouLostFight:
                 // You started fight and I lost
-                utilityBeforeLastAct += costOfFighting;
+                reward -= costOfFighting;
+                if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+                if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
                 sugar() = 0;
                 spice() = 0;
                 break;
             case Bandits:
-                utilityBeforeLastAct += costOfBanditAttack;
+                reward -= costOfBanditAttack;
+                if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+                if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
                 sugar() = 0;
                 spice() = 0;
                 break;
@@ -299,17 +324,16 @@ namespace abm::bodies {
                 break;
         }
         if(incomingMessage != close) recordIncomingMessage(incomingMessage);
-        double reward = utility() - utilityBeforeLastAct;
+        double returnedReward = reward;
+        reward = 0.0;
 //        std::cout << "sending reward " << reward << std::endl;
-        return reward;
+        isTerminal =
+                (incomingMessage == Bandits ||
+                incomingMessage == YouWonFight ||
+                incomingMessage == YouLostFight ||
+                (incomingMessage == WalkAway && getLastOutgoingMessage() == WalkAway));
+        return returnedReward;
     }
-
-
 }
-
-
-
-
-
 
 #endif //MULTIAGENTGOVERNMENT_SUGARSPICETRADINGBODY_H

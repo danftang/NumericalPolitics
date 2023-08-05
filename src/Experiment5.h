@@ -100,50 +100,48 @@ void experiment5a() {
 
             abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
 
-            abm::GreedyPolicy(
+            abm::GreedyPolicy<body_type::action_type>(
                     0.5,
                     NTRAININGEPISODES,
                     0.005)
     };
 
-//    decltype(mind)::observation_type x;
-//    abm::DQN<9,6>::input_type x;
-//    mind.train(x,1,1.0,x,true);
 
-    auto agent = abm::Agent(body_type(), mind);
+    std::vector agents({
+        abm::Agent(body_type(), mind),
+        abm::Agent(body_type(), mind)
+    });
 
-    abm::societies::RandomEncounterSociety soc({agent, agent});
-
-
-//    typedef abm::QAgent<body_type, abm::QTable<body_type::nstates,body_type::action_type::size>> SugarSpiceTradingAgent;
-//    abm::societies::RandomEncounterSociety<SugarSpiceTradingAgent> soc(2);
+//    abm::societies::RandomEncounterSociety soc({agent, agent});
 
     // train
-//    soc.verbose = true;
+    bool verbose = false;
     for(int iterations = 0; iterations < NTRAININGEPISODES; ++iterations) {
         if(iterations%100 == 0) {
             std::cout << iterations << " "
-            << soc.agents[0].exponentialMeanReward << " "
-            << soc.agents[1].exponentialMeanReward << " "
-            << soc.agents[0].exponentialMeanReward + soc.agents[1].exponentialMeanReward
+            << agents[0].meanReward << " "
+            << agents[1].meanReward << " "
+            << agents[0].meanReward + agents[1].meanReward
             << std::endl;
         }
         // set random initial state
         bool agent0HasSugar = deselby::Random::nextBool();
         bool agent0HasSpice = deselby::Random::nextBool();
-        soc.agents[0].body.reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
-        soc.agents[1].body.reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
-        assert(!soc.agents[0].body.isTerminal);
-        assert(!soc.agents[1].body.isTerminal);
-        soc.episode();
+        agents[0].body.reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
+        agents[1].body.reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+        if(deselby::Random::nextBool()) {
+            episode(agents[0], agents[1], verbose);
+        } else {
+            episode(agents[1], agents[0], verbose);
+        }
     }
 
     // perform
     abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>::pBanditAttack = 0.001;
-    soc.verbose = true;
+    verbose = true;
 
-    soc.agents[0].mind.policy.pExplore = 0.0;
-    soc.agents[1].mind.policy.pExplore = 0.0;
+    agents[0].mind.policy.pExplore = 0.0;
+    agents[1].mind.policy.pExplore = 0.0;
     for(int state = 0; state < 32; ++state) {
         // set random initial state
         int agentToStart = state & 1;
@@ -151,11 +149,11 @@ void experiment5a() {
         bool startAgentPrefersSugar = (state >> 2) & 1;
         bool startAgentHasSugar = (state >> 3) & 1;
         bool startAgentHasSpice = (state >> 4) & 1;
-        soc.agents[agentToStart].body.reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
-        soc.agents[agentToStart^1].body.reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
+        agents[agentToStart].body.reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
+        agents[agentToStart^1].body.reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
 
         // random agent starts
-        soc.episode({&soc.agents[agentToStart], &soc.agents[agentToStart^1]});
+        episode(agents[agentToStart], agents[agentToStart^1], verbose);
     }
 }
 

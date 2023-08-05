@@ -14,18 +14,17 @@ namespace abm::societies {
     class RandomEncounterSociety {
     public:
         std::vector<AGENT> agents;
-        bool verbose;
-
-        explicit RandomEncounterSociety(int nAgents): agents(nAgents), verbose(false) { }
-        RandomEncounterSociety(std::initializer_list<AGENT> agents): agents(agents), verbose(false) { }
+\
+        explicit RandomEncounterSociety(int nAgents): agents(nAgents) { }
+        RandomEncounterSociety(std::initializer_list<AGENT> agents): agents(agents) { }
 
         // execute one episode between randomly chosen agents
         // returns the total number of messages passed (not including close) in the episode
-        int episode() {
-            return episode(chooseAgentPair());
+        int episode(bool verbose = false) {
+            return episode(chooseAgentPair(), verbose);
         }
 
-        int episode(std::array<AGENT *,2> players) {
+        static int episode(std::array<AGENT *,2> players, bool verbose = false) {
             if(verbose) {
                 std::cout << std::endl << "------- Starting game -------";
                 std::cout << std::endl << players[0]->body << players[1]->body;

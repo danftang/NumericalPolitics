@@ -27,7 +27,8 @@ namespace abm::minds {
     public:
 
         typedef QFUNCTION::input_type   observation_type;
-        typedef QFUNCTION::action_type  action_type;
+        typedef POLICY::action_type  action_type;
+        typedef double  reward_type;
         typedef std::bitset<action_type::size> action_mask;
 
         QFUNCTION   qFunction;
@@ -45,7 +46,7 @@ namespace abm::minds {
          * @param reward reward since the last decision point
          * @return decision how to act in the current situation
          **/
-        action_type act(observation_type observation, const action_mask &legalActs, double rewardFromLastChoice) {
+        action_type act(observation_type observation, const action_mask &legalActs, reward_type rewardFromLastChoice) {
             if(lastState.has_value()) qFunction.train(std::move(lastState.value()), lastAction, rewardFromLastChoice, observation, false);
             lastAction = policy.sample(qFunction.predict(observation), legalActs);
             lastState = std::move(observation);
@@ -56,6 +57,7 @@ namespace abm::minds {
         void endEpisode(double finalReward) {
             if(lastState.has_value()) qFunction.train(lastState.value(), lastAction, finalReward, lastState.value(), true);
             lastState.reset();
+            assert(!lastState.has_value());
         }
 
 //        template<class STATE> requires(std::is_convertible_v<STATE,observation_type>)

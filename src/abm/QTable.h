@@ -79,7 +79,7 @@ namespace abm {
          * @param isEndgame
          */
         void train(int startState, action_type action, double reward, int endState, bool isEndgame) {
-//            std::cout << "training on " << std::oct << startState << " " << action << " " << reward << " " << std::oct << endState << std::endl;
+//            std::cout << "training " << this << " on " << std::oct << startState << " " << action << " " << reward << " " << std::oct << endState << " " << isEndgame << std::endl;
 
             ++nSamples[startState][action];
             const double rrn = std::pow(sampleDecay, nSamples[startState][action]);
@@ -88,9 +88,11 @@ namespace abm {
             const double endStateQValue = (isEndgame ? 0.0 : Qtable[endState].max());
             const double forwardQ = reward + discount * endStateQValue;
             Qtable[startState][action] = (1.0-sampleWeight) * Qtable[startState][action] + sampleWeight * forwardQ;
+            assert(!Qtable[startState].has_nan());
         }
 
         output_type predict(int state) {
+            assert(!Qtable[state].has_nan());
             return Qtable[state];
         }
     };

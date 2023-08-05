@@ -8,11 +8,13 @@
 #include <random>
 #include <bitset>
 #include "mlpack.hpp"
+#include "../abm/Mind.h"
 
-namespace abm::bodies {
-    class CartPoleEnvironment
-    {
+// TODO: make this just take a Mind and provides a step?
+namespace tests {
+    class CartPoleEnvironment {
     public:
+
         enum action_type {
             left,
             right,
@@ -64,8 +66,7 @@ namespace abm::bodies {
                 thetaThresholdRadians(thetaThresholdRadians),
                 xThreshold(xThreshold),
                 successReward(successReward),
-                stepsPerformed(0)
-        {
+                stepsPerformed(0) {
             reset();
         }
 
@@ -73,7 +74,7 @@ namespace abm::bodies {
          * Sets the state to a random start state and sets stepsPerformed to 0
          */
         void reset() {
-            std::uniform_real_distribution<double> rand(-0.05,0.05);
+            std::uniform_real_distribution<double> rand(-0.05, 0.05);
             std::default_random_engine gen;
             position = rand(gen);
             velocity = rand(gen);
@@ -89,13 +90,12 @@ namespace abm::bodies {
          * @param action The current action.
          * @return reward, it's 1.0
          */
-        message_type actToMessage(int action)
-        {
+        double actToReward(int action) {
             // Update the number of steps performed.
             stepsPerformed++;
 
             // Calculate acceleration.
-            double force = (action==right ? forceMag : -forceMag);
+            double force = (action == right ? forceMag : -forceMag);
             double cosTheta = std::cos(angle);
             double sinTheta = std::sin(angle);
             double temp = (force + poleMassLength * angularVelocity *
@@ -110,31 +110,28 @@ namespace abm::bodies {
             angle += tau * angularVelocity,
             angularVelocity += tau * thetaAcc;
             bool isEndOfEpisode = isTerminal();
-            if(isEndOfEpisode) reset();
-            return isEndOfEpisode?close:step;
+            if (isEndOfEpisode) reset();
+            return isEndOfEpisode ? 0.0 : 1.0;
+        }
+
+        template<abm::Mind MIND>
+        int episode(MIND &mind) {
+            int nSteps = 0;
+            std::bitset<2> actionMask = 3;
+            reset();
+            double reward = 0.0;
+            do {
+                int nextAct = mind.act(*this, actionMask, reward);
+                reward = actToReward(nextAct);
+                ++nSteps;
+            } while(reward == 1.0);
+            mind.endEpisode(1.0);
+            return nSteps;
         }
 
 
-        double messageToReward(message_type message) {
-            double reward = 1.0;
-            if(message == close) {
-                if(maxSteps != 0 && stepsPerformed >= maxSteps) reward = successReward;
-                reset(); // reset state for next episode
-            }
-            return reward;
-        }
-
-        /**
-         * All actions are always possible
-         * @return bitset with all bits set to true
-         */
-        action_mask legalActs() {
-            return 3; //((1<<action_type::size) - 1);
-        }
-
-
-        operator arma::mat::fixed<4,1>() const {
-            return { position, velocity, angle, angularVelocity };
+        operator arma::mat::fixed<4, 1>() const {
+            return {position, velocity, angle, angularVelocity};
         }
 
         /**
@@ -142,12 +139,12 @@ namespace abm::bodies {
          *
          * @return true if state is a terminal state, otherwise false.
          */
-        bool isTerminal() const
-        {
+        bool isTerminal() const {
 //            std::cout << position << " " << angle << std::endl;
             if (maxSteps != 0 && stepsPerformed >= maxSteps) return true;
             if (std::abs(position) > xThreshold ||
-                std::abs(angle) > thetaThresholdRadians) return true;
+                std::abs(angle) > thetaThresholdRadians)
+                return true;
 
             return false;
         }
@@ -157,11 +154,13 @@ namespace abm::bodies {
 
         //! Get the maximum number of steps allowed.
         size_t MaxSteps() const { return maxSteps; }
-        //! Set the maximum number of steps allowed.
-        size_t& MaxSteps() { return maxSteps; }
 
-        friend std::ostream &operator <<(std::ostream &out, const CartPoleEnvironment &cartPole) {
-            out << "{" << cartPole.position << ", " << cartPole.angle << ", " << cartPole.velocity << ", " << cartPole.angularVelocity << "}";
+        //! Set the maximum number of steps allowed.
+        size_t &MaxSteps() { return maxSteps; }
+
+        friend std::ostream &operator<<(std::ostream &out, const CartPoleEnvironment &cartPole) {
+            out << "{" << cartPole.position << ", " << cartPole.angle << ", " << cartPole.velocity << ", "
+                << cartPole.angularVelocity << "}";
             return out;
         }
 
@@ -211,8 +210,6 @@ namespace abm::bodies {
         //! Locally-stored number of steps performed.
         size_t stepsPerformed;
     };
-
 }
-
 
 #endif //MULTIAGENTGOVERNMENT_CARTPOLE_H
