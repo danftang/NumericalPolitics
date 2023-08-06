@@ -14,9 +14,13 @@ namespace abm {
         { actionMask[action] } -> std::convertible_to<bool>;
     };
 
-    template<class T, class ACTION>
-    concept DiscreteActionMask = ActionMask<T,ACTION> && requires(T actionMask, ACTION action) {
-        { actionMask.count() } -> std::convertible_to<std::size_t>; // number of legal actions (what about continuous?)
+    /** Action masks are used to specify a set of legal actions from the domain of all actions
+     * In the discrete case, we assume the domain is size_t
+     */
+    template<class T>
+    concept DiscreteActionMask = ActionMask<T,size_t> && requires(T actionMask) {
+        { actionMask.size()  } -> std::convertible_to<std::size_t>;
+        { actionMask.count() } -> std::convertible_to<std::size_t>; // number of legal actions
     };
 
     template<class ACTION, class MASK>

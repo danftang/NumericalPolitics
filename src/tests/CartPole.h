@@ -121,7 +121,7 @@ namespace tests {
             reset();
             double reward = 0.0;
             do {
-                int nextAct = mind.act(*this, actionMask, reward);
+                int nextAct = mind.act(*this, actionMask, 0);
                 reward = actToReward(nextAct);
                 ++nSteps;
             } while(reward == 1.0);

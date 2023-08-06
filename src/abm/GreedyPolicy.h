@@ -1,4 +1,3 @@
-// Wrapper class for policies that are no
 //
 // Created by daniel on 18/07/23.
 //
@@ -9,8 +8,45 @@
 #include <bitset>
 #include <armadillo>
 #include "../DeselbyStd/random.h"
+#include <concepts>
+#include "utils.h"
 
 namespace abm {
+
+    class LinearDecay {
+    public:
+        double pExplore;
+        double exploreDecay;
+        double pExploreMin;
+
+        LinearDecay(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
+                pExplore(initialExploration),
+                exploreDecay((initialExploration - initialExploration)/stepsToDecayToMinimum),
+                pExploreMin(minimumExploration) {}
+
+        bool operator()() {
+            if (pExplore > pExploreMin) pExplore -= exploreDecay;
+            return deselby::Random::nextBool(pExplore);
+        }
+    };
+
+
+    class ExponentialDecay {
+    public:
+        double pExplore;
+        double exploreDecay;
+        double pExploreMin;
+
+        ExponentialDecay(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
+                pExplore(initialExploration),
+                exploreDecay(pow(minimumExploration/initialExploration, 1.0/stepsToDecayToMinimum)),
+                pExploreMin(minimumExploration) {}
+
+        bool operator()() {
+            if (pExplore > pExploreMin) pExplore *= exploreDecay;
+            return deselby::Random::nextBool(pExplore);
+        }
+    };
 
     template<class ACTION>
     class GreedyPolicy {
@@ -18,26 +54,19 @@ namespace abm {
 
         typedef ACTION action_type;
 
-        double pExplore;
-        double exploreDeay;
-        double pExploreMin;
+        std::function<bool()> explorationStrategy;
 
         //  d^steps = (minimum/initialExp)^{1/steps}
-        GreedyPolicy(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
-                pExplore(initialExploration),
-                exploreDeay(pow(minimumExploration/initialExploration, 1.0/stepsToDecayToMinimum)),
-//                exploreDeay((initialExploration - initialExploration)/stepsToDecayToMinimum),
-                pExploreMin(minimumExploration) {}
+        explicit GreedyPolicy(std::function<bool()> explorationStrategy) : explorationStrategy(std::move(explorationStrategy)) {}
 
 
-//        template<unsigned long long MATSIZE, size_t BITSETSIZE> requires(MATSIZE == BITSETSIZE)
-        ACTION sample(const arma::mat::fixed<action_type::size, 1> &qValues, const std::bitset<action_type::size> &legalMoves,
-                   bool decayExplore = true) {
-            assert(!qValues.has_nan());
+        template<class QVECTOR, DiscreteActionMask ACTIONMASK>
+        ACTION sample(const QVECTOR &qValues, const ACTIONMASK &legalMoves) {
+//            assert(!qValues.has_nan());
 //            std::cout << "sampling from " << qValues.t() << std::endl;
             int chosenMove = -1;
             assert(legalMoves.count() >= 1);
-            if (deselby::Random::nextBool(pExplore)) {
+            if (explorationStrategy()) {
                 // choose a legal move at random
                 chosenMove = sampleUniformly(legalMoves);
             } else {
@@ -51,34 +80,10 @@ namespace abm {
                 }
                 assert(bestQ != -std::numeric_limits<double>::infinity());
             }
-            if (decayExplore) decayExploration();
+//            if (decayExploration) explorationStrategy.decay();
 //            std::cout << "Chose " << chosenMove << std::endl;
             return static_cast<ACTION>(chosenMove);
         }
-
-        template<size_t SIZE>
-        static int sampleUniformly(const std::bitset<SIZE> &legalMoves) {
-            int chosenMove = -1;
-            int nLegalMoves = legalMoves.count();
-            assert(nLegalMoves > 0);
-            int legalMovesToGo = deselby::Random::nextInt(1, nLegalMoves + 1);
-            do {
-                ++chosenMove;
-                assert(chosenMove < SIZE);
-                while (legalMoves[chosenMove] == false) { ++chosenMove; }
-                --legalMovesToGo;
-            } while (legalMovesToGo != 0);
-            return chosenMove;
-        }
-
-        void decayExploration() {
-            if (pExplore > pExploreMin) {
-//                pExplore -= exploreDeay;
-                pExplore *= exploreDeay;
-//                std::cout << "pExplore = " << pExplore << std::endl;
-            }
-        }
-
     };
 }
 

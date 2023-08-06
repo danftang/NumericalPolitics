@@ -19,9 +19,11 @@ namespace tests {
                         1.0),
 
                 abm::GreedyPolicy<tests::CartPoleEnvironment::action_type>(
-                        0.5, // 0.1,
-                        50000, //20000,
-                        0.01)
+                        abm::LinearDecay(
+                            0.5, // 0.1,
+                            50000, //20000,
+                            0.01)
+                )
         };
 
         tests::CartPoleEnvironment cartPole;

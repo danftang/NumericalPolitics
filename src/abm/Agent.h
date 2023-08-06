@@ -77,7 +77,7 @@ namespace abm {
          * @return message that begins the episode
          */
         out_message_type startEpisode() {
-            action_type lastAct = mind.act(body, body.legalActs(), std::numeric_limits<double>::quiet_NaN());
+            action_type lastAct = mind.act(body, body.legalActs(), 0);
             out_message_type initialMessage = body.actToMessage(lastAct);
             if(body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
@@ -103,7 +103,7 @@ namespace abm {
                 mind.endEpisode(reward);
                 return {};
             }
-            action_type lastAct = mind.act(body, body.legalActs(), reward);
+            action_type lastAct = mind.act(body, body.legalActs(), 0);
             out_message_type response = body.actToMessage(lastAct);
             if (body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
