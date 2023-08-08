@@ -11,12 +11,9 @@ namespace tests {
         const int nRootSamples = 4;
 
         typedef abm::bodies::SugarSpiceTradingBody<false> body_type;
-        abm::minds::IncompleteInformationMCTS<body_type> myMCTS(
-                []() {
-                    return body_type(deselby::Random::nextBool(), deselby::Random::nextBool(),
-                                     deselby::Random::nextBool());
-                }, 0, 0);
+        abm::minds::IncompleteInformationMCTS<body_type> myMCTS(0, 0, std::function<std::function<const BODY &()>(
+                const BODY &)>(), std::function<std::function<const BODY &()>(const BODY &)>());
 
-        myMCTS.buildTree();
+        myMCTS.buildTree(std::function<const BODY &()>(), std::function<const BODY &()>());
     }
 }

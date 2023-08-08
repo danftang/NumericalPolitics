@@ -85,117 +85,165 @@
 #include "abm/minds/QMind.h"
 #include "abm/minds/IncompleteInformationMCTS.h"
 
-template<class AGENT>
-void experiment5base(std::vector<AGENT> agents, size_t nTrainingEpisodes) {
-
-    // train
-    bool verbose = false;
-    for(int iterations = 0; iterations < nTrainingEpisodes; ++iterations) {
-        if(iterations%100 == 0) {
-            std::cout << iterations << " "
-                      << agents[0].meanReward << " "
-                      << agents[1].meanReward << " "
-                      << agents[0].meanReward + agents[1].meanReward
-                      << std::endl;
-        }
-        // set random initial state
-        bool agent0HasSugar = deselby::Random::nextBool();
-        bool agent0HasSpice = deselby::Random::nextBool();
-        agents[0].body.reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
-        agents[1].body.reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
-        if(deselby::Random::nextBool()) {
-            episode(agents[0], agents[1], verbose);
-        } else {
-            episode(agents[1], agents[0], verbose);
+namespace experiment5 {
+    template<class AGENT>
+    void train(std::vector<AGENT> &agents, size_t nTrainingEpisodes) {
+        bool verbose = false;
+        for(int iterations = 0; iterations < nTrainingEpisodes; ++iterations) {
+            if(iterations%100 == 0) {
+                std::cout << iterations << " "
+                          << agents[0].meanReward << " "
+                          << agents[1].meanReward << " "
+                          << agents[0].meanReward + agents[1].meanReward
+                          << std::endl;
+            }
+            // set random initial state
+            bool agent0HasSugar = deselby::Random::nextBool();
+            bool agent0HasSpice = deselby::Random::nextBool();
+            agents[0].body.reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
+            agents[1].body.reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
+            if(deselby::Random::nextBool()) {
+                episode(agents[0], agents[1], verbose);
+            } else {
+                episode(agents[1], agents[0], verbose);
+            }
         }
     }
 
-    // perform
-    agents[0].body.pBanditAttack = 0.002;
-    verbose = true;
+    template<class AGENT>
+    void showBehaviour(std::vector<AGENT> &agents) {
+        bool verbose = true;
+        for(int state = 0; state < 32; ++state) {
+            // set random initial state
+            int agentToStart = state & 1;
+            bool otherAgentPrefersSugar = (state >> 1) & 1;
+            bool startAgentPrefersSugar = (state >> 2) & 1;
+            bool startAgentHasSugar = (state >> 3) & 1;
+            bool startAgentHasSpice = (state >> 4) & 1;
+            // TODO: think of a modular way of resetting an agent
+            agents[agentToStart].body.reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
+            agents[agentToStart^1].body.reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
 
-    agents[0].mind.policy.explorationStrategy = []() { return false; };
-    agents[1].mind.policy.explorationStrategy = []() { return false; };
-    for(int state = 0; state < 32; ++state) {
-        // set random initial state
-        int agentToStart = state & 1;
-        bool otherAgentPrefersSugar = (state >> 1) & 1;
-        bool startAgentPrefersSugar = (state >> 2) & 1;
-        bool startAgentHasSugar = (state >> 3) & 1;
-        bool startAgentHasSpice = (state >> 4) & 1;
-        // TODO: think of a modular way of resetting an agent
-        agents[agentToStart].body.reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
-        agents[agentToStart^1].body.reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
+            // random agent starts
+            abm::episode(agents[agentToStart], agents[agentToStart^1], verbose);
+        }
+    }
 
-        // random agent starts
-        episode(agents[agentToStart], agents[agentToStart^1], verbose);
+
+    /** Samples from the distribution of other, given the current state */
+    template<bool HASLANGUAGE>
+    std::function<abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>()> createOtherPlayerSampler(const abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> &body) {
+        bool hasSugar = (body.sugar() == 0.0);
+        bool hasSpice = (body.spice() == 0.0);
+        return [hasSugar, hasSpice]() {
+            return abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>(hasSugar, hasSpice, deselby::Random::nextBool());
+        };
+    }
+
+
+    /** samples from the distribution of self, given the current public state
+      * i.e. samples over the (possibly counterfactual) hidden state */
+    template<bool HASLANGUAGE>
+    std::function<abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>()> createNextPlayerSampler(const abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> &body) {
+        bool hasSugar = (body.sugar() == 1.0);
+        bool hasSpice = (body.spice() == 1.0);
+        return [hasSugar, hasSpice]() {
+            return abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>(hasSugar, hasSpice, deselby::Random::nextBool());
+        };
+    }
+
+
+    /** Test a QTable on binary, repeated SugarSpiceTrading
+     *
+     */
+    void runA() {
+        const int NTRAININGEPISODES = 200000; // 4000000;
+        const bool HASLANGUAGE = false;
+
+        typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
+
+        auto mind = abm::minds::QMind {
+                abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
+
+                abm::GreedyPolicy<body_type::action_type>(
+                        abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                )
+        };
+
+        std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
+        train(agents,NTRAININGEPISODES);
+        body_type::pBanditAttack = 0.002;
+        agents[0].mind.policy.explorationStrategy = abm::NoExploration();
+        agents[1].mind.policy.explorationStrategy = abm::NoExploration();
+        showBehaviour(agents);
+    }
+
+    /** Test a Deep Q-network on binary, repeated SugarSpiceTrading
+ * (spoiler: doesn't learn to cooperate)
+ */
+    void runB() {
+        const int NTRAININGEPISODES = 200000; // 4000000;
+        const bool HASLANGUAGE = false;
+
+        typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
+
+        auto mind = abm::minds::QMind {
+                abm::DQN<body_type::dimension, body_type::action_type::size>(
+                        mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(50,25, body_type::action_type::size),
+                        abm::RandomReplay(16, 128, body_type::dimension),
+                        2,
+                        1.0),
+                abm::GreedyPolicy<body_type::action_type>(
+                        abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                )
+        };
+
+        std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
+        train(agents,NTRAININGEPISODES);
+        body_type::pBanditAttack = 0.002;
+        agents[0].mind.policy.explorationStrategy = abm::NoExploration();
+        agents[1].mind.policy.explorationStrategy = abm::NoExploration();
+        showBehaviour(agents);
+    }
+
+    /** Test a Deep Q-network on binary, repeated SugarSpiceTrading
+    * (spoiler: doesn't learn to cooperate)
+    */
+    void runC() {
+        const bool HASLANGUAGE = false;
+
+        typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
+
+//        body_type body(true, true, true);
+//        std::function<std::function<body_type()>(const body_type &)> samplerFac = createNextPlayerSampler<HASLANGUAGE>;
+//        std::function<body_type()> sampler = samplerFac(body);
+//        body_type bodySample = sampler();
+//        std::cout << bodySample << std::endl;
+
+        auto mind = abm::minds::IncompleteInformationMCTS<body_type>(
+                1000,
+                1.0,
+                createNextPlayerSampler<HASLANGUAGE>,
+                createOtherPlayerSampler<HASLANGUAGE>
+        );
+
+//        std::function<body_type()> sampler2 = mind.thisSamplerFactory(body);
+//        body_type bodySample2 = sampler2();
+//        std::cout << bodySample2 << std::endl;
+
+        std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
+        showBehaviour(agents);
     }
 
 }
 
-/** Test a QTable on binary, repeated SugarSpiceTrading
- *
- */
-void experiment5a() {
-    const int NTRAININGEPISODES = 200000; // 4000000;
-    const bool HASLANGUAGE = false;
-
-    typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
-
-    auto mind = abm::minds::QMind {
-            abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
-
-            abm::GreedyPolicy<body_type::action_type>(
-                    abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
-            )
-    };
-
-    std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
-    experiment5base(agents,NTRAININGEPISODES);
-}
 
 
-/** Test a Deep Q-network on binary, repeated SugarSpiceTrading
- * (spoiler: doesn't learn to cooperate)
- */
-void experiment5b() {
-    const int NTRAININGEPISODES = 200000; // 4000000;
-    const bool HASLANGUAGE = false;
-
-    typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
-
-    auto mind = abm::minds::QMind {
-            abm::DQN<body_type::dimension, body_type::action_type::size>(
-                    mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(50,25, body_type::action_type::size),
-                    abm::RandomReplay(16, 128, body_type::dimension),
-                    2,
-                    1.0),
-            abm::GreedyPolicy<body_type::action_type>(
-                    abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
-            )
-    };
-
-    std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
-    experiment5base(agents,NTRAININGEPISODES);
-}
 
 
-/** Test a Deep Q-network on binary, repeated SugarSpiceTrading
- * (spoiler: doesn't learn to cooperate)
- */
-void experiment5c() {
-    const int NTRAININGEPISODES = 200000; // 4000000;
-    const bool HASLANGUAGE = false;
 
-    typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
-    auto priorBodySampler =
 
-    abm::minds::IncompleteInformationMCTS<body_type> agent(body_type(), );
-
-    std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
-    experiment5base(agents,NTRAININGEPISODES);
-}
 
 
 // Can 4 agents with no way to distinguish between each other generate a shared langauge?

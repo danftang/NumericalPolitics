@@ -24,7 +24,11 @@ namespace abm {
             ++sampleCount;
         }
         [[nodiscard]] double mean() const { return  sumOfQ / sampleCount; };
-        [[nodiscard]] double standardVarianceInMean() const { return(sumOfQSq - pow(sumOfQ, 2))/pow(sampleCount, 3); }
+        [[nodiscard]] double standardErrorOfMean() const {
+            assert(sampleCount > 1);
+            double variance = sumOfQSq/(sampleCount-1) - pow(sumOfQ,2)/(sampleCount*(sampleCount-1));
+            return sqrt(variance/sampleCount);
+        }
 
         operator double() const { return mean(); } // implicit conversion for use with policies that expect a single value
     };
@@ -34,10 +38,10 @@ namespace abm {
     template<size_t SIZE>
     class QVector: public std::array<QValue, SIZE> {
     public:
-        int         totalSamples() {
-            return std::reduce(begin(*this), end(*this), QValue(), [](const QValue &a, const QValue &b) {
-                return a.sampleCount + b.sampleCount;
-            });
+        int totalSamples() const {
+            int sum = 0;
+            for(const QValue &val : *this) sum += val.sampleCount;
+            return sum;
         }
     };
 

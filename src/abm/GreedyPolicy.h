@@ -48,6 +48,15 @@ namespace abm {
         }
     };
 
+    struct NoExploration { bool operator()() { return false; } };
+
+    class FixedExploration {
+    public:
+        double pExplore;
+        FixedExploration(double pExplore): pExplore(pExplore) {}
+        bool operator()() { return deselby::Random::nextBool(pExplore); }
+    };
+
     template<class ACTION>
     class GreedyPolicy {
     public:

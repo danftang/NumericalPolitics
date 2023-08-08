@@ -16,7 +16,7 @@ namespace abm {
         typename T::action_type;    // incoming action type
         body.actToMessage(actFromMind);                 // no constraints on outgoing message
         body.messageToReward(messageFromEnvironment);   // returns a reward (no constraint until joined with mind)
-        body.legalActs();                               // returns a mask of legal acts (no constraint until joined with mind)
+        { body.legalActs() } -> ActionMask; // returns a mask of legal acts (no constraint until joined with mind)
         { body.isEndOfEpisode() } -> std::same_as<bool>; // can be called after actToMessage or messageToReward to signal terminal condition (how to get final reward?)
         body.endEpisode();                               // ends the episode, returning any outstanding reward from final act.
     };

@@ -8,8 +8,8 @@
 #include <concepts>
 
 namespace abm {
-    template<class MASK, class ACTION>
-    concept ActionMask = requires(MASK actionMask, ACTION action) {
+    template<class MASK>
+    concept ActionMask = requires(MASK actionMask, size_t action) {
         { actionMask.any() } -> std::convertible_to<bool>; // true if there are any legal actions
         { actionMask[action] } -> std::convertible_to<bool>;
     };
@@ -18,13 +18,13 @@ namespace abm {
      * In the discrete case, we assume the domain is size_t
      */
     template<class T>
-    concept DiscreteActionMask = ActionMask<T,size_t> && requires(T actionMask) {
+    concept DiscreteActionMask = ActionMask<T> && requires(T actionMask) {
         { actionMask.size()  } -> std::convertible_to<std::size_t>;
         { actionMask.count() } -> std::convertible_to<std::size_t>; // number of legal actions
     };
 
-    template<class ACTION, class MASK>
-    concept FitsMask = ActionMask<MASK,ACTION>;
+//    template<class ACTION, class MASK>
+//    concept FitsMask = ActionMask<MASK,ACTION>;
 
 }
 

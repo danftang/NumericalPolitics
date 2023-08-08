@@ -31,19 +31,20 @@ namespace abm {
          *
          * @return the chosen act
          */
-        template<size_t SIZE, class MASK> requires(MASK::size() == SIZE)
+        template<size_t SIZE, class MASK>
         ACTION sample(const QVector<SIZE> &qValues, const MASK &legalActs) {
+            assert(legalActs.size() == SIZE);
+            assert(legalActs.count() > 0);
             double nStandardErrors = sqrt(log(qValues.totalSamples()));
             int bestActId;
             double bestQ = -std::numeric_limits<double>::infinity();
+            std::vector<int> unsamplesActs; // TODO: sample randomly from acts with count 0, then count 1, then Upper Confidence
+            std::vector<int> onceSampledActs;
             for (int actId = 0; actId < SIZE; ++actId) {
                 if(legalActs[actId]) {
-                    const QValue &qVal = (*this)[actId];
-                    if (qVal.sampleCount == 0) {
-                        bestActId = actId;
-                        break; // if there is an unexplored option, always explore.
-                    }
-                    double upperConfidenceQ = qVal.mean() + nStandardErrors * sqrt(qVal.standardVarianceInMean());
+                    const QValue &qVal = qValues[actId];
+                    double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
+                    assert(!isnan(upperConfidenceQ));
                     if (upperConfidenceQ >= bestQ) {
                         bestQ = upperConfidenceQ;
                         bestActId = actId;

@@ -19,7 +19,7 @@ namespace abm {
     concept Compatible = Body<BODY> && Mind<MIND> && requires(
             MIND mind,
             BODY body,
-            BODY::message_type message,
+            BODY::in_message_type message,
             MIND::reward_type reward,
             MIND::action_mask mask
             ) {
@@ -44,7 +44,7 @@ namespace abm {
         typedef BODY body_type;
         typedef MIND mind_type;
         typedef BODY::in_message_type in_message_type;
-        typedef MIND::action_type action_type;
+        typedef BODY::action_type action_type;
         typedef decltype(std::declval<BODY>().actToMessage(std::declval<action_type>())) out_message_type;
 
         BODY body;
@@ -72,6 +72,9 @@ namespace abm {
 
         // ------ Agent Interface ------
 
+
+//        void reset(BODY &&bodyState) { body = std::forward<BODY>(bodyState); }
+
         /**
          * Call this to nudge the agent to be the first mover in an episodic interaction
          * @return message that begins the episode
@@ -79,6 +82,8 @@ namespace abm {
         out_message_type startEpisode() {
             action_type lastAct = mind.act(body, body.legalActs(), 0);
             out_message_type initialMessage = body.actToMessage(lastAct);
+            callOutgoingMessageHook(mind, initialMessage);
+            callHalfStepObservationHook(mind, body);
             if(body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
                 const double residualFlux = 2.0*residualReward;
@@ -96,6 +101,7 @@ namespace abm {
          */
         std::optional<out_message_type> handleMessage(in_message_type incomingMessage) {
             double reward = body.messageToReward(incomingMessage);
+            callIncomingMessageHook(mind,incomingMessage);
             meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*reward;
             if(body.isEndOfEpisode()) {
                 double residualReward = body.endEpisode();
@@ -105,6 +111,8 @@ namespace abm {
             }
             action_type lastAct = mind.act(body, body.legalActs(), 0);
             out_message_type response = body.actToMessage(lastAct);
+            callOutgoingMessageHook(mind,response);
+            callHalfStepObservationHook(mind,body);
             if (body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
                 const double residualFlux = 2.0*residualReward;

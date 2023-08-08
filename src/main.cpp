@@ -16,9 +16,9 @@ int main() {
 ////    experiment1();
 //    experiment2a();
 ////    experiment2b();
-    experiment5a();
+//    experiment5a();
 //    experiment5b();
-
+    experiment5::runC();
     // ---- TESTS
 //    cartPoleDQNTest();
 //    tests::DQNCartPole();
