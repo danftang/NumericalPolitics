@@ -9,6 +9,7 @@
 #include "QVector.h"
 #include <bitset>
 #include <cassert>
+#include <ranges>
 
 namespace abm {
 
@@ -31,24 +32,32 @@ namespace abm {
          *
          * @return the chosen act
          */
-        template<size_t SIZE, class MASK>
+        template<size_t SIZE, DiscreteActionMask MASK>
         ACTION sample(const QVector<SIZE> &qValues, const MASK &legalActs) {
             assert(legalActs.size() == SIZE);
             assert(legalActs.count() > 0);
+            double bestQ = -std::numeric_limits<double>::infinity();
+            std::vector<size_t> actIndices = abm::legalIndices(legalActs);
+
+            auto unsampledActs = actIndices
+                    | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 0; });
+            auto randomUnsampledActIt = deselby::Random::chooseElement(unsampledActs);
+            if(randomUnsampledActIt != unsampledActs.end()) return static_cast<ACTION>(*randomUnsampledActIt);
+
+            auto onceSampledActs = actIndices
+                    | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 1; });
+            auto randomOnceSampledActIt = deselby::Random::chooseElement(onceSampledActs);
+            if(randomOnceSampledActIt != onceSampledActs.end()) return static_cast<ACTION>(*randomOnceSampledActIt);
+
             double nStandardErrors = sqrt(log(qValues.totalSamples()));
             int bestActId;
-            double bestQ = -std::numeric_limits<double>::infinity();
-            std::vector<int> unsamplesActs; // TODO: sample randomly from acts with count 0, then count 1, then Upper Confidence
-            std::vector<int> onceSampledActs;
-            for (int actId = 0; actId < SIZE; ++actId) {
-                if(legalActs[actId]) {
-                    const QValue &qVal = qValues[actId];
-                    double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
-                    assert(!isnan(upperConfidenceQ));
-                    if (upperConfidenceQ >= bestQ) {
-                        bestQ = upperConfidenceQ;
-                        bestActId = actId;
-                    }
+            for (size_t actId : actIndices) {
+                const QValue &qVal = qValues[actId];
+                double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
+                assert(!isnan(upperConfidenceQ));
+                if (upperConfidenceQ >= bestQ) {
+                    bestQ = upperConfidenceQ;
+                    bestActId = actId;
                 }
             }
             assert(bestQ > -std::numeric_limits<double>::infinity()); // make sure we found an act
