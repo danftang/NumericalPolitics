@@ -57,13 +57,13 @@ namespace abm {
 
             const double N = qValues.totalSamples();
             assert(N > 1);
-            double nStandardErrors = sqrt(log(N));
+            double nStandardErrors = 2.0*sqrt(log(N));
             size_t bestActId;
             double bestQ = -std::numeric_limits<double>::infinity();
             for (size_t actId : legalActIndices) {
                 const QValue &qVal = qValues[actId];
-//                double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
-                double upperConfidenceQ = qVal.mean() + nStandardErrors * 16.0/sqrt(qVal.sampleCount);
+                double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
+//                double upperConfidenceQ = qVal.mean() + nStandardErrors * 16.0/sqrt(qVal.sampleCount);
                 assert(!isnan(upperConfidenceQ));
                 if (upperConfidenceQ >= bestQ) {
                     bestQ = upperConfidenceQ;

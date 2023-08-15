@@ -197,7 +197,7 @@ namespace experiment5 {
     */
     void runC() {
         std::cout << "starting experiment" << std::endl;
-        auto mind = abm::minds::IncompleteInformationMCTS<body_type>(320000, 1.0);
+        auto mind = abm::minds::IncompleteInformationMCTS<body_type>(9000, 1.0);
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
 
         showBehaviour(agents);
