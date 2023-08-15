@@ -9,9 +9,11 @@
 #include "ActionMask.h"
 
 
-// TODO: add hooks to Mind so that we can see messages coming in and out.
-//  Also endEpisode can become a hook, to deal with the case where we know the reward
 namespace abm {
+
+    /** This is the minimum requirements for a class to be a Mind. In addition, a Mind can add "hooks"
+     * which are called at specific points in an episode. See the hook documentation for more details.
+     */
     template<class T>
     concept Mind = requires(T mind, T::observation_type observation, T::action_mask actMask, T::reward_type reward) {
         typename T::observation_type;
@@ -22,17 +24,15 @@ namespace abm {
         { mind.endEpisode(reward) } -> std::same_as<void>;
     };
 
-    /**
-     *
-     * @tparam T
-     * @tparam MESSAGE
+    /** If a Mind has an incomingMessageHook method, it will be called when a
+     * message is received, directly after it is processed by the body.
      */
     template<class T, class MESSAGE>
     concept HasIncomingMessageHook = requires(T object, MESSAGE message) {
         object.incomingMessageHook(message);
     };
 
-    template<class MESSAGE, class OBJ> requires(!HasIncomingMessageHook<OBJ,MESSAGE>)
+    template<class MESSAGE, class OBJ>
     void callIncomingMessageHook(OBJ &object, MESSAGE &&message) { }
 
     template<class MESSAGE, HasIncomingMessageHook<MESSAGE> OBJ>
@@ -40,41 +40,69 @@ namespace abm {
         object.incomingMessageHook(std::forward<MESSAGE>(message));
     }
 
-    /**
-     *
-     * @tparam T
-     * @tparam MESSAGE
+    /** If a Mind has an outgoingMessageHook method, it will be called directly
+     * after a body has processed an act
      */
-    template<class T, class MESSAGE>
-    concept HasOutgoingMessageHook = requires(T object, MESSAGE message) {
-        object.outgoingMessageHook(message);
+    template<class MIND, class MESSAGE>
+    concept HasOutgoingMessageHook = requires(MIND mind, MESSAGE message) {
+        mind.outgoingMessageHook(message);
     };
 
-    template<class MESSAGE, class OBJ> requires(!HasOutgoingMessageHook<OBJ,MESSAGE>)
-    void callOutgoingMessageHook(OBJ &object, MESSAGE &&message) { }
+    template<class MIND, class MESSAGE>
+    inline void callOutgoingMessageHook(MIND &object, MESSAGE &&message) { }
 
-    template<class MESSAGE, HasOutgoingMessageHook<MESSAGE> OBJ>
-    void callOutgoingMessageHook(OBJ &object, MESSAGE &&message) {
-        object.outgoingMessageHook(std::forward<MESSAGE>(message));
+    template<class MIND, class MESSAGE> requires HasOutgoingMessageHook<MIND,MESSAGE>
+    inline void callOutgoingMessageHook(MIND &mind, MESSAGE &&message) {
+        mind.outgoingMessageHook(std::forward<MESSAGE>(message));
     }
 
-    /**
-     *
-     * @tparam T
-     * @tparam OBSERVATION
+    /** If a Mind has a halfStepObservationHook method it will be called on receipt of a
+     * message, directly BEFORE the body processes the message.
      */
-    template<class T, class OBSERVATION>
-    concept HasHalfStepObservationHook = requires(T object, OBSERVATION observation) {
-        object.halfStepObservationHook(observation);
+    template<class MIND>
+    concept HasHalfStepObservationHook = requires(MIND mind, MIND::observation_type observation) {
+        mind.halfStepObservationHook(observation);
     };
 
-    template<class OBSERVATION, class OBJ> requires(!HasHalfStepObservationHook<OBJ,OBSERVATION>)
-    void callHalfStepObservationHook(OBJ &object, OBSERVATION &&observation) { }
+    template<Mind MIND>
+    inline void callHalfStepObservationHook(MIND &mind, const typename MIND::observation_type &observation) { }
 
-    template<class OBSERVATION, HasHalfStepObservationHook<OBSERVATION> OBJ>
-    void callHalfStepObservationHook(OBJ &object, OBSERVATION &&observation) {
-        object.halfStepObservationHook(std::forward<OBSERVATION>(observation));
+    template<Mind MIND> requires HasHalfStepObservationHook<MIND>
+    inline void callHalfStepObservationHook(MIND &mind, const typename MIND::observation_type &observation) {
+        mind.halfStepObservationHook(observation);
     }
+
+
+    /** If a Mind has a startEpisodeHook method it will be called at the start of an
+     * episode
+     */
+    template<class MIND, class BODY, class SHAREDINFORMATION>
+    concept HasInitEpisodeHook = requires(MIND mind, BODY body, SHAREDINFORMATION sharedinformation) {
+        mind.initEpisodeHook(body, sharedinformation);
+    };
+
+    template<class MIND, class BODY, class SHAREDINFORMATION>
+    inline void callInitEpisodeHook(MIND &mind, BODY &&body, SHAREDINFORMATION &&info) { }
+
+    template<class MIND, class BODY, class SHAREDINFORMATION> requires HasInitEpisodeHook<MIND,BODY,SHAREDINFORMATION>
+    inline void callInitEpisodeHook(MIND &mind, BODY &&body, SHAREDINFORMATION &&sharedInfo) {
+        mind.initEpisodeHook(std::forward<BODY>(body), std::forward<SHAREDINFORMATION>(sharedInfo));
+    }
+
+
+    template<class MIND, class BODY>
+    concept HasInitEpisodeHookNoSharedInfo = requires(MIND mind, BODY body) {
+        mind.initEpisodeHook(body);
+    };
+
+    template<class MIND, class BODY>
+    inline void callInitEpisodeHook(MIND &mind, BODY body) { }
+
+    template<class MIND, class BODY> requires HasInitEpisodeHookNoSharedInfo<MIND,BODY>
+    inline void callInitEpisodeHook(MIND &mind, BODY &&body) {
+        mind.initEpisodeHook(std::forward<BODY>(body));
+    }
+
 
 }
 

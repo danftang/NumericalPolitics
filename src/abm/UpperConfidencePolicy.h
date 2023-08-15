@@ -20,6 +20,7 @@ namespace abm {
     template<class ACTION>
     class UpperConfidencePolicy {
     public:
+        bool i;
         typedef ACTION action_type;
 
         /**
@@ -36,24 +37,33 @@ namespace abm {
         ACTION sample(const QVector<SIZE> &qValues, const MASK &legalActs) {
             assert(legalActs.size() == SIZE);
             assert(legalActs.count() > 0);
+            std::vector<size_t> legalActIndices = abm::legalIndices(legalActs);
+
+            constexpr int minSamples = 10;
+            auto undersampledActs = legalActIndices
+                                 | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount < minSamples; });
+            auto randomUnsampledActIt = deselby::Random::chooseElement(undersampledActs);
+            if(randomUnsampledActIt != undersampledActs.end()) return static_cast<ACTION>(*randomUnsampledActIt);
+
+//            auto unsampledActs = legalActIndices
+//                                 | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 0; });
+//            auto randomUnsampledActIt = deselby::Random::chooseElement(unsampledActs);
+//            if(randomUnsampledActIt != unsampledActs.end()) return static_cast<ACTION>(*randomUnsampledActIt);
+//
+//            auto onceSampledActs = legalActIndices
+//                                   | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 1; });
+//            auto randomOnceSampledActIt = deselby::Random::chooseElement(onceSampledActs);
+//            if(randomOnceSampledActIt != onceSampledActs.end()) return static_cast<ACTION>(*randomOnceSampledActIt);
+
+            const double N = qValues.totalSamples();
+            assert(N > 1);
+            double nStandardErrors = sqrt(log(N));
+            size_t bestActId;
             double bestQ = -std::numeric_limits<double>::infinity();
-            std::vector<size_t> actIndices = abm::legalIndices(legalActs);
-
-            auto unsampledActs = actIndices
-                    | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 0; });
-            auto randomUnsampledActIt = deselby::Random::chooseElement(unsampledActs);
-            if(randomUnsampledActIt != unsampledActs.end()) return static_cast<ACTION>(*randomUnsampledActIt);
-
-            auto onceSampledActs = actIndices
-                    | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 1; });
-            auto randomOnceSampledActIt = deselby::Random::chooseElement(onceSampledActs);
-            if(randomOnceSampledActIt != onceSampledActs.end()) return static_cast<ACTION>(*randomOnceSampledActIt);
-
-            double nStandardErrors = sqrt(log(qValues.totalSamples()));
-            int bestActId;
-            for (size_t actId : actIndices) {
+            for (size_t actId : legalActIndices) {
                 const QValue &qVal = qValues[actId];
-                double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
+//                double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
+                double upperConfidenceQ = qVal.mean() + nStandardErrors * 16.0/sqrt(qVal.sampleCount);
                 assert(!isnan(upperConfidenceQ));
                 if (upperConfidenceQ >= bestQ) {
                     bestQ = upperConfidenceQ;

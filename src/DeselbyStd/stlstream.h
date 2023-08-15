@@ -7,17 +7,12 @@
 #ifndef DESELBY_STLSTREAM_H
 #define DESELBY_STLSTREAM_H
 
-#include <vector>
-#include <list>
-#include <iterator>
-#include <map>
-#include <set>
 #include <chrono>
-#include <deque>
-#include <forward_list>
-#include <unordered_set>
+#include <optional>
+#include <utility>
 #include <ostream>
-#include "traits.h"
+#include <ranges>
+#include <concepts>
 
 
 template<typename I, intmax_t UNITS>
@@ -39,36 +34,37 @@ std::ostream &operator <<(std::ostream &out, const std::chrono::duration<I,std::
 }
 
 
-// Prior declarations to allow recursion in containers
+// Prior declarations to allow containers of pairs and pairs of containers etc...
 template<typename T> std::ostream &operator <<(std::ostream &out, const std::optional<T> &optional);
-template<typename T> std::ostream &operator <<(std::ostream &out, const std::valarray<T> &vec);
 template<typename T1, typename T2> std::ostream &operator <<(std::ostream &out, const std::pair<T1,T2> &pair);
 
 
-template<class T, typename = std::enable_if_t<deselby::is_stl_container_v<T>>>
+template<std::ranges::range T> requires(!std::convertible_to<T,std::string>)
 std::ostream &operator <<(std::ostream &out, const T &container) {
-    out << "{";
-    auto it = container.begin();
-    if(it != container.end()) {
-            if constexpr (deselby::is_stl_associative_container_v<T>) {
-                out << it->first << "->" << it->second;
-                while (++it != container.end()) out << ", " << it->first << "->" << it->second;
-            } else {
-                out << *it;
-                while (++it != container.end()) out << ", " << *it;
-            }
+    out << '{';
+    auto it = std::ranges::begin(container);
+    if(it != std::ranges::end(container)) {
+        out << *it;
+        while (++it != container.end()) out << ", " << *it;
     }
-    out << "}";
+    out << '}';
     return out;
 }
 
 
-template<typename T>
-std::ostream &operator <<(std::ostream &out, const std::valarray<T> &vec) {
-    out << "{";
-    for(int i=0; i<vec.size()-1; ++i) out << vec[i] << ", ";
-    if(vec.size() > 0) out << vec[vec.size()-1];
-    out << "}";
+template<std::ranges::range T> requires requires(T map) {
+    typename T::key_type;
+    typename T::mapped_type;
+    { map.begin() } -> std::convertible_to<std::pair<const typename T::key_type, typename T::mapped_type>>;
+}
+std::ostream &operator <<(std::ostream &out, const T &container) {
+    out << '{';
+    auto it = std::ranges::begin(container);
+    if(it != std::ranges::end(container)) {
+        out << it->first << "->" << it->second;
+        while (++it != container.end()) out << ", " << it->first << "->" << it->second;
+    }
+    out << '}';
     return out;
 }
 

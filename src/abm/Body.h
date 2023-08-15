@@ -20,6 +20,16 @@ namespace abm {
         { body.isEndOfEpisode() } -> std::same_as<bool>; // can be called after actToMessage or messageToReward to signal terminal condition (how to get final reward?)
         body.endEpisode();                               // ends the episode, returning any outstanding reward from final act.
     };
+
+    template<Body BODY>
+    class Traits {
+    public:
+        typedef BODY::in_message_type in_message_type;
+        typedef BODY::action_type action_type;
+        typedef decltype(std::declval<BODY>().actToMessage(std::declval<typename BODY::action_type>())) out_message_type;
+        typedef decltype(std::declval<BODY>().endEpisode()) reward_type;
+        typedef decltype(std::declval<BODY>().legalActs()) action_mask;
+    };
 }
 
 #endif //MULTIAGENTGOVERNMENT_BODY_H

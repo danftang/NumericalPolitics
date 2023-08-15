@@ -67,6 +67,8 @@
 #include "../QVector.h"
 #include "../UpperConfidencePolicy.h"
 #include "ZeroIntelligence.h"
+#include "../../DeselbyStd/stlstream.h"
+#include "../episodes/SimpleEpisode.h"
 
 namespace abm::minds {
 
@@ -110,7 +112,7 @@ namespace abm::minds {
             TreeNode *getChildOrNull(message_type message) { return children[static_cast<size_t>(message)]; }
             TreeNode *unlinkChild(message_type message);
             iterator addQEntry(const BODY &agent);
-            std::function<BODY()> createNextPlayerSampler();
+            std::function<BODY()> createNextMoverSampler();
             std::function<BODY()> createOtherPlayerSampler();
             size_t nSamples();
         };
@@ -139,7 +141,7 @@ namespace abm::minds {
             POLICY                                      policy;
             bool                                        hasAddedQEntry;
 
-            SelfPlayMind(TreeNode *treeNode, POLICY policy, double discount):
+            SelfPlayMind(TreeNode *treeNode, double discount,const POLICY &policy):
             treeNode(treeNode), discount(discount), policy(policy), hasAddedQEntry(false) {}
 
             action_type act(const observation_type &body, action_mask legalActs, reward_type rewardFromLastAct);
@@ -151,40 +153,52 @@ namespace abm::minds {
 
 
         TreeNode *rootNode;                                 // points to the rootNode. nullptr signifies no acts this episode yet.
-        std::function<std::function<BODY()>(const BODY &)>     thisSamplerFactory;
-        std::function<std::function<BODY()>(const BODY &)>     otherSamplerFactory;
+//        std::function<BODY()>     firstMoverPrior;
+//        std::function<BODY()>     secondMoverPrior;
         size_t nSamplesPerTree;                             // number of samples taken to build the tree before a decision is made
         double discount;                                    // discount of rewards into the future
         GreedyPolicy<action_type> policy;                   // fixed policy for now (greedy, no exploration)
 
-        explicit IncompleteInformationMCTS(size_t nSamplesPerTree, double discount,
-                                           std::function<std::function<BODY()>(
-                                                   const BODY &)> thisSamplerFactory,
-                                           std::function<std::function<BODY()>(
-                                                   const BODY &)> otherSamplerFactory);
+        explicit IncompleteInformationMCTS(size_t nSamplesPerTree, double discount);
         ~IncompleteInformationMCTS() { delete (rootNode); }
 
         // ----- Mind interface -----
 
         action_type act(const observation_type &body, action_mask legalActs, [[maybe_unused]] reward_type rewardFromLastAct) {
-            if(rootNode == nullptr) { // must be first move
-                rootNode = new TreeNode();
-                buildTree(thisSamplerFactory(body), otherSamplerFactory(body));
-            } else {
-                buildTree(rootNode->createNextPlayerSampler(), rootNode->createOtherPlayerSampler());
-            }
+            // onTree and can add entry so try emplace
+//            std::cout << "Available bodies \n" << (rootNode->qEntries | std::views::keys) << std::endl;
+//            std::cout << "Search body \n" << body << std::endl;
+//            std::cout << "Equality vector\n" << (rootNode->qEntries | std::views::keys | std::views::transform([&body](auto &bod) { return bod == body; })) << std::endl;
+//            std::cout << "Size of qEntry map " << rootNode->qEntries.size() << std::endl;
+//            std::cout << "Size of other  map " << rootNode->otherPlayerDistribution.size() << std::endl;
+//            std::cout << "Nsamples " << rootNode->nSamples() << std::endl;
+
+            buildTree(rootNode->createNextMoverSampler(), rootNode->createOtherPlayerSampler());
+
             QVector<action_type::size> qVec = rootNode->qEntries.at(body);
+//            std::cout << "QVector = " << qVec << std::endl;
             action_type action = policy.sample(qVec, legalActs);
             return action;
         }
 
-        void incomingMessageHook(message_type incomingMessage) { shiftRoot(incomingMessage); }
+        void incomingMessageHook(message_type incomingMessage) {
+            assert(rootNode != nullptr);
+            shiftRoot(incomingMessage);
+        }
 
-        void outgoingMessageHook(message_type outgoingMessage) { shiftRoot(outgoingMessage); }
+        void outgoingMessageHook(message_type outgoingMessage) {
+            assert(rootNode != nullptr);
+            shiftRoot(outgoingMessage);
+        }
 
         void endEpisode([[maybe_unused]] double rewardFromFinalAct) {
             delete(rootNode);
             rootNode = nullptr;
+        }
+
+        void initEpisodeHook(const BODY &bodyState, const episodes::SimpleEpisode<BODY,BODY> &initialDistribution) {
+            rootNode = new TreeNode();
+            buildTree(initialDistribution.firstMoverPriorBodyDistribution, initialDistribution.secondMoverPriorBodyDistribution);
         }
 
     protected:
@@ -243,8 +257,8 @@ namespace abm::minds {
             rewards.pop_back();
         }
         while(!rewards.empty()) {
-            cumulativeReward = cumulativeReward*discount + rewards.back();
             qValues.back()->addSample(cumulativeReward);
+            cumulativeReward = cumulativeReward*discount + rewards.back();
             rewards.pop_back();
             qValues.pop_back();
         }
@@ -255,6 +269,7 @@ namespace abm::minds {
     IncompleteInformationMCTS<BODY>::action_type
     IncompleteInformationMCTS<BODY>::SelfPlayMind<POLICY>::act(const observation_type &body, action_mask legalActs,
                                                                IncompleteInformationMCTS::reward_type rewardFromLastAct) {
+//        std::cout << "rewardFromLastAct " << rewardFromLastAct << std::endl;
         QVector<action_type::size> *qEntry = nullptr; // if null, choose at random
         if(treeNode != nullptr) {
             if (hasAddedQEntry) {
@@ -262,9 +277,11 @@ namespace abm::minds {
                 auto qIt = treeNode->qEntries.find(body);
                 if(qIt != treeNode->qEntries.end()) qEntry = &(qIt->second);
             } else {
-                // onTree and can add entry so try emplace
                 auto [qIt, insertedNewEntry] = treeNode->qEntries.try_emplace(body);
-                if (insertedNewEntry) hasAddedQEntry = true;
+                if (insertedNewEntry) {
+//                    std::cout << "Added QEntry " << std::endl;
+                    hasAddedQEntry = true;
+                }
                 qEntry = &(qIt->second);
             }
         }
@@ -284,6 +301,7 @@ namespace abm::minds {
     std::function<BODY()> IncompleteInformationMCTS<BODY>::TreeNode::createOtherPlayerSampler() {
         std::vector<BODY>   states;
         std::vector<double> weights;
+        assert(otherPlayerDistribution.size() > 0);
         states.reserve(otherPlayerDistribution.size());
         weights.reserve(otherPlayerDistribution.size());
         for(auto &entry: otherPlayerDistribution) {
@@ -314,9 +332,10 @@ namespace abm::minds {
      * proportional to the total number of samples in each qEntry of this node.
      */
     template<Body BODY>
-    std::function<BODY()> IncompleteInformationMCTS<BODY>::TreeNode::createNextPlayerSampler() {
+    std::function<BODY()> IncompleteInformationMCTS<BODY>::TreeNode::createNextMoverSampler() {
         std::vector<BODY>   states;
         std::vector<double> weights;
+        assert(qEntries.size() > 0);
         states.reserve(qEntries.size());
         weights.reserve(qEntries.size());
         for(auto &entry: qEntries) {
@@ -351,32 +370,26 @@ namespace abm::minds {
      * @param discount
      */
     template<Body BODY>
-    void IncompleteInformationMCTS<BODY>::buildTree(std::function<BODY()> thisBodySampler,
-                                                    std::function<BODY()> otherBodySampler) {
+    void IncompleteInformationMCTS<BODY>::buildTree(std::function<BODY()> firstMoverBodySampler,
+                                                    std::function<BODY()> secondMoverBodySampler) {
         for (size_t nSamples = rootNode->nSamples(); nSamples < nSamplesPerTree; ++nSamples) {
-            auto player1 = Agent(thisBodySampler(),
+            auto player1 = Agent(firstMoverBodySampler(),
                                  SelfPlayMind(rootNode,
-                                              UpperConfidencePolicy<action_type>(),
-                                              discount)
+                                              discount,
+                                              UpperConfidencePolicy<action_type>())
             );
-            auto player2 = Agent(otherBodySampler(),
+            auto player2 = Agent(secondMoverBodySampler(),
                                  SelfPlayMind(rootNode,
-                                              UpperConfidencePolicy<action_type>(),
-                                              discount)
+                                              discount,
+                                              UpperConfidencePolicy<action_type>())
             );
             episode(player1,player2);
         }
     }
 
     template<Body BODY>
-    IncompleteInformationMCTS<BODY>::IncompleteInformationMCTS(size_t nSamplesPerTree, double discount,
-                                                               std::function<std::function<BODY()>(
-                                                                       const BODY &)> thisSamplerFactory,
-                                                               std::function<std::function<BODY()>(
-                                                                       const BODY &)> otherSamplerFactory) :
+    IncompleteInformationMCTS<BODY>::IncompleteInformationMCTS(size_t nSamplesPerTree, double discount) :
             rootNode(nullptr),
-            thisSamplerFactory(thisSamplerFactory),
-            otherSamplerFactory(otherSamplerFactory),
             nSamplesPerTree(nSamplesPerTree),
             discount(discount),
             policy(NoExploration()) { }

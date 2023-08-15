@@ -84,8 +84,27 @@
 #include "abm/Agent.h"
 #include "abm/minds/QMind.h"
 #include "abm/minds/IncompleteInformationMCTS.h"
+#include "abm/episodes/SimpleEpisode.h"
 
 namespace experiment5 {
+    const bool HASLANGUAGE = false;
+
+    typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
+
+
+    std::function<body_type()> bodyHiddenStateSampler(bool hasSugar, bool hasSpice) {
+        return [hasSugar, hasSpice]() {
+            return body_type(hasSugar, hasSpice, deselby::Random::nextBool());
+        };
+    }
+
+
+    auto makeEpisode(bool firstMoverHasSugar, bool firstMoverHasSpice) {
+        return abm::episodes::SimpleEpisode(bodyHiddenStateSampler(firstMoverHasSugar, firstMoverHasSpice),
+                                            bodyHiddenStateSampler(!firstMoverHasSugar, !firstMoverHasSpice));
+    }
+
+
     template<class AGENT>
     void train(std::vector<AGENT> &agents, size_t nTrainingEpisodes) {
         bool verbose = false;
@@ -98,15 +117,11 @@ namespace experiment5 {
                           << std::endl;
             }
             // set random initial state
-            bool agent0HasSugar = deselby::Random::nextBool();
-            bool agent0HasSpice = deselby::Random::nextBool();
-            agents[0].body.reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
-            agents[1].body.reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
-            if(deselby::Random::nextBool()) {
-                episode(agents[0], agents[1], verbose);
-            } else {
-                episode(agents[1], agents[0], verbose);
-            }
+            bool firstMoverHasSugar = deselby::Random::nextBool();
+            bool firstMoverHasSpice = deselby::Random::nextBool();
+            auto episode = makeEpisode(firstMoverHasSugar, firstMoverHasSpice);
+            int firstMoverIndex = deselby::Random::nextBool();
+            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1], verbose);
         }
     }
 
@@ -115,41 +130,18 @@ namespace experiment5 {
         bool verbose = true;
         for(int state = 0; state < 32; ++state) {
             // set random initial state
-            int agentToStart = state & 1;
-            bool otherAgentPrefersSugar = (state >> 1) & 1;
-            bool startAgentPrefersSugar = (state >> 2) & 1;
-            bool startAgentHasSugar = (state >> 3) & 1;
-            bool startAgentHasSpice = (state >> 4) & 1;
-            // TODO: think of a modular way of resetting an agent
-            agents[agentToStart].body.reset(startAgentHasSugar, startAgentHasSpice, startAgentPrefersSugar);
-            agents[agentToStart^1].body.reset(!startAgentHasSugar, !startAgentHasSpice, otherAgentPrefersSugar);
+            int firstMoverIndex = state & 1;
+            bool firstMoverHasSugar = state & 2;
+            bool firstMoverHasSpice = state & 4;
+            bool firstMoverPrefersSugar = state & 8;
+            bool secondMoverPrefersSugar = state & 16;
+            auto episode = makeEpisode(firstMoverHasSugar, firstMoverHasSpice);
 
-            // random agent starts
-            abm::episode(agents[agentToStart], agents[agentToStart^1], verbose);
+            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1],
+                        body_type(firstMoverHasSugar, firstMoverHasSpice, firstMoverPrefersSugar),
+                        body_type(!firstMoverHasSugar, !firstMoverHasSpice, secondMoverPrefersSugar),
+                        verbose);
         }
-    }
-
-
-    /** Samples from the distribution of other, given the current state */
-    template<bool HASLANGUAGE>
-    std::function<abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>()> createOtherPlayerSampler(const abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> &body) {
-        bool hasSugar = (body.sugar() == 0.0);
-        bool hasSpice = (body.spice() == 0.0);
-        return [hasSugar, hasSpice]() {
-            return abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>(hasSugar, hasSpice, deselby::Random::nextBool());
-        };
-    }
-
-
-    /** samples from the distribution of self, given the current public state
-      * i.e. samples over the (possibly counterfactual) hidden state */
-    template<bool HASLANGUAGE>
-    std::function<abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>()> createNextPlayerSampler(const abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> &body) {
-        bool hasSugar = (body.sugar() == 1.0);
-        bool hasSpice = (body.spice() == 1.0);
-        return [hasSugar, hasSpice]() {
-            return abm::bodies::SugarSpiceTradingBody<HASLANGUAGE>(hasSugar, hasSpice, deselby::Random::nextBool());
-        };
     }
 
 
@@ -158,9 +150,6 @@ namespace experiment5 {
      */
     void runA() {
         const int NTRAININGEPISODES = 200000; // 4000000;
-        const bool HASLANGUAGE = false;
-
-        typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
         auto mind = abm::minds::QMind {
                 abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
@@ -183,9 +172,6 @@ namespace experiment5 {
  */
     void runB() {
         const int NTRAININGEPISODES = 200000; // 4000000;
-        const bool HASLANGUAGE = false;
-
-        typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
         auto mind = abm::minds::QMind {
                 abm::DQN<body_type::dimension, body_type::action_type::size>(
@@ -210,29 +196,24 @@ namespace experiment5 {
     * (spoiler: doesn't learn to cooperate)
     */
     void runC() {
-        const bool HASLANGUAGE = false;
-
-        typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
-
-//        body_type body(true, true, true);
-//        std::function<std::function<body_type()>(const body_type &)> samplerFac = createNextPlayerSampler<HASLANGUAGE>;
-//        std::function<body_type()> sampler = samplerFac(body);
-//        body_type bodySample = sampler();
-//        std::cout << bodySample << std::endl;
-
-        auto mind = abm::minds::IncompleteInformationMCTS<body_type>(
-                1000,
-                1.0,
-                createNextPlayerSampler<HASLANGUAGE>,
-                createOtherPlayerSampler<HASLANGUAGE>
-        );
-
-//        std::function<body_type()> sampler2 = mind.thisSamplerFactory(body);
-//        body_type bodySample2 = sampler2();
-//        std::cout << bodySample2 << std::endl;
-
+        std::cout << "starting experiment" << std::endl;
+        auto mind = abm::minds::IncompleteInformationMCTS<body_type>(320000, 1.0);
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
+
         showBehaviour(agents);
+
+//        bool hasSugar = true;
+//        bool hasSpice = false;
+//        bool prefersSugar0 = true;
+//        bool prefersSugar1 = false;
+//        deselby::Random::gen.seed(4568);
+//        auto episode = makeEpisode(hasSugar, hasSpice);
+//        episode.run(agents[0], agents[1],
+//                    body_type(hasSugar, hasSpice, prefersSugar0),
+//                    body_type(!hasSugar, !hasSpice, prefersSugar1),
+//                    true);
+
+
     }
 
 }

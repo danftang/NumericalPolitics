@@ -217,8 +217,8 @@ namespace abm::bodies {
     SugarSpiceTradingBody<HASLANGUAGE>::message_type SugarSpiceTradingBody<HASLANGUAGE>::actToMessage(int action) {
         if (deselby::Random::nextBool(pBanditAttack)) {
             reward -= costOfBanditAttack;
-            if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
-            if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+            if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+            if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
             sugar() = 0;
             spice() = 0;
             isTerminal = true;
@@ -230,13 +230,13 @@ namespace abm::bodies {
                 assert(sugar() >= 1);
                 sugar() -= 1;
                 outgoingMessage = message_type::GiveSugar;
-                reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+                reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                 break;
             case iGiveSpice:
                 assert(spice() >= 1);
                 spice() -= 1;
                 outgoingMessage = message_type::GiveSpice;
-                reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+                reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 break;
             case iWalkAway:
                 outgoingMessage = message_type::WalkAway;
@@ -246,14 +246,14 @@ namespace abm::bodies {
                 reward -= costOfFighting;
                 if(deselby::Random::nextBool()) {
                     outgoingMessage = message_type::YouWonFight;
-                    if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
-                    if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+                    if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                    if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                     sugar() = 0;
                     spice() = 0;
                 } else {
                     outgoingMessage = message_type::YouLostFight;
-                    if(sugar() == 0.0) reward += prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
-                    if(spice() == 0.0)  reward += prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+                    if(sugar() == 0.0) reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                    if(spice() == 0.0)  reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                     sugar() = 1;
                     spice() = 1;
                 }
@@ -280,32 +280,32 @@ namespace abm::bodies {
         switch (incomingMessage) {
             case message_type::GiveSugar:
                 sugar() += 1;
-                reward += prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
+                reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                 break;
             case message_type::GiveSpice:
                 spice() += 1;
-                reward += prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+                reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 break;
             case message_type::YouWonFight:
                 // You started fight and I won
                 reward -= costOfFighting;
-                if(sugar() == 0.0) reward += prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
-                if(spice() == 0.0)  reward += prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+                if(sugar() == 0.0) reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(spice() == 0.0)  reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 sugar() = 1;
                 spice() = 1;
                 break;
             case message_type::YouLostFight:
                 // You started fight and I lost
                 reward -= costOfFighting;
-                if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
-                if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+                if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 sugar() = 0;
                 spice() = 0;
                 break;
             case message_type::Bandits:
                 reward -= costOfBanditAttack;
-                if(sugar() == 1.0) reward -= prefersSugar()?utilityOfPreferred:utilityOfNonPreferred;
-                if(spice() == 1.0)  reward -= prefersSugar()?utilityOfNonPreferred:utilityOfPreferred;
+                if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 sugar() = 0;
                 spice() = 0;
                 break;

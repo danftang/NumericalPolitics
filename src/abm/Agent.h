@@ -28,6 +28,8 @@ namespace abm {
         { body.legalActs() }                -> std::convertible_to<typename MIND::action_mask>;
     };
 
+
+
     /**
      *  An agent consists of a body and a mind.
      *  The body stores any local state, handles incoming
@@ -45,7 +47,7 @@ namespace abm {
         typedef MIND mind_type;
         typedef BODY::in_message_type in_message_type;
         typedef BODY::action_type action_type;
-        typedef decltype(std::declval<BODY>().actToMessage(std::declval<action_type>())) out_message_type;
+        typedef Traits<BODY>::out_message_type out_message_type;
 
         BODY body;
         MIND mind;
@@ -75,6 +77,17 @@ namespace abm {
 
 //        void reset(BODY &&bodyState) { body = std::forward<BODY>(bodyState); }
 
+        template<class SHAREDINFORMATION>
+        inline void initEpisode(BODY initBodyState, SHAREDINFORMATION sharedinformation) {
+            body = std::move(initBodyState);
+            callInitEpisodeHook(mind, body, sharedinformation);
+        }
+
+        inline void initEpisode(BODY initBodyState) {
+            body = std::move(initBodyState);
+            callInitEpisodeHook(mind, body);
+        }
+
         /**
          * Call this to nudge the agent to be the first mover in an episodic interaction
          * @return message that begins the episode
@@ -83,11 +96,11 @@ namespace abm {
             action_type lastAct = mind.act(body, body.legalActs(), 0);
             out_message_type initialMessage = body.actToMessage(lastAct);
             callOutgoingMessageHook(mind, initialMessage);
-            callHalfStepObservationHook(mind, body);
             if(body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
                 const double residualFlux = 2.0*residualReward;
                 meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
+                callHalfStepObservationHook(mind,body);
                 mind.endEpisode(residualReward);
             }
             return initialMessage;
@@ -100,7 +113,9 @@ namespace abm {
          * @return response to incoming message
          */
         std::optional<out_message_type> handleMessage(in_message_type incomingMessage) {
+            callHalfStepObservationHook(mind,body);
             double reward = body.messageToReward(incomingMessage);
+//            std::cout << "reward = " << reward << std::endl;
             callIncomingMessageHook(mind,incomingMessage);
             meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*reward;
             if(body.isEndOfEpisode()) {
@@ -109,14 +124,14 @@ namespace abm {
                 mind.endEpisode(reward);
                 return {};
             }
-            action_type lastAct = mind.act(body, body.legalActs(), 0);
+            action_type lastAct = mind.act(body, body.legalActs(), reward);
             out_message_type response = body.actToMessage(lastAct);
             callOutgoingMessageHook(mind,response);
-            callHalfStepObservationHook(mind,body);
             if (body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
                 const double residualFlux = 2.0*residualReward;
                 meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
+//                std::cout << "Residual reward = " << residualReward << std::endl;
                 mind.endEpisode(residualReward);
             }
             return response;
@@ -164,8 +179,8 @@ namespace abm {
      * @return
      */
     template<Body BODY0, Mind MIND0, Body BODY1, Mind MIND1>
-    requires(std::is_convertible_v<typename BODY0::message_type, typename BODY1::message_type> &&
-             std::is_convertible_v<typename BODY1::message_type, typename BODY0::message_type>)
+    requires std::is_convertible_v<typename Traits<BODY0>::out_message_type, typename BODY1::in_message_type> &&
+             std::is_convertible_v<typename Traits<BODY1>::out_message_type, typename BODY0::in_message_type>
     int episode(Agent<BODY0, MIND0> &agent0, Agent<BODY1, MIND1> &agent1, bool verbose = false) {
         if(verbose) {
             std::cout << "------- Starting episode -------" << std::endl;
@@ -193,6 +208,18 @@ namespace abm {
         return nMessages;
 
     }
+
+//    template<Body BODY0, Mind MIND0, Body BODY1, Mind MIND1, class SHAREDINFORMATION>
+//    requires std::is_convertible_v<typename BODY0::out_message_type, typename BODY1::in_message_type>
+//            && std::is_convertible_v<typename BODY1::out_message_type, typename BODY0::in_message_type>
+//            && HasInitEpisodeHook<MIND0,BODY0,SHAREDINFORMATION>
+//            && HasInitEpisodeHook<MIND1,BODY1,SHAREDINFORMATION>
+//    int episode(Agent<BODY0, MIND0> &agent0, Agent<BODY1, MIND1> &agent1, SHAREDINFORMATION sharedinformation, bool verbose = false) {
+//        callInitEpisodeHook(agent0.mind, agent0.body, sharedinformation);
+//        callInitEpisodeHook(agent1.mind, agent1.body, sharedinformation);
+//        return episode(agent0, agent1, verbose);
+//    }
+
 }
 
 

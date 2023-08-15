@@ -9,6 +9,8 @@
 #include <cmath>
 #include <array>
 #include <numeric>
+#include <iostream>
+#include <cassert>
 
 namespace abm {
     /** A QValue stores mean, sample size and standard deviation of the Q-Value of a single (state,action) pair */
@@ -23,14 +25,35 @@ namespace abm {
             sumOfQSq += cumulativeReward * cumulativeReward;
             ++sampleCount;
         }
-        [[nodiscard]] double mean() const { return  sumOfQ / sampleCount; };
+
+        [[nodiscard]] double mean() const {
+            assert(sampleCount > 0);
+            return  sumOfQ / sampleCount;
+        }
+
         [[nodiscard]] double standardErrorOfMean() const {
             assert(sampleCount > 1);
-            double variance = sumOfQSq/(sampleCount-1) - pow(sumOfQ,2)/(sampleCount*(sampleCount-1));
-            return sqrt(variance/sampleCount);
+            const double sigmasq = variance();
+            assert(sigmasq > -1e-8);
+            if(sigmasq <= 0.0) return 0.0; // rounding error
+            return sqrt(sigmasq/sampleCount);
+        }
+
+        double variance() const {
+            return sumOfQSq/(sampleCount-1) - (sumOfQ/sampleCount)*(sumOfQ/(sampleCount-1));
         }
 
         operator double() const { return mean(); } // implicit conversion for use with policies that expect a single value
+
+        friend std::ostream &operator <<(std::ostream &out, const QValue &qVal) {
+            out << qVal.sampleCount << ": ";
+            if(qVal.sampleCount < 2) {
+                out << "##";
+            } else {
+                out << qVal.mean() << "+-" << qVal.standardErrorOfMean();
+            }
+            return out;
+        }
     };
 
 
