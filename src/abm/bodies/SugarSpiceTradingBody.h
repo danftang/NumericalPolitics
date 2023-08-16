@@ -23,7 +23,7 @@ namespace abm::bodies {
             iWalkAway,
             iFight,
             iSay0,
-            iSay1,
+//            iSay1,
             size  // marker for number of actions
         };
 
@@ -191,7 +191,7 @@ namespace abm::bodies {
         if (sugar() == 0) legalActs[iGiveSugar] = false;
         if (spice() == 0) legalActs[iGiveSpice] = false;
         legalActs[iSay0] = HASLANGUAGE;
-        legalActs[iSay1] = HASLANGUAGE;
+//        legalActs[iSay1] = HASLANGUAGE;
         return legalActs;
     }
 
@@ -261,8 +261,9 @@ namespace abm::bodies {
             case iSay0:
                 outgoingMessage = message_type::Say0;
                 break;
-            case iSay1:
-                outgoingMessage = message_type::Say1;
+//            case iSay1:
+//                outgoingMessage = message_type::Say1;
+//                break;
             default:
                 throw(std::out_of_range("Unrecognized act while handling act"));
         }

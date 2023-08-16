@@ -56,15 +56,8 @@
 // --------------------
 //
 // Created by daniel on 30/05/23.
+
 //
-
-#ifndef MULTIAGENTGOVERNMENT_EXPERIMENT5_H
-#define MULTIAGENTGOVERNMENT_EXPERIMENT5_H
-
-#include "DeselbyStd/random.h"
-#include "abm/abm.h"
-#include "abm/agents/agents.h"
-
 // Two agents that repeatedly have a sustained, turns-based interaction.
 // At the start of each interaction, resources of 1 unit of spice and 1 unit of sugar are randomly distributed
 // between them, and each agent is randomly assigned a preference of sugar or spice. At each turn an agent can:
@@ -79,15 +72,22 @@
 //  An agent state consists of the inventory of self and other, one's own preference (but not that of the other) and
 //  the game history.
 
+#ifndef MULTIAGENTGOVERNMENT_EXPERIMENT5_H
+#define MULTIAGENTGOVERNMENT_EXPERIMENT5_H
+
+#include "DeselbyStd/random.h"
 #include "abm/societies/RandomEncounterSociety.h"
-//#include "abm/agents/SugarSpiceTradingBody.h"
 #include "abm/Agent.h"
 #include "abm/minds/QMind.h"
 #include "abm/minds/IncompleteInformationMCTS.h"
 #include "abm/episodes/SimpleEpisode.h"
+#include "abm/bodies/SugarSpiceTradingBody.h"
+#include "abm/DQN.h"
+#include "abm/RandomReplay.h"
+#include "abm/MeanRewardMindWrapper.h"
 
 namespace experiment5 {
-    const bool HASLANGUAGE = false;
+    const bool HASLANGUAGE = true;
 
     typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
@@ -111,9 +111,9 @@ namespace experiment5 {
         for(int iterations = 0; iterations < nTrainingEpisodes; ++iterations) {
             if(iterations%100 == 0) {
                 std::cout << iterations << " "
-                          << agents[0].meanReward << " "
-                          << agents[1].meanReward << " "
-                          << agents[0].meanReward + agents[1].meanReward
+                          << agents[0].mind.meanReward << " "
+                          << agents[1].mind.meanReward << " "
+                          << agents[0].mind.meanReward + agents[1].mind.meanReward
                           << std::endl;
             }
             // set random initial state
@@ -151,13 +151,15 @@ namespace experiment5 {
     void runA() {
         const int NTRAININGEPISODES = 200000; // 4000000;
 
-        auto mind = abm::minds::QMind {
-                abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
-
-                abm::GreedyPolicy<body_type::action_type>(
-                        abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+        auto mind = abm::MeanRewardMindWrapper(
+                0.99,
+                abm::minds::QMind(
+                        abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
+                        abm::GreedyPolicy<body_type::action_type>(
+                                abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                        )
                 )
-        };
+        );
 
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
         train(agents,NTRAININGEPISODES);
@@ -173,16 +175,20 @@ namespace experiment5 {
     void runB() {
         const int NTRAININGEPISODES = 200000; // 4000000;
 
-        auto mind = abm::minds::QMind {
-                abm::DQN<body_type::dimension, body_type::action_type::size>(
-                        mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(50,25, body_type::action_type::size),
-                        abm::RandomReplay(16, 128, body_type::dimension),
-                        2,
-                        1.0),
-                abm::GreedyPolicy<body_type::action_type>(
-                        abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+        auto mind = abm::MeanRewardMindWrapper(
+                0.99,
+                abm::minds::QMind(
+                        abm::DQN<body_type::dimension, body_type::action_type::size>(
+                                mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(
+                                        50, 25, body_type::action_type::size),
+                                abm::RandomReplay(16, 128, body_type::dimension),
+                                2,
+                                1.0),
+                        abm::GreedyPolicy<body_type::action_type>(
+                                abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                        )
                 )
-        };
+        );
 
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
         train(agents,NTRAININGEPISODES);
@@ -197,7 +203,11 @@ namespace experiment5 {
     */
     void runC() {
         std::cout << "starting experiment" << std::endl;
-        auto mind = abm::minds::IncompleteInformationMCTS<body_type>(9000, 1.0);
+        auto mind = abm::MeanRewardMindWrapper(
+                0.99,
+//                abm::minds::IncompleteInformationMCTS<body_type>(9000, 1.0)
+        abm::minds::IncompleteInformationMCTS<body_type>(500000, 1.0)
+        );
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
 
         showBehaviour(agents);

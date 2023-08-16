@@ -52,15 +52,13 @@ namespace abm {
         BODY body;
         MIND mind;
 
-        /** the sum of actual received rewards, exponentially discounted into the past
-         * (for monitoring purposes only, doesn't affect behaviour) */
-        double meanReward = 0.0;
-
-    private:
-        double meanRewardDecay; // rate of exponential decay of the weight of rewards into the past when calculating the mean
-        double halfStepRewardDecay; // exponential decay of the mean weight for half a step (at beginning or end of an episode)
-
-    public:
+//        /** the sum of actual received rewards, exponentially discounted into the past
+//         * (for monitoring purposes only, doesn't affect behaviour) */
+//        double meanReward = 0.0;
+//    private:
+//        double meanRewardDecay; // rate of exponential decay of the weight of rewards into the past when calculating the mean
+//        double halfStepRewardDecay; // exponential decay of the mean weight for half a step (at beginning or end of an episode)
+//    public:
 
         /**
          *
@@ -68,9 +66,7 @@ namespace abm {
          * @param mind
          * @param meanRewardDecayRate  The discount factor per message/response interaction for "meanReward",
          */
-        Agent(BODY body, MIND mind, double meanRewardDecayRate = 0.99) : body(std::move(body)), mind(std::move(mind)) {
-            setMeanRewardDecay(meanRewardDecayRate);
-        }
+        Agent(BODY body, MIND mind) : body(std::move(body)), mind(std::move(mind)) { }
 
         // ------ Agent Interface ------
 
@@ -98,8 +94,8 @@ namespace abm {
             callOutgoingMessageHook(mind, initialMessage);
             if(body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
-                const double residualFlux = 2.0*residualReward;
-                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
+//                const double residualFlux = 2.0*residualReward;
+//                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
                 callHalfStepObservationHook(mind,body);
                 mind.endEpisode(residualReward);
             }
@@ -117,7 +113,7 @@ namespace abm {
             double reward = body.messageToReward(incomingMessage);
 //            std::cout << "reward = " << reward << std::endl;
             callIncomingMessageHook(mind,incomingMessage);
-            meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*reward;
+//            meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*reward;
             if(body.isEndOfEpisode()) {
                 double residualReward = body.endEpisode();
                 assert(residualReward == 0.0);
@@ -129,41 +125,18 @@ namespace abm {
             callOutgoingMessageHook(mind,response);
             if (body.isEndOfEpisode()) {
                 const double residualReward = body.endEpisode();
-                const double residualFlux = 2.0*residualReward;
-                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
+//                const double residualFlux = 2.0*residualReward;
+//                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
 //                std::cout << "Residual reward = " << residualReward << std::endl;
                 mind.endEpisode(residualReward);
             }
             return response;
         }
 
-        /** We define the exponentially weighted mean flux of reward as
-         * m = int_{-inf}^{0} w(t)f(t) dt
-         * where w(t) = ke^{kt} is a weighting that sums to 1 and decays into the past
-         * and f(t) is the historical flux of reward per unit time.
-         *
-         * If we let d = e^-k (and so int_{-1}^0 ke^{kt} = 1-d) and assume a total reward of r
-         * is received with a constant flux over one unit of time then
-         * m' = md + (1-d)r
-         *
-         * For a half step we shift the weights by 0.5 so if we let
-         * d' = e^-0.5*k = sqrt(d)
-         * so if we get a reward r' in a half step then
-         * m' = md' + (1-d')2r'
-         * where the flux is twice the total reward as it is sustained over half a unit of time
-         *
-         * N.B. to see this is correct, consider a single unit total reward at time 0 sustained over
-         * a duration, DT. In this case
-         * m = (1-d^DT)(1/DT) = (1 - e^{log(d)DT})/DT
-         * as DT tends to 0, the flux tends to a delta function and m tends to -log(d) which is k above,
-         * (i.e. w(0)) which is what we would expect.
-         *
-         * @param exponentialDecayRatePerTransaction
-         */
-        void setMeanRewardDecay(double exponentialDecayRatePerTransaction) {
-            meanRewardDecay = exponentialDecayRatePerTransaction;
-            halfStepRewardDecay = sqrt(exponentialDecayRatePerTransaction);
-        }
+//        void setMeanRewardDecay(double exponentialDecayRatePerTransaction) {
+//            meanRewardDecay = exponentialDecayRatePerTransaction;
+//            halfStepRewardDecay = sqrt(exponentialDecayRatePerTransaction);
+//        }
     };
 
 
