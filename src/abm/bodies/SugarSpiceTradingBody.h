@@ -75,7 +75,7 @@ namespace abm::bodies {
         message_type actToMessage(int action);
         double messageToReward(message_type incomingMessage);
         std::bitset<action_type::size> legalActs();
-        bool isEndOfEpisode();
+//        bool isEndOfEpisode();
         double endEpisode();
 
         // ---- End of Body interface
@@ -177,15 +177,16 @@ namespace abm::bodies {
         return residualReward;
     }
 
-    template<bool HASLANGUAGE>
-    bool SugarSpiceTradingBody<HASLANGUAGE>::isEndOfEpisode() {
-        return isTerminal;
-    }
+//    template<bool HASLANGUAGE>
+//    bool SugarSpiceTradingBody<HASLANGUAGE>::isEndOfEpisode() {
+//        return isTerminal;
+//    }
 
 
     template<bool HASLANGUAGE>
     SugarSpiceTradingBody<HASLANGUAGE>::action_mask
     SugarSpiceTradingBody<HASLANGUAGE>::legalActs() {
+        if(isTerminal) return 0;
         action_mask legalActs;
         for (int i = 0; i < legalActs.size(); ++i) legalActs[i] = true;
         if (sugar() == 0) legalActs[iGiveSugar] = false;
@@ -267,11 +268,11 @@ namespace abm::bodies {
             default:
                 throw(std::out_of_range("Unrecognized act while handling act"));
         }
-        isTerminal =
-                (outgoingMessage == message_type::YouWonFight ||
-                outgoingMessage == message_type::YouLostFight ||
-                (outgoingMessage == message_type::WalkAway && getLastIncomingMessage() == message_type::WalkAway));
-        if (!isTerminal) recordOutgoingMessage(outgoingMessage);
+//        isTerminal =
+//                (outgoingMessage == message_type::YouWonFight ||
+//                outgoingMessage == message_type::YouLostFight ||
+//                (outgoingMessage == message_type::WalkAway && getLastIncomingMessage() == message_type::WalkAway));
+        recordOutgoingMessage(outgoingMessage);
         return outgoingMessage;
     }
 

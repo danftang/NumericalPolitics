@@ -39,21 +39,11 @@ namespace abm {
             assert(legalActs.count() > 0);
             std::vector<size_t> legalActIndices = abm::legalIndices(legalActs);
 
-            constexpr int minSamples = 10;
+            constexpr int minSamples = 1;
             auto undersampledActs = legalActIndices
                                  | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount < minSamples; });
             auto randomUnsampledActIt = deselby::Random::chooseElement(undersampledActs);
             if(randomUnsampledActIt != undersampledActs.end()) return static_cast<ACTION>(*randomUnsampledActIt);
-
-//            auto unsampledActs = legalActIndices
-//                                 | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 0; });
-//            auto randomUnsampledActIt = deselby::Random::chooseElement(unsampledActs);
-//            if(randomUnsampledActIt != unsampledActs.end()) return static_cast<ACTION>(*randomUnsampledActIt);
-//
-//            auto onceSampledActs = legalActIndices
-//                                   | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount == 1; });
-//            auto randomOnceSampledActIt = deselby::Random::chooseElement(onceSampledActs);
-//            if(randomOnceSampledActIt != onceSampledActs.end()) return static_cast<ACTION>(*randomOnceSampledActIt);
 
             const double N = qValues.totalSamples();
             assert(N > 1);
@@ -62,7 +52,7 @@ namespace abm {
             double bestQ = -std::numeric_limits<double>::infinity();
             for (size_t actId : legalActIndices) {
                 const QValue &qVal = qValues[actId];
-//                double upperConfidenceQ = qVal.mean() + nStandardErrors * qVal.standardErrorOfMean();
+//                double upperConfidenceQ = qVal.mean() + nStandardErrors * 3.0 * qVal.standardErrorOfMean();
                 double upperConfidenceQ = qVal.mean() + nStandardErrors * 16.0/sqrt(qVal.sampleCount);
                 assert(!isnan(upperConfidenceQ));
                 if (upperConfidenceQ >= bestQ) {

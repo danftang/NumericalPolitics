@@ -40,7 +40,7 @@ namespace abm {
      * @tparam BODY
      * @tparam MIND
      */
-    template<Body BODY, Mind MIND> requires(Compatible<BODY,MIND>)
+    template<Body BODY, Mind MIND> requires Compatible<BODY,MIND>
     class Agent {
     public:
         typedef BODY body_type;
@@ -52,6 +52,9 @@ namespace abm {
         BODY body;
         MIND mind;
 
+    private:
+        double reward = 0.0;
+    public:
 //        /** the sum of actual received rewards, exponentially discounted into the past
 //         * (for monitoring purposes only, doesn't affect behaviour) */
 //        double meanReward = 0.0;
@@ -73,8 +76,24 @@ namespace abm {
 
 //        void reset(BODY &&bodyState) { body = std::forward<BODY>(bodyState); }
 
-        template<class SHAREDINFORMATION>
-        inline void initEpisode(BODY initBodyState, SHAREDINFORMATION sharedinformation) {
+        /** An episode should begin with a call to initEpisode. Here is where all the initial setup of the episode
+         * happens.
+         *
+         * @param initBodyState     The initial body state of the agent at the start of the episode (this should encode
+         *                          any private information that the agent has)
+         * @param sharedinformation Any prior information that is publicly shared at the beginning of the episode,
+         *                          i.e. agents know is shared, and know that the other agent knows it is shared etc...
+         * TODO: could also include any information that this agent is given that isn't known to be public.
+         *   Also, can we make this generic without templating the classes? [in full generality, we have an
+         *   infinite sequence of PDFs over both my state and yours representing n'th level beliefs about
+         *   a state. What we're saying with this interface is that there is only public information and private
+         *   information (i.e. information that is in-fact private and it is public information that it is private)]
+         *
+         *   TODO: this could be inplemented as an agent that is listening for open channel requests, which upon
+         *     request, returns an open channel to which the opening agent can send the first message.
+         */
+        template<class PUBLICINFORMATION>
+        inline void initEpisode(BODY initBodyState, PUBLICINFORMATION sharedinformation) {
             body = std::move(initBodyState);
             callInitEpisodeHook(mind, body, sharedinformation);
         }
@@ -84,53 +103,89 @@ namespace abm {
             callInitEpisodeHook(mind, body);
         }
 
-        /**
-         * Call this to nudge the agent to be the first mover in an episodic interaction
+        /** This method is called after initiation.
+         * If the episode is turns-based it is called on the first mover only in order to start the episode.
+         * If the episode is synchronous (e.g. rock-paper-scisors) it is called on both agents.
          * @return message that begins the episode
          */
         out_message_type startEpisode() {
             action_type lastAct = mind.act(body, body.legalActs(), 0);
             out_message_type initialMessage = body.actToMessage(lastAct);
             callOutgoingMessageHook(mind, initialMessage);
-            if(body.isEndOfEpisode()) {
-                const double residualReward = body.endEpisode();
-//                const double residualFlux = 2.0*residualReward;
-//                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
-                callHalfStepObservationHook(mind,body);
-                mind.endEpisode(residualReward);
-            }
             return initialMessage;
         }
 
+//        out_message_type startEpisode() {
+//            action_type lastAct = mind.act(body, body.legalActs(), 0);
+//            out_message_type initialMessage = body.actToMessage(lastAct);
+//            callOutgoingMessageHook(mind, initialMessage);
+//            if(body.isEndOfEpisode()) {
+//                const double residualReward = body.endEpisode();
+////                const double residualFlux = 2.0*residualReward;
+////                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
+//                callHalfStepObservationHook(mind,body);
+//                mind.endEpisode(residualReward);
+//            }
+//            return initialMessage;
+//        }
 
-        /**
-         * Call this when the agent receives a message from another agent
-         * @param incomingMessage message originating from another agent
-         * @return response to incoming message
+
+
+        /** This method is called when the agent receives a message from another agent
+         * @param incomingMessage message sent by the other agent
+         * @return response to incoming message. If unset, the agent has (perhaps unilaterally)
+         *   ended the episode.
          */
         std::optional<out_message_type> handleMessage(in_message_type incomingMessage) {
             callHalfStepObservationHook(mind,body);
-            double reward = body.messageToReward(incomingMessage);
-//            std::cout << "reward = " << reward << std::endl;
+            reward = body.messageToReward(incomingMessage);
             callIncomingMessageHook(mind,incomingMessage);
-//            meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*reward;
-            if(body.isEndOfEpisode()) {
-                double residualReward = body.endEpisode();
-                assert(residualReward == 0.0);
-                mind.endEpisode(reward);
-                return {};
-            }
-            action_type lastAct = mind.act(body, body.legalActs(), reward);
+            auto legalActs = body.legalActs();
+            if(!legalActs.any()) return {}; // no legal acts: end episode
+            action_type lastAct = mind.act(body, legalActs, reward);
+//            std::cout << "got reward " << reward << " for " << this << std::endl;
+            reward = 0.0;
             out_message_type response = body.actToMessage(lastAct);
             callOutgoingMessageHook(mind,response);
-            if (body.isEndOfEpisode()) {
-                const double residualReward = body.endEpisode();
-//                const double residualFlux = 2.0*residualReward;
-//                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
-//                std::cout << "Residual reward = " << residualReward << std::endl;
-                mind.endEpisode(residualReward);
-            }
             return response;
+        }
+
+//        std::optional<out_message_type> handleMessage(in_message_type incomingMessage) {
+//            callHalfStepObservationHook(mind,body);
+//            double reward = body.messageToReward(incomingMessage);
+////            std::cout << "reward = " << reward << std::endl;
+//            callIncomingMessageHook(mind,incomingMessage);
+////            meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*reward;
+//            if(body.isEndOfEpisode()) {
+//                double residualReward = body.endEpisode();
+//                assert(residualReward == 0.0);
+//                mind.endEpisode(reward);
+//                return {};
+//            }
+//            action_type lastAct = mind.act(body, body.legalActs(), reward);
+//            out_message_type response = body.actToMessage(lastAct);
+//            callOutgoingMessageHook(mind,response);
+//            if (body.isEndOfEpisode()) {
+//                const double residualReward = body.endEpisode();
+////                const double residualFlux = 2.0*residualReward;
+////                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
+////                std::cout << "Residual reward = " << residualReward << std::endl;
+//                mind.endEpisode(residualReward);
+//            }
+//            return response;
+//        }
+
+
+
+        /** This method is called when any agent ends the episode.
+         * It is called on both agents, irrespective of who ended the episode.
+         * TODO: can the environment end an episode, or should this be modelled as an
+         *   intermediary agent with two open communication channels [yes, better this way]?
+         */
+        void endEpisode() {
+            double residualReward = body.endEpisode();
+            mind.endEpisode(reward + residualReward);
+            // std::cout << "Got final reward " << reward << " + " << residualReward << " = " << reward + residualReward << " for " << this << std::endl;
         }
 
 //        void setMeanRewardDecay(double exponentialDecayRatePerTransaction) {
@@ -159,21 +214,20 @@ namespace abm {
             std::cout << "------- Starting episode -------" << std::endl;
             std::cout  << agent0.body << agent1.body << std::endl;
         }
-        std::optional<typename BODY0::message_type> message0 = agent0.startEpisode();
-        std::optional<typename BODY1::message_type> message1;
+        std::optional<typename Traits<BODY0>::out_message_type> message0 = agent0.startEpisode();
+        std::optional<typename Traits<BODY1>::out_message_type> message1;
         int nMessages = 0;
-        while(message0.has_value()) {
-            if (verbose) std::cout << message0 << std::endl;
+        do {
+            if (verbose) std::cout << "--> " << message0 << std::endl;
             message1 = agent1.handleMessage(message0.value());
             ++nMessages;
-            if(message1.has_value()) {
-                if (verbose) std::cout << message1 << std::endl;
-                message0 = agent0.handleMessage(message1.value());
-                ++nMessages;
-            } else {
-                message0.reset();
-            }
-        }
+            if(!message1.has_value()) break;
+            if (verbose) std::cout << "<-- " << message1 << std::endl;
+            message0 = agent0.handleMessage(message1.value());
+            ++nMessages;
+        } while(message0.has_value());
+        agent0.endEpisode();
+        agent1.endEpisode();
         if(verbose) {
             std::cout << agent0.body << agent1.body << std::endl;
             std::cout << "------- Ending episode -------" << std::endl;
@@ -182,16 +236,34 @@ namespace abm {
 
     }
 
-//    template<Body BODY0, Mind MIND0, Body BODY1, Mind MIND1, class SHAREDINFORMATION>
-//    requires std::is_convertible_v<typename BODY0::out_message_type, typename BODY1::in_message_type>
-//            && std::is_convertible_v<typename BODY1::out_message_type, typename BODY0::in_message_type>
-//            && HasInitEpisodeHook<MIND0,BODY0,SHAREDINFORMATION>
-//            && HasInitEpisodeHook<MIND1,BODY1,SHAREDINFORMATION>
-//    int episode(Agent<BODY0, MIND0> &agent0, Agent<BODY1, MIND1> &agent1, SHAREDINFORMATION sharedinformation, bool verbose = false) {
-//        callInitEpisodeHook(agent0.mind, agent0.body, sharedinformation);
-//        callInitEpisodeHook(agent1.mind, agent1.body, sharedinformation);
-//        return episode(agent0, agent1, verbose);
-//    }
+
+    template<Body BODY0, Mind MIND0, Body BODY1, Mind MIND1>
+    requires std::is_convertible_v<typename Traits<BODY0>::out_message_type, typename BODY1::in_message_type> &&
+             std::is_convertible_v<typename Traits<BODY1>::out_message_type, typename BODY0::in_message_type>
+    int synchronousEpisode(Agent<BODY0, MIND0> &agent0, Agent<BODY1, MIND1> &agent1, bool verbose = false) {
+        if (verbose) {
+            std::cout << "------- Starting episode -------" << std::endl;
+            std::cout << agent0.body << agent1.body << std::endl;
+        }
+        std::optional<typename BODY0::message_type> message0 = agent0.startEpisode();
+        std::optional<typename BODY1::message_type> message1 = agent1.startEpisode();
+        int nMessages = 0;
+        while (message0.has_value() && message1.has_value()) {
+            if (verbose) std::cout << message0 << " <--> " << message1 << std::endl;
+            auto tmpMessage = agent1.handleMessage(message0.value());
+            message0 = agent0.handleMessage(message1.value());
+            message1 = tmpMessage;
+            ++nMessages;
+        }
+        agent0.endEpisode();
+        agent1.endEpisode();
+        if (verbose) {
+            std::cout << agent0.body << agent1.body << std::endl;
+            std::cout << "------- Ending episode -------" << std::endl;
+        }
+        return nMessages;
+
+    }
 
 }
 
