@@ -12,12 +12,13 @@
 namespace abm::minds {
     template<Body BODY>
     class ZeroIntelligence {
+    public:
         typedef BODY                observation_type;
         typedef BODY::action_mask   action_mask;
         typedef double              reward_type;
 
         BODY::action_type act([[maybe_unused]] const observation_type &observation, const action_mask &legalMoves,
-                              [[maybe_unused]] reward_type reward) {
+                              [[maybe_unused]] reward_type reward = 0.0) const {
             assert(legalMoves.size() == BODY::action_type::size);
             return static_cast<BODY::action_type>(sampleUniformly(legalMoves));
         }

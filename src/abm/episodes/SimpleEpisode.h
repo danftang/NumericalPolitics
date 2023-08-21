@@ -34,11 +34,7 @@ namespace abm::episodes {
          * @return number of timesteps in the episode
          */
         template<class AGENT1, class AGENT2> requires std::same_as<typename AGENT1::body_type, BODY1> && std::same_as<typename AGENT2::body_type, BODY2>
-        inline int run(AGENT1 &agent1, AGENT2 &agent2, bool verbose = false) {
-            agent1.initEpisode(firstMoverPriorBodyDistribution(), *this);
-            agent2.initEpisode(secondMoverPriorBodyDistribution(), *this);
-            return episode(agent1, agent2, verbose);
-        }
+        inline int run(AGENT1 &agent1, AGENT2 &agent2, bool verbose = false);
 
         /** Set the agent's bodies to those supplied and run an episode
          * @param agent1
@@ -49,13 +45,101 @@ namespace abm::episodes {
          * @return
          */
         template<class AGENT1, class AGENT2> requires std::same_as<typename AGENT1::body_type, BODY1> && std::same_as<typename AGENT2::body_type, BODY2>
-        inline int run(AGENT1 &agent1, AGENT2 &agent2, BODY1 initBodyState1, BODY2 initBodyState2, bool verbose = false) {
-            agent1.initEpisode(std::move(initBodyState1), *this);
-            agent2.initEpisode(std::move(initBodyState2), *this);
-            return episode(agent1, agent2, verbose);
-        }
+        inline int run(AGENT1 &agent1, AGENT2 &agent2, BODY1 initBodyState1, BODY2 initBodyState2, bool verbose = false);
 
     };
+
+
+
+    /** Execute a single episode between two agents
+     *
+     * @tparam BODY0
+     * @tparam MIND0
+     * @tparam BODY1
+     * @tparam MIND1
+     * @param agent0
+     * @param agent1
+     * @param verbose
+     * @return
+     */
+    template<Body BODY0, Mind MIND0, Body BODY1, Mind MIND1>
+    requires std::is_convertible_v<typename Traits<BODY0>::out_message_type, typename BODY1::in_message_type> &&
+             std::is_convertible_v<typename Traits<BODY1>::out_message_type, typename BODY0::in_message_type>
+    int episode(Agent<BODY0, MIND0> &agent0, Agent<BODY1, MIND1> &agent1, bool verbose = false) {
+        if(verbose) {
+            std::cout << "------- Starting episode -------" << std::endl;
+            std::cout  << agent0.body << agent1.body << std::endl;
+        }
+        std::optional<typename Traits<BODY0>::out_message_type> message0 = agent0.startEpisode();
+        std::optional<typename Traits<BODY1>::out_message_type> message1;
+        int nMessages = 0;
+        do {
+            if (verbose) std::cout << "--> " << message0 << std::endl;
+            message1 = agent1.handleMessage(message0.value());
+            ++nMessages;
+            if(!message1.has_value()) break;
+            if (verbose) std::cout << "<-- " << message1 << std::endl;
+            message0 = agent0.handleMessage(message1.value());
+            ++nMessages;
+        } while(message0.has_value());
+        agent0.endEpisode();
+        agent1.endEpisode();
+        if(verbose) {
+            std::cout << agent0.body << agent1.body << std::endl;
+            std::cout << "------- Ending episode -------" << std::endl;
+        }
+        return nMessages;
+
+    }
+
+
+    template<Body BODY0, Mind MIND0, Body BODY1, Mind MIND1>
+    requires std::is_convertible_v<typename Traits<BODY0>::out_message_type, typename BODY1::in_message_type> &&
+             std::is_convertible_v<typename Traits<BODY1>::out_message_type, typename BODY0::in_message_type>
+    int synchronousEpisode(Agent<BODY0, MIND0> &agent0, Agent<BODY1, MIND1> &agent1, bool verbose = false) {
+        if (verbose) {
+            std::cout << "------- Starting episode -------" << std::endl;
+            std::cout << agent0.body << agent1.body << std::endl;
+        }
+        std::optional<typename BODY0::message_type> message0 = agent0.startEpisode();
+        std::optional<typename BODY1::message_type> message1 = agent1.startEpisode();
+        int nMessages = 0;
+        while (message0.has_value() && message1.has_value()) {
+            if (verbose) std::cout << message0 << " <--> " << message1 << std::endl;
+            auto tmpMessage = agent1.handleMessage(message0.value());
+            message0 = agent0.handleMessage(message1.value());
+            message1 = tmpMessage;
+            ++nMessages;
+        }
+        agent0.endEpisode();
+        agent1.endEpisode();
+        if (verbose) {
+            std::cout << agent0.body << agent1.body << std::endl;
+            std::cout << "------- Ending episode -------" << std::endl;
+        }
+        return nMessages;
+
+    }
+
+    template<class BODY1, class BODY2>
+    template<class AGENT1, class AGENT2>
+    requires std::same_as<typename AGENT1::body_type, BODY1> && std::same_as<typename AGENT2::body_type, BODY2>
+    int SimpleEpisode<BODY1, BODY2>::run(AGENT1 &agent1, AGENT2 &agent2, bool verbose) {
+        agent1.initEpisode(firstMoverPriorBodyDistribution(), *this);
+        agent2.initEpisode(secondMoverPriorBodyDistribution(), *this);
+        return episode(agent1, agent2, verbose);
+    }
+
+    template<class BODY1, class BODY2>
+    template<class AGENT1, class AGENT2>
+    requires std::same_as<typename AGENT1::body_type, BODY1> && std::same_as<typename AGENT2::body_type, BODY2>
+    int SimpleEpisode<BODY1, BODY2>::run(AGENT1 &agent1, AGENT2 &agent2, BODY1 initBodyState1, BODY2 initBodyState2,
+                                         bool verbose) {
+        agent1.initEpisode(std::move(initBodyState1), *this);
+        agent2.initEpisode(std::move(initBodyState2), *this);
+        return episode(agent1, agent2, verbose);
+    }
+
 }
 
 #endif //MULTIAGENTGOVERNMENT_SIMPLEEPISODE_H

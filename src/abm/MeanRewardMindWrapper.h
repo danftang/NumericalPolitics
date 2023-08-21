@@ -12,26 +12,22 @@
 namespace abm {
 
     /** Use this class to wrap a Mind in order to record the exponentially weighted mean
-     * flux of reward, which we define as
+     *  reward, which we define as
      *
-     * m(T) = int_{-inf}^{T} w(t-T)f(t) dt
+     * E_n[R] = a_n.R_n + a_n.r.R_{n-1} + a_n.r^2.R_{n-2} + ... + a_n.r^{n-1}.R_1
      *
      * where
-     *   w(t-T) = ke^{k(t-T)} is a weighting that sums to 1 between -inf and T and decays into the past
+     * R_t is the reward at time t,
+     * r is a supplied constant decay rate
+     * a_n = (1-r)/(1-r^n)
+     * but we have the recurrence relation
+     * E_n[R] = a_n.R_n + (a_n.r/a_{n-1}).E_{n-1}[R]
+     * and, by expansion
+     * a_n.r/a_{n-1} + a_n = (r-r^n)/(1-r^n) + (1-r)/(1-r^n) = 1
+     * so
+     * a_n.r/a_{n-1} = 1-a_n
      * and
-     *   f(t) is the historical flux of reward per unit time.
-     *
-     * Fluxes of reward are considered to be uniform between actions, and we take one unit of time to be
-     * the time between actions so a reward of r_{T+1} at time T+1 is considered to be a flux
-     * f(t) = r_{T+1} for T < t <= T+1.
-     *
-     * So,
-     *
-     * m(T+1)   = int_{-inf}^{T+1} ke^{k(t-(T+1))}f(t) dt
-     *          = int_{-inf}^{T}  e^{-k} ke^{k(t-T)}f(t) dt + int_{T}^{T+1} ke^{k(t-(T+1))}f(t) dt
-     *          = e^{-k}m(T) + r_{T+1} (1 - e^{-k})
-     * Letting d = e^-k gives the recurrence relation
-     * m(T+1)   = d.m(T) + (1-d)r_{T+1}
+     * E_n[R] = a_n.R_n + (1-a_n).E_{n-1}[R]
      *
      * At the end of an episode, if the last agent to receive a message is the first to move
      * in the next episode, then the next episode begins immediately after the end of the last.
@@ -49,6 +45,7 @@ namespace abm {
 
         /** The exponentialy weighted mean reward */
         double  meanReward = 0.0;
+        int     nSamples = 0;
     private:
         double  endOfEpisodeReward = 0.0;
         const double meanRewardDecay;
@@ -96,7 +93,9 @@ namespace abm {
 
 
         auto act(observation_type observation, action_mask actMask, reward_type reward) {
-            meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*(reward + endOfEpisodeReward);
+            double a_n = (1.0-meanRewardDecay)/(1.0-std::pow(meanRewardDecay, ++nSamples));
+            meanReward *= 1.0-a_n;
+            meanReward += a_n*(reward + endOfEpisodeReward);
             endOfEpisodeReward = 0.0;
             return MIND::act(observation, actMask, reward);
         }

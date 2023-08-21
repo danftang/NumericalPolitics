@@ -111,19 +111,19 @@ inline void experiment1() {
 //                std::cout << "Trying policy " << policy0 << ":" << policy1 << std::endl;
             agents[0].setPolicy(policy0);
             agents[1].setPolicy(policy1);
-            long initialSociety = agents[0].policy.policyID() * agent_type::policy_type::nPolicies() + agents[1].policy.policyID();
+            long initialSociety = agents[0].finalDecisionPolicy.policyID() * agent_type::policy_type::nPolicies() + agents[1].finalDecisionPolicy.policyID();
             agent_type::schedule_type sim(agents[0].start() + agents[1].start());
 
             //// exec until no policy change for NTIMESTEPS or NTRANSITIONS policy transitions without convergence.
             sim.execUntil(
                     [&agents, &sim]() {
-                        return (agents[0].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS_TO_CONVERGENCE &&
-                                agents[1].policy.trainingStepsSinceLastPolicyChange > NTIMESTEPS_TO_CONVERGENCE) ||
+                        return (agents[0].finalDecisionPolicy.trainingStepsSinceLastPolicyChange > NTIMESTEPS_TO_CONVERGENCE &&
+                                agents[1].finalDecisionPolicy.trainingStepsSinceLastPolicyChange > NTIMESTEPS_TO_CONVERGENCE) ||
                                sim.time() >= MAXSTEPS;
                     },
                     std::execution::seq);
 //                std::cout << "Sim time = " << std::dec << sim.time() << std::endl;
-            long finalSociety = agents[0].policy.policyID() * agent_type::policy_type::nPolicies() + agents[1].policy.policyID();
+            long finalSociety = agents[0].finalDecisionPolicy.policyID() * agent_type::policy_type::nPolicies() + agents[1].finalDecisionPolicy.policyID();
             if(sim.time() < MAXSTEPS) {
                 std::cout << std::hex << initialSociety << " goes to point attractor :" << std::hex << finalSociety << std::endl;
                 stableSocieties.insert(finalSociety);
@@ -133,9 +133,9 @@ inline void experiment1() {
                 std::cout << finalSociety << " -> ";
                 do {
                     sim.execUntil([&agents]() {
-                        return agents[0].policy.trainingStepsSinceLastPolicyChange == 0 || agents[1].policy.trainingStepsSinceLastPolicyChange == 0;
+                        return agents[0].finalDecisionPolicy.trainingStepsSinceLastPolicyChange == 0 || agents[1].finalDecisionPolicy.trainingStepsSinceLastPolicyChange == 0;
                     }, std::execution::seq);
-                    societyOnAttractor = agents[0].policy.policyID() * agent_type::policy_type::nPolicies() + agents[1].policy.policyID();
+                    societyOnAttractor = agents[0].finalDecisionPolicy.policyID() * agent_type::policy_type::nPolicies() + agents[1].finalDecisionPolicy.policyID();
                     std::cout << societyOnAttractor << " -> ";
                 } while(societyOnAttractor != finalSociety);
                 std::cout << std::endl;

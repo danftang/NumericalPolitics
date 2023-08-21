@@ -52,25 +52,26 @@ namespace abm {
          * Single training step for one action.
          *
          * At equilibrium we have
-         * Q(s0,a) = reward(s0,a,s1) + discount * max_a'(Q(s1,a'))
+         * Q(s0,a) = E[reward(s0,a,s1) + discount * max_a'(Q(s1,a'))]
          *
-         * We consider each forward Q(s0,a) value as a noisy sample of the real value
-         * and weight the samples exponentially with more recent samples having higher
+         * We consider the expectation above as being over the weighted mean where we
+         * weight the samples exponentially with more recent samples having higher
          * weight.
          * So, after receiving n samples Q_1...Q_n, we have:
-         * Q(s0,a) = a_n Q_n + a_n r Q_{n-1} + a_n r^2 Q_{n-2} + ... + a_n r^{n-1} Q_1
+         * E_n[Q] = a_n.Q_n + a_n.r.Q_{n-1} + a_n.r^2.Q_{n-2} + ... + a_n.r^{n-1}.Q_1
          *
          * The sum of the weights should be 1 so
          * S_n = a_n(1-r^n)/(1-r) = 1
          * so
          * a_n = (1-r)/(1-r^n)
+         * but we have the recurrence relation
+         * E_n[Q] = (a_n.r/a_{n-1})E_{n-1}[Q] + a_n.Q_n
+         * and, by expansion
+         * a_n.r/a_{n-1} + a_n = (r-r^n)/(1-r^n) + (1-r)/(1-r^n) = 1
+         * so
+         * a_n.r/a_{n-1} = 1-a_n
          * and
-         * a_{n+1} = a_n(1-r^n)/(1-r^{n+1})
-         *
-         * so on receiving a new sample, we multiply the current estimate of Q by (r-r^{n+1})/(1-r^{n+1})
-         * and weight the current sample by (1-r)/(1-r^{n+1})
-         *
-         * But (r-r^{n+1})/(1-r^{n+1}) = 1-((1-r)/(1-r^{n+1})) so we only need to calculate one
+         * E_n[Q] = (1-a_n)E_{n-1}[Q] + a_n.Q_n
          *
          * @param startState
          * @param action
@@ -80,14 +81,10 @@ namespace abm {
          */
         void train(int startState, action_type action, double reward, int endState, bool isEndgame) {
 //            std::cout << "training " << this << " on " << std::oct << startState << " " << action << " " << reward << " " << std::oct << endState << " " << isEndgame << std::endl;
-
-            ++nSamples[startState][action];
-            const double rrn = std::pow(sampleDecay, nSamples[startState][action]);
-            double sampleWeight = (1.0-sampleDecay)/(1.0-rrn);
-
+            const double a_n            = (1.0-sampleDecay)/(1.0-std::pow(sampleDecay, ++nSamples[startState][action]));
             const double endStateQValue = (isEndgame ? 0.0 : Qtable[endState].max());
-            const double forwardQ = reward + discount * endStateQValue;
-            Qtable[startState][action] = (1.0-sampleWeight) * Qtable[startState][action] + sampleWeight * forwardQ;
+            const double forwardQ       = reward + discount * endStateQValue;
+            Qtable[startState][action]  = (1.0-a_n) * Qtable[startState][action] + a_n * forwardQ;
             assert(!Qtable[startState].has_nan());
         }
 

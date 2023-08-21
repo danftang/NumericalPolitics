@@ -156,7 +156,7 @@ namespace experiment5 {
                 abm::minds::QMind(
                         abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
                         abm::GreedyPolicy<body_type::action_type>(
-                                abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                                abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
                         )
                 )
         );
@@ -164,8 +164,8 @@ namespace experiment5 {
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
         train(agents,NTRAININGEPISODES);
         body_type::pBanditAttack = 0.002;
-        agents[0].mind.policy.explorationStrategy = abm::NoExploration();
-        agents[1].mind.policy.explorationStrategy = abm::NoExploration();
+        agents[0].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
+        agents[1].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
         showBehaviour(agents);
     }
 
@@ -185,7 +185,7 @@ namespace experiment5 {
                                 2,
                                 1.0),
                         abm::GreedyPolicy<body_type::action_type>(
-                                abm::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                                abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
                         )
                 )
         );
@@ -193,8 +193,8 @@ namespace experiment5 {
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
         train(agents,NTRAININGEPISODES);
         body_type::pBanditAttack = 0.002;
-        agents[0].mind.policy.explorationStrategy = abm::NoExploration();
-        agents[1].mind.policy.explorationStrategy = abm::NoExploration();
+        agents[0].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
+        agents[1].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
         showBehaviour(agents);
     }
 

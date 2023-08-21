@@ -54,6 +54,19 @@ namespace abm::minds {
         }
 
 
+        /** act with no training
+         *
+         * @param observation
+         * @param legalActs
+         * @return
+         */
+        action_type act(observation_type observation, const action_mask &legalActs) {
+            lastAction = policy.sample(qFunction.predict(observation), legalActs);
+            lastState = std::move(observation);
+            return lastAction;
+        }
+
+
         void endEpisode(double finalReward) {
             if(lastState.has_value()) qFunction.train(lastState.value(), lastAction, finalReward, lastState.value(), true);
             lastState.reset();
