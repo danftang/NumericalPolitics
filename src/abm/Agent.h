@@ -28,6 +28,12 @@ namespace abm {
         { body.legalActs() }                -> std::convertible_to<typename MIND::action_mask>;
     };
 
+    template<class T>
+    concept AgentChannel = requires(T agentChannel, T::in_message_type incomingMessage) {
+        typename T::in_message_type;
+        { agentChannel.startEpisode() };
+        { agentChannel.handleMEssage(incomingMessage) };
+    };
 
 
     /**
@@ -92,16 +98,18 @@ namespace abm {
          *   TODO: this could be inplemented as an agent that is listening for open channel requests, which upon
          *     request, returns an open channel to which the opening agent can send the first message.
          */
-        template<class PUBLICINFORMATION>
-        inline void initEpisode(BODY initBodyState, PUBLICINFORMATION sharedinformation) {
-            body = std::move(initBodyState);
-            callInitEpisodeHook(mind, body, sharedinformation);
+        template<class BODYARG, class MINDARG>
+        inline void init(BODYARG &&bodyArg, MINDARG &&mindArg) { // TODO: init is better in the episode
+            initCallback(body,std::forward<BODYARG>(bodyArg));
+            initCallback(mind,std::forward<MINDARG>(mindArg)); // mind had better have this otherwise sharedInformation is not used
+//            callInitEpisodeHook(mind, body, sharedinformation);
         }
 
-        inline void initEpisode(BODY initBodyState) {
-            body = std::move(initBodyState);
-            callInitEpisodeHook(mind, body);
-        }
+
+//        inline void initEpisode(BODY initBodyState) {
+//            body = std::move(initBodyState);
+//            callInitEpisodeHook(mind, body);
+//        }
 
         /** This method is called after initiation.
          * If the episode is turns-based it is called on the first mover only in order to start the episode.
@@ -111,7 +119,7 @@ namespace abm {
         out_message_type startEpisode() {
             action_type lastAct = mind.act(body, body.legalActs(), 0);
             out_message_type initialMessage = body.actToMessage(lastAct);
-            callOutgoingMessageHook(mind, initialMessage);
+            outgoingMessageCallback(mind, initialMessage, body);
             return initialMessage;
         }
 
@@ -137,16 +145,16 @@ namespace abm {
          *   ended the episode.
          */
         std::optional<out_message_type> handleMessage(in_message_type incomingMessage) {
-            callHalfStepObservationHook(mind,body);
+//            callHalfStepObservationHook(mind,body);
             reward = body.messageToReward(incomingMessage);
-            callIncomingMessageHook(mind,incomingMessage);
+            incomingMessageCallback(mind,incomingMessage,body);
             auto legalActs = body.legalActs();
             if(!legalActs.any()) return {}; // no legal acts: end episode
             action_type lastAct = mind.act(body, legalActs, reward);
 //            std::cout << "got reward " << reward << " for " << this << std::endl;
             reward = 0.0;
             out_message_type response = body.actToMessage(lastAct);
-            callOutgoingMessageHook(mind,response);
+            outgoingMessageCallback(mind,response,body);
             return response;
         }
 

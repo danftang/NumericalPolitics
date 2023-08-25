@@ -7,7 +7,6 @@
 
 #include <deque>
 #include <bitset>
-#include "../abm.h"
 #include "../../DeselbyStd/random.h"
 #include "mlpack.hpp"
 
@@ -45,6 +44,7 @@ namespace abm::bodies {
         };
 
         typedef message_type in_message_type;
+        typedef const SugarSpiceTradingBody<HASLANGUAGE> & init_type;
 
         static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
         static const int utilityOfNonPreferred = 1;
@@ -141,6 +141,8 @@ namespace abm::bodies {
         }
 
         void reset(bool hasSugar, bool hasSpice, bool prefersSugar);
+
+        void onInit(const SugarSpiceTradingBody<HASLANGUAGE> &state) { reset(state.sugar(), state.spice(), state.prefersSugar()); }
 
         // [[nodiscard]] double utility() const;
 

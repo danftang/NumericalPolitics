@@ -66,7 +66,7 @@
 
 #include <cstdlib>
 #include "abm/abm.h"
-#include "abm/agents/agents.h"
+#include "abm/V0.1/agents/agents.h"
 #include <random>
 
 template<class AGENT> void experiment2(int startPopulation, int endPopulation, int burninTimesteps, int simTimesteps);

@@ -7,7 +7,7 @@
 
 #include "../Body.h"
 #include <cassert>
-#include "../utils.h"
+#include "../ActionMask.h"
 
 namespace abm::minds {
     template<Body BODY>

@@ -63,7 +63,6 @@
 #include "../GreedyPolicy.h"
 #include "../bodies/MessageRecorder.h"
 #include "../societies/RandomEncounterSociety.h"
-#include "../utils.h"
 #include "../QVector.h"
 #include "../UpperConfidencePolicy.h"
 #include "ZeroIntelligence.h"
@@ -76,21 +75,17 @@ namespace abm::minds {
      *
      * @tparam BODY The body with which we should play out in order to build this tree
      */
-    template<Body BODY>
+    template<Body BODY, Mind OffTreeMind = abm::minds::ZeroIntelligence<BODY>, class SelfPlayPolicy = abm::UpperConfidencePolicy<typename BODY::action_type>>
     class IncompleteInformationMCTS {
     public:
 
         typedef BODY observation_type;
         typedef BODY::action_mask action_mask;
         typedef double reward_type;
-
         typedef BODY::action_type action_type;
         typedef BODY::message_type message_type; // in and out messages must be the same for self-play to be possible
         typedef BODY body_type;
-
-        typedef abm::minds::ZeroIntelligence<BODY>       OffTreeMind;       // decision mechanism used during playout when off the tree
-        typedef abm::UpperConfidencePolicy<action_type>  SelfPlayPolicy;    // policy used when building tree
-
+        typedef const episodes::SimpleEpisode<BODY,BODY> & init_type;
 
         inline static std::default_random_engine randomGenerator = std::default_random_engine();
 
@@ -151,9 +146,15 @@ namespace abm::minds {
 
             action_type act(const observation_type &body, action_mask legalActs, reward_type rewardFromLastAct);
             void endEpisode(double rewardFromFinalAct);
-            void outgoingMessageHook(message_type outgoingMessage);
-            void halfStepObservationHook(const observation_type &body);
-            void incomingMessageHook(message_type incomingMessage);
+            void onOutgoingMessage(message_type outgoingMessage, const BODY &body);
+//            void halfStepObservationHook(const observation_type &body);
+            void onIncomingMessage(message_type incomingMessage, const BODY &body);
+            void onInit() {
+                treeNode = tree.rootNode;
+                qValues.clear();
+                rewards.clear();
+                hasAddedQEntry = false;
+            }
         };
 
 
@@ -173,12 +174,12 @@ namespace abm::minds {
 
         action_type act(const observation_type &body, action_mask legalActs, [[maybe_unused]] reward_type rewardFromLastAct);
 
-        void incomingMessageHook(message_type incomingMessage) {
+        void onIncomingMessage(message_type incomingMessage, const BODY &body) {
             assert(rootNode != nullptr);
             shiftRoot(incomingMessage);
         }
 
-        void outgoingMessageHook(message_type outgoingMessage) {
+        void onOutgoingMessage(message_type outgoingMessage, const BODY &body) {
             assert(rootNode != nullptr);
             shiftRoot(outgoingMessage);
         }
@@ -188,21 +189,21 @@ namespace abm::minds {
             rootNode = nullptr;
         }
 
-        void initEpisodeHook(const BODY &bodyState, const episodes::SimpleEpisode<BODY,BODY> &initialDistribution) {
+        void onInit(init_type initialDistribution) {
             rootNode = new TreeNode();
-            buildTree(initialDistribution.firstMoverPriorBodyDistribution, initialDistribution.secondMoverPriorBodyDistribution);
+            buildTree(initialDistribution);
         }
 
     protected:
-        void buildTree(std::function<BODY()> thisBodySampler, std::function<BODY()> otherBodySampler);
+        void buildTree(const episodes::SimpleEpisode<BODY> &episode);
         void shiftRoot(message_type message);
 
     };
 
 
-    template<Body BODY>
-    IncompleteInformationMCTS<BODY>::action_type
-    IncompleteInformationMCTS<BODY>::act(const observation_type &body, action_mask legalActs,
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    IncompleteInformationMCTS<BODY,OffTreeMind,SelfPlayPolicy>::action_type
+    IncompleteInformationMCTS<BODY,OffTreeMind,SelfPlayPolicy>::act(const observation_type &body, action_mask legalActs,
                                                      IncompleteInformationMCTS::reward_type rewardFromLastAct) {
         // onTree and can add entry so try emplace
 //            std::cout << "Available bodies \n" << (rootNode->qEntries | std::views::keys) << std::endl;
@@ -212,7 +213,8 @@ namespace abm::minds {
 //            std::cout << "Size of other  map " << rootNode->otherPlayerDistribution.size() << std::endl;
 //            std::cout << "Nsamples " << rootNode->nSamples() << std::endl;
 
-        buildTree(rootNode->createNextMoverSampler(), rootNode->createOtherPlayerSampler());
+        assert(rootNode != nullptr);
+        buildTree(episodes::SimpleEpisode(rootNode->createNextMoverSampler(), rootNode->createOtherPlayerSampler()));
 
         QVector<action_type::size> qVec = rootNode->qEntries.at(body);
 //            std::cout << "QVector = " << qVec << std::endl;
@@ -220,26 +222,26 @@ namespace abm::minds {
         return action;
     }
 
-    template<Body BODY>
-    void IncompleteInformationMCTS<BODY>::SelfPlayMind::halfStepObservationHook(const observation_type &body) {
-        if(treeNode != nullptr && !hasAddedQEntry) treeNode->otherPlayerDistribution[body]++;
-    }
+//    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+//    void IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::SelfPlayMind::halfStepObservationHook(const observation_type &body) {
+//        if(treeNode != nullptr && !hasAddedQEntry) treeNode->otherPlayerDistribution[body]++;
+//    }
 
     /**
      *
      * @param message identifies the child to unlink
      * @return the unlinked child
      */
-    template<Body BODY>
-    IncompleteInformationMCTS<BODY>::TreeNode *IncompleteInformationMCTS<BODY>::TreeNode::unlinkChild(message_type message) {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode *IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::unlinkChild(message_type message) {
         const size_t childIndex = static_cast<size_t>(message);
         TreeNode *child = children[childIndex];
         children[childIndex] = nullptr;
         return child;
     }
 
-    template<Body BODY>
-    void IncompleteInformationMCTS<BODY>::SelfPlayMind::incomingMessageHook(message_type incomingMessage) {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    void IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::SelfPlayMind::onIncomingMessage(message_type incomingMessage, const BODY &body) {
         if(treeNode != nullptr) {
             if(hasAddedQEntry)
                 treeNode = treeNode->getChildOrNull(incomingMessage);
@@ -248,18 +250,20 @@ namespace abm::minds {
         }
     }
 
-    template<Body BODY>
-    void IncompleteInformationMCTS<BODY>::SelfPlayMind::outgoingMessageHook(message_type outgoingMessage) {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    void IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::SelfPlayMind::onOutgoingMessage(message_type outgoingMessage, const BODY &body) {
         if(treeNode != nullptr) {
-            if(hasAddedQEntry)
+            if(hasAddedQEntry) {
                 treeNode = treeNode->getChildOrNull(outgoingMessage);
-            else
+            } else {
                 treeNode = treeNode->getChildOrCreate(outgoingMessage);
+                treeNode->otherPlayerDistribution[body]++;
+            }
         }
     }
 
-    template<Body BODY>
-    void IncompleteInformationMCTS<BODY>::SelfPlayMind::endEpisode(double rewardFromFinalAct) { // back propagate rewards
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    void IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::SelfPlayMind::endEpisode(double rewardFromFinalAct) { // back propagate rewards
         double cumulativeReward = rewardFromFinalAct;
         while(rewards.size() > qValues.size()) {
             cumulativeReward = cumulativeReward*tree.discount + rewards.back();
@@ -273,9 +277,9 @@ namespace abm::minds {
         }
     }
 
-    template<Body BODY>
-    IncompleteInformationMCTS<BODY>::action_type
-    IncompleteInformationMCTS<BODY>::SelfPlayMind::act(const observation_type &body, action_mask legalActs,
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::action_type
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::SelfPlayMind::act(const observation_type &body, action_mask legalActs,
                                                                IncompleteInformationMCTS::reward_type rewardFromLastAct) {
 //        std::cout << "rewardFromLastAct " << rewardFromLastAct << std::endl;
         QVector<action_type::size> *qEntry = nullptr; // if null, choose at random
@@ -306,11 +310,12 @@ namespace abm::minds {
         return action;
     }
 
-    template<Body BODY>
-    std::function<BODY()> IncompleteInformationMCTS<BODY>::TreeNode::createOtherPlayerSampler() {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    std::function<BODY()> IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::createOtherPlayerSampler() {
         std::vector<BODY>   states;
         std::vector<double> weights;
-        assert(otherPlayerDistribution.size() > 0);
+        if(otherPlayerDistribution.size() == 0) return {}; // undefined if no data
+//        assert(otherPlayerDistribution.size() > 0);
         states.reserve(otherPlayerDistribution.size());
         weights.reserve(otherPlayerDistribution.size());
         for(auto &entry: otherPlayerDistribution) {
@@ -328,10 +333,10 @@ namespace abm::minds {
     /**
      * @return the total number of samples that have passed this tree node.
      */
-    template<Body BODY>
-    size_t IncompleteInformationMCTS<BODY>::TreeNode::nSamples() {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    size_t IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::nSamples() {
         size_t sum = 0;
-        for(const auto &entry: otherPlayerDistribution) sum += entry.second;
+        for(const auto &entry: qEntries) sum += entry.second.totalSamples();
         return sum;
     }
 
@@ -340,8 +345,8 @@ namespace abm::minds {
      * @return A function that returns a sample from the body states with a probability
      * proportional to the total number of samples in each qEntry of this node.
      */
-    template<Body BODY>
-    std::function<BODY()> IncompleteInformationMCTS<BODY>::TreeNode::createNextMoverSampler() {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    std::function<BODY()> IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::createNextMoverSampler() {
         std::vector<BODY>   states;
         std::vector<double> weights;
         assert(qEntries.size() > 0);
@@ -363,8 +368,8 @@ namespace abm::minds {
      *
      * @param message identifies the child of the rootNode that will become the new root
      */
-    template<Body BODY>
-    void IncompleteInformationMCTS<BODY>::shiftRoot(message_type message) {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    void IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::shiftRoot(message_type message) {
         TreeNode *newRoot = rootNode->unlinkChild(message);
         assert(newRoot != nullptr);
         delete(rootNode);
@@ -378,18 +383,17 @@ namespace abm::minds {
      * @param nSamples
      * @param discount
      */
-    template<Body BODY>
-    void IncompleteInformationMCTS<BODY>::buildTree(std::function<BODY()> firstMoverBodySampler,
-                                                    std::function<BODY()> secondMoverBodySampler) {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    void IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::buildTree(const episodes::SimpleEpisode<BODY> &episode) {
         for (size_t nSamples = rootNode->nSamples(); nSamples < nSamplesPerTree; ++nSamples) {
-            auto player1 = Agent(firstMoverBodySampler(), SelfPlayMind(*this));
-            auto player2 = Agent(secondMoverBodySampler(), SelfPlayMind(*this));
+            Agent<BODY,SelfPlayMind> player1(episode.sampleFirstMoverBody(), SelfPlayMind(*this));
+            Agent<BODY,SelfPlayMind> player2(episode.sampleSecondMoverBody(), SelfPlayMind(*this));
             episodes::episode(player1,player2);
         }
     }
 
-    template<Body BODY>
-    IncompleteInformationMCTS<BODY>::IncompleteInformationMCTS(size_t nSamplesPerTree, double discount) :
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::IncompleteInformationMCTS(size_t nSamplesPerTree, double discount) :
             rootNode(nullptr),
             nSamplesPerTree(nSamplesPerTree),
             discount(discount),
@@ -401,9 +405,9 @@ namespace abm::minds {
     * @param agent
     * @return
     */
-    template<Body BODY>
-    IncompleteInformationMCTS<BODY>::TreeNode::iterator
-    IncompleteInformationMCTS<BODY>::TreeNode::addQEntry(const BODY &agent) {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::iterator
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::addQEntry(const BODY &agent) {
         auto [newEntry, wasInserted] = qEntries.try_emplace(
                 agent); // insert uniform quality with zero sample count
         assert(wasInserted);
@@ -417,8 +421,8 @@ namespace abm::minds {
     * @param act the act that identifies the child
     * @return a pointer to the child
     */
-    template<Body BODY>
-    IncompleteInformationMCTS<BODY>::TreeNode *IncompleteInformationMCTS<BODY>::TreeNode::getChildOrCreate(message_type message) {
+    template<Body BODY, Mind OffTreeMind, class SelfPlayPolicy>
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode *IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::getChildOrCreate(message_type message) {
         TreeNode *childNode = children[static_cast<size_t>(message)];
         if (childNode == nullptr) {
             childNode = new TreeNode();

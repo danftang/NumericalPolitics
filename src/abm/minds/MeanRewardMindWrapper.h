@@ -6,10 +6,10 @@
 #define MULTIAGENTGOVERNMENT_MEANREWARDMINDWRAPPER_H
 
 #include <cmath>
-#include "Mind.h"
+#include "../Mind.h"
 
 
-namespace abm {
+namespace abm::minds {
 
     /** Use this class to wrap a Mind in order to record the exponentially weighted mean
      *  reward, which we define as

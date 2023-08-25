@@ -6,6 +6,7 @@
 #define MULTIAGENTGOVERNMENT_QTABLE_H
 
 #include <array>
+#include <armadillo>
 #include "../DeselbyStd/random.h"
 #include "../DeselbyStd/BoundedInteger.h"
 

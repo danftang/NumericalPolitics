@@ -34,8 +34,8 @@
 
 #include <cstdlib>
 
-#include "abm/abm.h"
-#include "abm/agents/agents.h"
+#include "abm/V0.1/abm.h"
+#include "abm/V0.1/agents/agents.h"
 
 class ObservedPrisonersDilemmaAgent {
 public:

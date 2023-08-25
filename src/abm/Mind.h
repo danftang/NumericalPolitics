@@ -24,84 +24,103 @@ namespace abm {
         { mind.endEpisode(reward) } -> std::same_as<void>;
     };
 
-    /** If a Mind has an incomingMessageHook method, it will be called when a
+    // ---------------- Optional Callbacks -----------------------
+    // A Mind can be called at certain points in an interaction by
+    // implementing methods with special names:
+    //   onIncomingMessage
+    //   onOutgoingMessage
+    //   onInit
+
+
+    /** If a Mind has an onIncomingMessage method, it will be called when a
      * message is received, directly after it is processed by the body.
      */
-    template<class T, class MESSAGE>
-    concept HasIncomingMessageHook = requires(T object, MESSAGE message) {
-        object.incomingMessageHook(message);
+    template<class MIND, class MESSAGE, class BODY>
+    concept HasIncomingMessageCallback = requires(MIND mind, MESSAGE message, BODY body) {
+        mind.onIncomingMessage(message, body);
     };
 
-    template<class MESSAGE, class OBJ>
-    void callIncomingMessageHook(OBJ &object, MESSAGE &&message) { }
+    template<class MIND, class MESSAGE, class BODY>
+    inline void incomingMessageCallback(MIND &object, MESSAGE &&message, BODY &&body) { }
 
-    template<class MESSAGE, HasIncomingMessageHook<MESSAGE> OBJ>
-    void callIncomingMessageHook(OBJ &object, MESSAGE &&message) {
-        object.incomingMessageHook(std::forward<MESSAGE>(message));
+    template<class MIND, class MESSAGE, class BODY> requires HasIncomingMessageCallback<MIND,MESSAGE,BODY>
+    inline void incomingMessageCallback(MIND &mind, MESSAGE &&message, BODY &&body) {
+        mind.onIncomingMessage(std::forward<MESSAGE>(message), std::forward<BODY>(body));
     }
 
-    /** If a Mind has an outgoingMessageHook method, it will be called directly
-     * after a body has processed an act
+
+    /** If a Mind has an onOutgoingMessage method, it will be called directly
+     * after a body has processed an act and turned it into a message, and directly
+     * before it is sent.
      */
-    template<class MIND, class MESSAGE>
-    concept HasOutgoingMessageHook = requires(MIND mind, MESSAGE message) {
-        mind.outgoingMessageHook(message);
+    template<class MIND, class MESSAGE, class BODY>
+    concept HasOutgoingMessageCallback = requires(MIND mind, MESSAGE message, BODY body) {
+        mind.onOutgoingMessage(message, body);
     };
 
-    template<class MIND, class MESSAGE>
-    inline void callOutgoingMessageHook(MIND &object, MESSAGE &&message) { }
+    template<class MIND, class MESSAGE, class BODY>
+    inline void outgoingMessageCallback(MIND &object, MESSAGE &&message, BODY &&body) { }
 
-    template<class MIND, class MESSAGE> requires HasOutgoingMessageHook<MIND,MESSAGE>
-    inline void callOutgoingMessageHook(MIND &mind, MESSAGE &&message) {
-        mind.outgoingMessageHook(std::forward<MESSAGE>(message));
-    }
-
-    /** If a Mind has a halfStepObservationHook method it will be called on receipt of a
-     * message, directly BEFORE the body processes the message.
-     */
-    template<class MIND>
-    concept HasHalfStepObservationHook = requires(MIND mind, MIND::observation_type observation) {
-        mind.halfStepObservationHook(observation);
-    };
-
-    template<Mind MIND>
-    inline void callHalfStepObservationHook(MIND &mind, const typename MIND::observation_type &observation) { }
-
-    template<Mind MIND> requires HasHalfStepObservationHook<MIND>
-    inline void callHalfStepObservationHook(MIND &mind, const typename MIND::observation_type &observation) {
-        mind.halfStepObservationHook(observation);
+    template<class MIND, class MESSAGE, class BODY> requires HasOutgoingMessageCallback<MIND,MESSAGE,BODY>
+    inline void outgoingMessageCallback(MIND &mind, MESSAGE &&message, BODY &&body) {
+        mind.onOutgoingMessage(std::forward<MESSAGE>(message), std::forward<BODY>(body));
     }
 
 
-    /** If a Mind has a startEpisodeHook method it will be called at the start of an
+    /** If a Mind has an onInit method it will be called at the start of every
      * episode
      */
-    template<class MIND, class BODY, class SHAREDINFORMATION>
-    concept HasInitEpisodeHook = requires(MIND mind, BODY body, SHAREDINFORMATION sharedinformation) {
-        mind.initEpisodeHook(body, sharedinformation);
+    template<class T>
+    concept HasParameterlessInitCallback = requires(T obj) {
+        obj.onInit();
     };
 
-    template<class MIND, class BODY, class SHAREDINFORMATION>
-    inline void callInitEpisodeHook(MIND &mind, BODY &&body, SHAREDINFORMATION &&info) { }
-
-    template<class MIND, class BODY, class SHAREDINFORMATION> requires HasInitEpisodeHook<MIND,BODY,SHAREDINFORMATION>
-    inline void callInitEpisodeHook(MIND &mind, BODY &&body, SHAREDINFORMATION &&sharedInfo) {
-        mind.initEpisodeHook(std::forward<BODY>(body), std::forward<SHAREDINFORMATION>(sharedInfo));
-    }
-
-
-    template<class MIND, class BODY>
-    concept HasInitEpisodeHookNoSharedInfo = requires(MIND mind, BODY body) {
-        mind.initEpisodeHook(body);
+    template<class T>
+    concept HasOneParamInitCallback = requires(T obj, T::init_type sharedinformation) {
+        typename T::init_type;
+        obj.onInit(sharedinformation);
     };
 
-    template<class MIND, class BODY>
-    inline void callInitEpisodeHook(MIND &mind, BODY body) { }
+    template<class T, class ARG> requires(!HasOneParamInitCallback<T> && !HasParameterlessInitCallback<T>)
+    inline void initCallback(T &obj, ARG &&info) { }
 
-    template<class MIND, class BODY> requires HasInitEpisodeHookNoSharedInfo<MIND,BODY>
-    inline void callInitEpisodeHook(MIND &mind, BODY &&body) {
-        mind.initEpisodeHook(std::forward<BODY>(body));
+//    template<class T, class ARG> requires(HasOneParamInitCallback<T> && std::convertible_to<ARG,typename T::init_type>)
+//    inline void initCallback(T &&obj, ARG &&sharedInfo) {
+//        std::forward<T>(obj).onInit(std::forward<ARG>(sharedInfo));
+//    }
+
+    template<class T> requires HasOneParamInitCallback<T>
+    inline void initCallback(T &obj, typename T::init_type sharedInfo) {
+        obj.onInit(sharedInfo);
     }
+
+    template<class T, class ARG> requires(HasParameterlessInitCallback<T> && !HasOneParamInitCallback<T>)
+    inline void initCallback(T &obj, ARG &&dummy) {
+        obj.onInit();
+    }
+//
+//    template<class T>
+//    inline void initCallback(T &&obj) { }
+//
+//    template<class T> requires HasParameterlessInitCallback<T>
+//    inline void initCallback(T &&obj) {
+//        std::forward<T>(obj).onInit();
+//    }
+
+
+//
+//    template<class MIND, class BODY>
+//    concept HasInitEpisodeHookNoSharedInfo = requires(MIND mind, BODY body) {
+//        mind.initEpisodeHook(body);
+//    };
+//
+//    template<class MIND, class BODY>
+//    inline void callInitEpisodeHook(MIND &mind, BODY body) { }
+//
+//    template<class MIND, class BODY> requires HasInitEpisodeHookNoSharedInfo<MIND,BODY>
+//    inline void callInitEpisodeHook(MIND &mind, BODY &&body) {
+//        mind.initEpisodeHook(std::forward<BODY>(body));
+//    }
 
 
 }

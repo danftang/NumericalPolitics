@@ -7,7 +7,7 @@
 
 #include <cstdlib>
 #include "../Schedule.h"
-#include "../V0.1/QTablePolicy.h"
+#include "../QTablePolicy.h"
 #include "../CommunicationChannel.h"
 
 namespace abm {

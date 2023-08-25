@@ -9,7 +9,7 @@
 #include <armadillo>
 #include "../DeselbyStd/random.h"
 #include <concepts>
-#include "utils.h"
+#include "ActionMask.h"
 
 namespace abm {
     template<class ACTION>

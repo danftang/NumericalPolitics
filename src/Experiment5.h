@@ -79,12 +79,13 @@
 #include "abm/societies/RandomEncounterSociety.h"
 #include "abm/Agent.h"
 #include "abm/minds/QMind.h"
+#include "abm/QTable.h"
 #include "abm/minds/IncompleteInformationMCTS.h"
 #include "abm/episodes/SimpleEpisode.h"
 #include "abm/bodies/SugarSpiceTradingBody.h"
 #include "abm/DQN.h"
 #include "abm/RandomReplay.h"
-#include "abm/MeanRewardMindWrapper.h"
+#include "abm/minds/MeanRewardMindWrapper.h"
 
 namespace experiment5 {
     const bool HASLANGUAGE = true;
@@ -151,7 +152,7 @@ namespace experiment5 {
     void runA() {
         const int NTRAININGEPISODES = 200000; // 4000000;
 
-        auto mind = abm::MeanRewardMindWrapper(
+        auto mind = abm::minds::MeanRewardMindWrapper(
                 0.99,
                 abm::minds::QMind(
                         abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
@@ -175,7 +176,7 @@ namespace experiment5 {
     void runB() {
         const int NTRAININGEPISODES = 200000; // 4000000;
 
-        auto mind = abm::MeanRewardMindWrapper(
+        auto mind = abm::minds::MeanRewardMindWrapper(
                 0.99,
                 abm::minds::QMind(
                         abm::DQN<body_type::dimension, body_type::action_type::size>(
@@ -209,16 +210,8 @@ namespace experiment5 {
 
         showBehaviour(agents);
 
-//        bool hasSugar = true;
-//        bool hasSpice = false;
-//        bool prefersSugar0 = true;
-//        bool prefersSugar1 = false;
-//        deselby::Random::gen.seed(4568);
-//        auto episode = makeEpisode(hasSugar, hasSpice);
-//        episode.run(agents[0], agents[1],
-//                    body_type(hasSugar, hasSpice, prefersSugar0),
-//                    body_type(!hasSugar, !hasSpice, prefersSugar1),
-//                    true);
+//        static_assert(abm::HasOneParamInitCallback<abm::minds::IncompleteInformationMCTS<body_type>>);
+//        static_assert(abm::HasOneParamInitCallback<body_type &>);
 
 
     }
