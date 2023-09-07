@@ -204,7 +204,19 @@ namespace experiment5 {
     */
     void runC() {
         std::cout << "starting experiment" << std::endl;
-        auto mind =  abm::minds::IncompleteInformationMCTS<body_type>(200000, 1.0);
+        typedef approximators::FeedForwardNeuralNet<body_type::dimension, body_type::action_type::size, mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>> qFunction;
+
+        auto network = mlpack::FFN(mlpack::MeanSquaredError(), mlpack::HeInitialization());
+        network.Add(new mlpack::Linear(100));
+        network.Add(new mlpack::ReLU());
+        network.Add(new mlpack::Linear(50));
+        network.Add(new mlpack::ReLU());
+        network.Add(new mlpack::Linear(body_type::action_type::size));
+
+        ens::Adam adam;
+        adam.MaxIterations()
+
+        auto mind =  abm::minds::IncompleteInformationMCTS<body_type,decltype(network)>(200000, 1.0, network);
 
         std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
 

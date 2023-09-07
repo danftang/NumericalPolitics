@@ -17,13 +17,17 @@ namespace abm::minds {
         typedef BODY::action_mask   action_mask;
         typedef double              reward_type;
 
-        BODY::action_type act([[maybe_unused]] const observation_type &observation, const action_mask &legalMoves,
-                              [[maybe_unused]] reward_type reward = 0.0) const {
+        BODY::action_type act( const observation_type & /* observation */, const action_mask &legalMoves,
+                              reward_type /* reward */ = 0.0) const {
             assert(legalMoves.size() == BODY::action_type::size);
             return static_cast<BODY::action_type>(sampleUniformly(legalMoves));
         }
 
-        void endEpisode([[maybe_unused]] reward_type reward) { }
+        BODY::action_type operator()(const BODY &body) {
+            return static_cast<BODY::action_type>(sampleUniformly(body.legalActs()));
+        }
+
+        void endEpisode(reward_type /* reward */) { }
 
     };
 

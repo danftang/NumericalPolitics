@@ -11,6 +11,7 @@
 #include <numeric>
 #include <iostream>
 #include <cassert>
+#include "mlpack.hpp"
 
 namespace abm {
     /** A QValue stores mean, sample size and standard deviation of the Q-Value of a single (state,action) pair */
@@ -66,6 +67,18 @@ namespace abm {
             for(const QValue &val : *this) sum += val.sampleCount;
             return sum;
         }
+
+        arma::mat::fixed<SIZE,1> toVector() {
+            arma::mat::fixed<SIZE,1> Qvec;
+            for(int i=0; i<SIZE; ++i) Qvec(i) = (*this)[i].mean();
+            return Qvec;
+        }
+
+        operator arma::mat::fixed<SIZE,1>() {
+            return toVector();
+        }
+
+
     };
 
 }

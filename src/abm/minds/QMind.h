@@ -11,19 +11,24 @@
 namespace abm::minds {
 
     template<class T>
-    concept QFunction = requires(T qFunction, T::input_type input, T::action_type act) {
-        { qFunction.predict(input) } -> std::same_as<typename T::output_type>;
+    concept HasPredict = requires(T qFunction, T::input_type input) {
+        { qFunction.predict(input) };
+    };
+
+    template<class T>
+    concept HasTimestepTraining = requires(T qFunction, T::input_type input, T::action_type act) {
         { qFunction.train(input, act, 1.0, input, true) };
     };
 
-    /**
+
+/**
      *
      * @tparam QFUNCTION    class that approximates a Q-function from body states to vectors of Q-values over acts
      *                      and implements a train function
      * @tparam POLICY       class that converts a vector of Q-values and a legal-act mask to an act to perform.
      */
-    template<QFunction QFUNCTION, class POLICY>
-    class QMind {
+    template<HasPredict QFUNCTION, class POLICY>
+    class QMind: public QFUNCTION { // A QMind is a QFunction with an act member
     public:
 
         typedef QFUNCTION::input_type   observation_type;
@@ -31,12 +36,14 @@ namespace abm::minds {
         typedef double  reward_type;
         typedef std::bitset<action_type::size> action_mask;
 
-        QFUNCTION   qFunction;
         POLICY      policy;
+
+    private:
         std::optional<observation_type> lastState;
         action_type lastAction;
+    public:
 
-        QMind(QFUNCTION qfunction, POLICY policy): qFunction(std::move(qfunction)), policy(std::move(policy)) { }
+        QMind(QFUNCTION qfunction, POLICY policy): QFUNCTION(std::move(qfunction)), policy(std::move(policy)) { }
 
         // --- Mind interface
 
@@ -46,9 +53,9 @@ namespace abm::minds {
          * @param reward reward since the last decision point
          * @return decision how to act in the current situation
          **/
-        action_type act(observation_type observation, const action_mask &legalActs, reward_type rewardFromLastChoice) {
-            if(lastState.has_value()) qFunction.train(std::move(lastState.value()), lastAction, rewardFromLastChoice, observation, false);
-            lastAction = policy.sample(qFunction.predict(observation), legalActs);
+        action_type act(observation_type observation, const action_mask &legalActs, reward_type rewardFromLastChoice) requires HasTimestepTraining<QFUNCTION> {
+            if(lastState.has_value()) this->train(std::move(lastState.value()), lastAction, rewardFromLastChoice, observation, false);
+            lastAction = policy.sample(this->predict(observation), legalActs);
             lastState = std::move(observation);
             return lastAction;
         }
@@ -61,14 +68,20 @@ namespace abm::minds {
          * @return
          */
         action_type act(observation_type observation, const action_mask &legalActs) {
-            lastAction = policy.sample(qFunction.predict(observation), legalActs);
+            lastAction = policy.sample(this->predict(observation), legalActs);
             lastState = std::move(observation);
             return lastAction;
         }
 
 
-        void endEpisode(double finalReward) {
-            if(lastState.has_value()) qFunction.train(lastState.value(), lastAction, finalReward, lastState.value(), true);
+        template<Body BODY> requires std::convertible_to<BODY,observation_type>
+        action_type operator()(BODY body) {
+            return act(body, body.legalActs());
+        }
+
+
+        void endEpisode(double finalReward) requires HasTimestepTraining<QFUNCTION> {
+            if(lastState.has_value()) this->train(lastState.value(), lastAction, finalReward, lastState.value(), true);
             lastState.reset();
             assert(!lastState.has_value());
         }

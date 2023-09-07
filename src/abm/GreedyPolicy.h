@@ -26,26 +26,26 @@ namespace abm {
 
         template<class QVECTOR, DiscreteActionMask ACTIONMASK>
         ACTION sample(const QVECTOR &qValues, const ACTIONMASK &legalMoves) {
-//            assert(!qValues.has_nan());
-//            std::cout << "sampling from " << qValues.t() << std::endl;
-            int chosenMove = -1;
+            size_t chosenMove = action_type::size;
             assert(legalMoves.count() >= 1);
             if (explorationStrategy()) {
                 // choose a legal move at random
                 chosenMove = sampleUniformly(legalMoves);
             } else {
-                // choose the legal move with highest Q
+                // choose a legal move with highest Q
+                std::vector<size_t> indices = legalIndices(legalMoves);
+                std::shuffle(indices.begin(), indices.end(), deselby::Random::gen); // ...in-case of multiple max values
                 double bestQ = -std::numeric_limits<double>::infinity();
-                for (int i = 0; i < legalMoves.size(); ++i) {
-                    if (legalMoves[i] && qValues[i] > bestQ) {
-                        bestQ = qValues[i];
+                for (size_t i : indices) {
+                    double q = qValues[i];
+                    assert(!isnan(q));
+                    if (q > bestQ) {
+                        bestQ = q;
                         chosenMove = i;
                     }
                 }
-                assert(bestQ != -std::numeric_limits<double>::infinity());
             }
-//            if (decayExploration) explorationStrategy.decay();
-//            std::cout << "Chose " << chosenMove << std::endl;
+            assert(chosenMove < action_type::size);
             return static_cast<ACTION>(chosenMove);
         }
 

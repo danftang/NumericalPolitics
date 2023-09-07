@@ -17,7 +17,6 @@ namespace abm {
             size_t OUTPUT_DIMENSION,
             class network_type = mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>,
             class replay_buffer_type = RandomReplay>
-
     class DQN {
     public:
         static constexpr int output_dimension = OUTPUT_DIMENSION;
@@ -94,7 +93,6 @@ namespace abm {
             return actionValue;
         }
 
-//        template<class STATE> requires(std::is_convertible_v<STATE,arma::mat>)
         template<class STATE> requires(std::is_convertible_v<STATE,input_type>)
         void train(const STATE &startState, action_type action, const double &reward, const STATE &endState, bool isTerminal) {
 //        std::cout << "Training on " << std::endl << startState.t() << endState.t() << action << " " << reward  << " " << isEnd << std::endl << std::endl;
@@ -140,7 +138,6 @@ namespace abm {
             }
         }
 
-
     private:
         // generates an adamParameters step object during construction
         static network_type &setInputDimension(network_type &network) {
@@ -158,4 +155,4 @@ namespace abm {
     };
 }
 
-#endif //MULTIAGENTGOVERNMENT_DQN_H
+#endif //MULTIAGENTGOVERNMENT_FEEDFORWARDNEURALNET_H

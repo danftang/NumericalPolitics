@@ -13,6 +13,9 @@ namespace abm {
 
     /** This is the minimum requirements for a class to be a Mind. In addition, a Mind can add "hooks"
      * which are called at specific points in an episode. See the hook documentation for more details.
+     *
+     * TODO: A mind is just a trainable function from <body,mask> pair to action. The mask type is defined by the body type.
+     *   In the case of reinforcement learning the observation type is Reward.
      */
     template<class T>
     concept Mind = requires(T mind, T::observation_type observation, T::action_mask actMask, T::reward_type reward) {

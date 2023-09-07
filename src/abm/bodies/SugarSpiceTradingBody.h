@@ -77,6 +77,7 @@ namespace abm::bodies {
         std::bitset<action_type::size> legalActs();
 //        bool isEndOfEpisode();
         double endEpisode();
+        double actToMessageProb(action_type action, message_type message);
 
         // ---- End of Body interface
 
@@ -170,6 +171,36 @@ namespace abm::bodies {
         }
 
     };
+
+    template<bool HASLANGUAGE>
+    double SugarSpiceTradingBody<HASLANGUAGE>::actToMessageProb(SugarSpiceTradingBody::action_type action,
+                                                                SugarSpiceTradingBody::message_type message) {
+        double p = 0.0;
+        if(message == message_type::Bandits) {
+            p = pBanditAttack;
+        } else {
+            switch(action) {
+                case iGiveSugar:
+                    if(message==message_type::GiveSugar) p = 1.0-pBanditAttack;
+                    break;
+                case iGiveSpice:
+                    if(message==message_type::GiveSpice) p = 1.0-pBanditAttack;
+                    break;
+                case iSay0:
+                    if(message==message_type::Say0) p = 1.0-pBanditAttack;
+                    break;
+                case iFight:
+                    if(message==message_type::YouWonFight || message == message_type::YouLostFight) p = (1.0-pBanditAttack)/2.0;
+                    break;
+                case iWalkAway:
+                    if(message==message_type::WalkAway) p = 1.0-pBanditAttack;
+                    break;
+                default:
+                    throw(std::out_of_range("Unrecognized action"));
+            }
+        }
+        return p;
+    }
 
     template<bool HASLANGUAGE>
     double SugarSpiceTradingBody<HASLANGUAGE>::endEpisode() {
