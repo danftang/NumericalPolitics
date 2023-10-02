@@ -11,12 +11,12 @@
 namespace abm::minds {
 
     template<class T>
-    concept HasPredict = requires(T qFunction, T::input_type input) {
+    concept HasPredict = requires(T qFunction, typename T::input_type input) {
         { qFunction.predict(input) };
     };
 
     template<class T>
-    concept HasTimestepTraining = requires(T qFunction, T::input_type input, T::action_type act) {
+    concept HasTimestepTraining = requires(T qFunction, typename T::input_type input, typename T::action_type act) {
         { qFunction.train(input, act, 1.0, input, true) };
     };
 
@@ -31,8 +31,8 @@ namespace abm::minds {
     class QMind: public QFUNCTION { // A QMind is a QFunction with an act member
     public:
 
-        typedef QFUNCTION::input_type   observation_type;
-        typedef POLICY::action_type  action_type;
+        typedef typename QFUNCTION::input_type   observation_type;
+        typedef typename POLICY::action_type  action_type;
         typedef double  reward_type;
         typedef std::bitset<action_type::size> action_mask;
 

@@ -10,15 +10,23 @@
 /** An approximator is any computable function that is used as an approximation of some
  * intractable or partially-known target function.
  *
- * A approximator class will often represent a family of functions.
- * An instance of a parameterised class contains a set of parameters, identified by a parameters()
- * method, that identifies a single function from the family.
- * Given some information about the target function, we can "train" the parameters to minimise
- * (or at least improve) some (perhaps stochastic) objective function. So, a "training strategy"
- * involves the collection of evidence on the one hand, and the update of the parameters of an
- * approximator on the other, all with respect to some objective function. This splits up further
- * into objective function (from parameters to real and gradient, with respect to the evidence collected so far)
- * and optimiser (from current parameters and objective function to new parameters).
+ * A parameterised approximator is a family of functions, each function identified by a point
+ * in the parameter space. A parameterised approximator implements a parameters() method, that identifies the
+ * current set of parameters.
+ *
+ * Given some information about the target function, we can "train" the parameters of a parameterised approximator
+ * to minimise (or at least improve) some (perhaps stochastic) objective function. A "training strategy"
+ * defines a set of types of evidence that can be used to update the approximators parameters, along with the
+ * code to actually do the parameter update. Eveidence is presented to an object by calling the train(.) mothod
+ * with an object that represents some class of evidence.
+ *
+ * A training strategy can often be split into:
+ *   - An (maybe differentiable) objective function from parameter space to the set of reals, given the approximator.
+ *   - An optimisation algorithm/step that updates the parameters to improve the objective
+ *   - A strategy on when to run the optimisation steps
+ * The objective function can itself often be split into
+ *   - a function from evidence to a (samplable) vector of input/output pairs
+ *   - a (maybe differentiable) function from (actual output, required output) to real (loss)
  *
  * In full generality, evidence can take any form but should be supplied to the training strategy as
  * callbacks as the evidence becomes available. These ultimately will be called from the callbacks

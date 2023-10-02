@@ -1,3 +1,13 @@
+// An agent is a node in a computational graph which implements handleMessage(...) methods
+// for some number of message types. The handling of a message may (or may not)
+// cause other messages to be sent.
+//   * If handle(.) can deliver the outgoing messages by tail recursion, it should
+//     do so and return void.
+//   * If handla(.) needs to return only one message to the sender, then it should
+//     do so in the return value
+//   * Otherwise, handle(.) should return a tuple of AddressedMessages, and
+//     a delivery agent should deliver these.
+//
 //
 // Created by daniel on 02/08/23.
 //
@@ -12,28 +22,62 @@
 #include <utility>
 #include "Body.h"
 #include "Mind.h"
+#include "Events.h"
 
 namespace abm {
 
+    // TODO: A body handles
+    //    acts from the mind
+    //    messages from the environment
+    //  and emits
+    //    rewards to the mind
+    //    messages to the environment
+    //  A mind handles
+    //    rewards from the body
+    //  and emits
+    //    acts to the body.
+    //  An Agent is just a body with a mind
+    //
+    //
     template<class BODY, class MIND>
-    concept Compatible = Body<BODY> && Mind<MIND> && requires(
-            MIND mind,
-            BODY body,
-            BODY::in_message_type message,
-            MIND::reward_type reward,
-            MIND::action_mask mask
-            ) {
-        { mind.act(body, mask, reward) }    -> std::convertible_to<typename BODY::action_type>;
-        { body.messageToReward(message) }   -> std::convertible_to<typename MIND::reward_type>;
-        { body.legalActs() }                -> std::convertible_to<typename MIND::action_mask>;
+    concept BodyMindPair = requires(BODY body, MIND mind) {
+        body.actToMessageAndReward(mind.act(body));
     };
 
-    template<class T>
-    concept AgentChannel = requires(T agentChannel, T::in_message_type incomingMessage) {
-        typename T::in_message_type;
-        { agentChannel.startEpisode() };
-        { agentChannel.handleMEssage(incomingMessage) };
+    namespace events {
+        template<class MESSAGE>
+        struct IncomingMessage {
+            IncomingMessage(MESSAGE &&message) : message(std::move<MESSAGE>(message)) {};
+            IncomingMessage(const MESSAGE &message): message(message) {};
+            MESSAGE message;
+        };
+
+        template<class MESSAGE>
+        struct OutgoingMessage {
+            OutgoingMessage(MESSAGE &&message) : message(std::move<MESSAGE>(message)) {};
+            OutgoingMessage(const MESSAGE &message): message(message) {};
+            MESSAGE &message;
+        };
+
+        struct Reward { double value; };
+
     };
+
+    template<Body BODY, Mind<BODY> MIND>
+    class BodyMindTraits {
+    public:
+        typedef decltype(std::declval<MIND>().act(std::declval<BODY>())) action_type;
+        typedef decltype(std::declval<BODY>().actToMessageAndReward(std::declval<action_type>()).first) out_message_type;
+        typedef decltype(std::declval<BODY>().actToMessageAndReward(std::declval<action_type>()).second) reward_type;
+        typedef decltype(std::declval<BODY>().legalActs()) action_mask;
+    };
+
+//    template<class T>
+//    concept AgentChannel = requires(T agentChannel, typename T::in_message_type incomingMessage) {
+//        typename T::in_message_type;
+//        { agentChannel.startEpisode() };
+//        { agentChannel.handleMEssage(incomingMessage) };
+//    };
 
 
     /**
@@ -46,17 +90,17 @@ namespace abm {
      * @tparam BODY
      * @tparam MIND
      */
-    template<Body BODY, Mind MIND> requires Compatible<BODY,MIND>
+    template<class BODY, class MIND> requires BodyMindPair<BODY,MIND>
     class Agent {
     public:
-        typedef BODY body_type;
-        typedef MIND mind_type;
-        typedef BODY::in_message_type in_message_type;
-        typedef BODY::action_type action_type;
-        typedef Traits<BODY>::out_message_type out_message_type;
-
         BODY body;
         MIND mind;
+
+        typedef BODY body_type;
+        typedef MIND mind_type;
+        typedef typename decltype(mind.optionalAct(body))::value_type action_type;           // N.B. these are not intrinsic to mind or body
+        typedef typename decltype(body.optionalMessage(declval<action_type>()))::value_type out_message_type; // but only defined given the pair
+
 
     private:
         double reward = 0.0;
@@ -98,12 +142,12 @@ namespace abm {
          *   TODO: this could be inplemented as an agent that is listening for open channel requests, which upon
          *     request, returns an open channel to which the opening agent can send the first message.
          */
-        template<class BODYARG, class MINDARG>
-        inline void init(BODYARG &&bodyArg, MINDARG &&mindArg) { // TODO: init is better in the episode
-            initCallback(body,std::forward<BODYARG>(bodyArg));
-            initCallback(mind,std::forward<MINDARG>(mindArg)); // mind had better have this otherwise sharedInformation is not used
-//            callInitEpisodeHook(mind, body, sharedinformation);
-        }
+//        template<class BODYARG, class MINDARG>
+//        inline void init(BODYARG &&bodyArg, MINDARG &&mindArg) { // TODO: init is better in the episode
+//            initCallback(body,std::forward<BODYARG>(bodyArg));
+//            initCallback(mind,std::forward<MINDARG>(mindArg)); // mind had better have this otherwise sharedInformation is not used
+////            callInitEpisodeHook(mind, body, sharedinformation);
+//        }
 
 
 //        inline void initEpisode(BODY initBodyState) {
@@ -116,10 +160,13 @@ namespace abm {
          * If the episode is synchronous (e.g. rock-paper-scisors) it is called on both agents.
          * @return message that begins the episode
          */
-        out_message_type startEpisode() {
-            action_type lastAct = mind.act(body, body.legalActs(), 0);
-            out_message_type initialMessage = body.actToMessage(lastAct);
-            outgoingMessageCallback(mind, initialMessage, body);
+        std::optional<out_message_type> startEpisode() {
+            std::optional<out_message_type> result;
+            std::optional<action_type> act = mind.optionalAct(body);
+            if(!act.has_value()) return result;
+            std::optional<out_message_type> initialMessage = body.optionalMessage(*act);
+            if(!initialMessage.has_value()) return result;
+            events::callback(events::OutgoingMessage(*initialMessage),mind);
             return initialMessage;
         }
 
@@ -144,17 +191,17 @@ namespace abm {
          * @return response to incoming message. If unset, the agent has (perhaps unilaterally)
          *   ended the episode.
          */
-        std::optional<out_message_type> handleMessage(in_message_type incomingMessage) {
-//            callHalfStepObservationHook(mind,body);
-            reward = body.messageToReward(incomingMessage);
-            incomingMessageCallback(mind,incomingMessage,body);
-            auto legalActs = body.legalActs();
-            if(!legalActs.any()) return {}; // no legal acts: end episode
-            action_type lastAct = mind.act(body, legalActs, reward);
-//            std::cout << "got reward " << reward << " for " << this << std::endl;
-            reward = 0.0;
-            out_message_type response = body.actToMessage(lastAct);
-            outgoingMessageCallback(mind,response,body);
+         template<class INMESSAGE>
+        std::optional<out_message_type> handleMessage(INMESSAGE incomingMessage) {
+            std::optional<out_message_type> response;
+            events::callback(events::IncomingMessage(incomingMessage),mind);
+            reward = body.handle(incomingMessage);
+            events::callback(events::Reward(reward),mind);
+            std::optional lastAct = mind.act(body);
+            if(!lastAct.has_value()) return response;
+//            reward = 0.0;
+            response = body.optionalMessage(*lastAct);
+            if(response.has_value()) events::callback(events::OutgoingMessage(*response));
             return response;
         }
 
@@ -189,11 +236,19 @@ namespace abm {
          * It is called on both agents, irrespective of who ended the episode.
          * TODO: can the environment end an episode, or should this be modelled as an
          *   intermediary agent with two open communication channels [yes, better this way]?
+         * TODO: should this be done in handleMessage with an unset optional?...or with an EndEpisode() message?
+         *   or even as optional callback? [probably this as it may be null of no learning]
          */
         void endEpisode() {
             double residualReward = body.endEpisode();
             mind.endEpisode(reward + residualReward);
             // std::cout << "Got final reward " << reward << " + " << residualReward << " = " << reward + residualReward << " for " << this << std::endl;
+        }
+
+        friend std::ostream &operator <<(std::ostream &out, const Agent<BODY,MIND> &agent) {
+            deselby::constexpr_if<deselby::IsStreamable<MIND>>([&out](auto &mind) { out << mind << std::endl; }, agent.mind);
+            deselby::constexpr_if<deselby::IsStreamable<BODY>>([&out](auto &body) { out << body << std::endl; }, agent.body);
+            return out;
         }
 
 //        void setMeanRewardDecay(double exponentialDecayRatePerTransaction) {

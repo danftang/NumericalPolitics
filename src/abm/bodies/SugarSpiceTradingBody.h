@@ -62,6 +62,7 @@ namespace abm::bodies {
         bool isTerminal = false;
         double reward = 0.0;
         message_type lastOutgoingMessage;
+        action_mask legalMoves;
 
         SugarSpiceTradingBody(): SugarSpiceTradingBody(false, false, false) { }
 
@@ -81,17 +82,23 @@ namespace abm::bodies {
 
         // ---- End of Body interface
 
-        double &sugar() { return netInput[0]; }
+        double &setSugar(int nSugar) {
+            netInput[0] = nSugar;
+            legalMoves[iGiveSugar] = nSugar>0;
+        }
 
-        double &spice() { return netInput[1]; }
+        double &setSpice(int nSpice) {
+            netInput[1] = nSpice;
+            legalMoves[iGiveSpice] = nSpice>0;
+        }
 
-        double &prefersSugar() { return netInput[2]; }
+        double &setPrefersSugar(bool prefersSugar) { netInput[2] = prefersSugar; }
 
-        [[nodiscard]] double sugar() const { return netInput[0]; }
+        [[nodiscard]] const double &sugar() const { return netInput[0]; }
 
-        [[nodiscard]] double spice() const { return netInput[1]; }
+        [[nodiscard]] const double &spice() const { return netInput[1]; }
 
-        [[nodiscard]] double prefersSugar() const { return netInput[2]; }
+        [[nodiscard]] const double &prefersSugar() const { return netInput[2]; }
 
         operator const arma::mat::fixed<dimension,1> &() const {
             return netInput;
@@ -170,6 +177,7 @@ namespace abm::bodies {
             return out;
         }
 
+        void resetLegalMoves();
     };
 
     template<bool HASLANGUAGE>
@@ -206,7 +214,7 @@ namespace abm::bodies {
     double SugarSpiceTradingBody<HASLANGUAGE>::endEpisode() {
         double residualReward = reward;
         reward = 0.0;
-        isTerminal = false;
+        resetLegalMoves();
         return residualReward;
     }
 
@@ -229,6 +237,14 @@ namespace abm::bodies {
         return legalActs;
     }
 
+    template<bool HASLANGUAGE>
+    void SugarSpiceTradingBody<HASLANGUAGE>::resetLegalMoves() {
+        for (int i = 0; i < legalMoves.size(); ++i) legalMoves[i] = true;
+        legalMoves[iSay0] = HASLANGUAGE;
+//        legalActs[iSay1] = HASLANGUAGE;
+
+
+    }
 //    template<bool HASLANGUAGE>
 //    double SugarSpiceTradingBody<HASLANGUAGE>::utility() const {
 //        double utilityOfSugar = (prefersSugar() > 0.5 ? utilityOfPreferred : utilityOfNonPreferred);
@@ -238,6 +254,7 @@ namespace abm::bodies {
 
     template<bool HASLANGUAGE>
     void SugarSpiceTradingBody<HASLANGUAGE>::reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
+        resetLegalMoves();
         recordIncomingMessage(message_type::IndeterminateTerminalMessage); // use first terminal state to mean Empty as we don't use this
         recordOutgoingMessage(message_type::IndeterminateTerminalMessage);
         sugar() = hasSugar;
@@ -265,12 +282,14 @@ namespace abm::bodies {
                 sugar() -= 1;
                 outgoingMessage = message_type::GiveSugar;
                 reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if (sugar() == 0) legalMoves[iGiveSugar] = false;
                 break;
             case iGiveSpice:
                 assert(spice() >= 1);
                 spice() -= 1;
                 outgoingMessage = message_type::GiveSpice;
                 reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                if (spice() == 0) legalMoves[iGiveSpice] = false;
                 break;
             case iWalkAway:
                 outgoingMessage = message_type::WalkAway;
@@ -284,6 +303,8 @@ namespace abm::bodies {
                     if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                     sugar() = 0;
                     spice() = 0;
+                    legalMoves[iGiveSugar] = true;
+                    legalMoves[iGiveSpice] = true;
                 } else {
                     outgoingMessage = message_type::YouLostFight;
                     if(sugar() == 0.0) reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);

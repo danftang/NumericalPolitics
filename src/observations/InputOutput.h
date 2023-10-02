@@ -12,9 +12,12 @@ namespace observations {
  * @tparam OUTPUT
  */
     template<class INPUT, class OUTPUT>
-    struct InputOutput {
+    class InputOutput {
+    public:
         INPUT input;
         OUTPUT output;
+
+
     };
 };
 

@@ -9,28 +9,28 @@
 #include "../Body.h"
 
 namespace abm::bodies {
-    template<Body BODY>
-    class MessageRecorder: public BODY {
-    public:
-        typedef BODY::message_type message_type;
-        typedef BODY::action_type action_type;
-        typedef BODY::action_mask action_mask;
-
-        message_type actToMessage(action_type action) {
-            lastOutgoingMessage = BODY::actToMessage(action);
-            return lastOutgoingMessage;
-        }
-
-        double messageToReward(message_type incomingMessage) {
-            lastIncomingMessage = incomingMessage;
-            return BODY::messageToReward(incomingMessage);
-        }
-
-        // TODO: add int and vector casts
-
-        message_type lastOutgoingMessage;
-        message_type lastIncomingMessage;
-    };
+//    template<Body BODY>
+//    class MessageRecorder: public BODY {
+//    public:
+////        typedef BODY::message_type message_type;
+////        typedef BODY::action_type action_type;
+////        typedef BODY::action_mask action_mask;
+//
+//        message_type actToMessage(action_type action) {
+//            lastOutgoingMessage = BODY::actToMessage(action);
+//            return lastOutgoingMessage;
+//        }
+//
+//        double messageToReward(message_type incomingMessage) {
+//            lastIncomingMessage = incomingMessage;
+//            return BODY::messageToReward(incomingMessage);
+//        }
+//
+//        // TODO: add int and vector casts
+//
+//        message_type lastOutgoingMessage;
+//        message_type lastIncomingMessage;
+//    };
 
 }
 

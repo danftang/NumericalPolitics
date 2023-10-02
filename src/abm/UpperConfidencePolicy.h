@@ -20,7 +20,7 @@ namespace abm {
     template<class ACTION>
     class UpperConfidencePolicy {
     public:
-        bool i;
+//        bool i;
         typedef ACTION action_type;
 
         /**

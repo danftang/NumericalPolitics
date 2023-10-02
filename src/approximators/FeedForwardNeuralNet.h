@@ -37,9 +37,9 @@ class FeedForwardNeuralNet: public mlpack::FFN<ObjectiveType,InitializationRuleT
          * @param replayBufferSize
          * @param discount
          */
-         template<std::ranges::range LAYERS> requires std::convertible_to<typename LAYERS::value_type, mlpack::Layer<MatType> *>
+         template<std::ranges::range LAYERS = std::initializer_list<mlpack::Layer<MatType> *>> requires std::convertible_to<typename LAYERS::value_type, mlpack::Layer<MatType> *>
         FeedForwardNeuralNet(
-                size_t inputDimension,
+//                size_t inputDimension,
                 LAYERS layers,
                 OptimiserType optimiser = ens::Adam(0.001,32,0.9,0.999,1e-8,10000,1e-5,false,false,false),
                 ObjectiveType outputLayer = ObjectiveType(),
@@ -51,7 +51,7 @@ class FeedForwardNeuralNet: public mlpack::FFN<ObjectiveType,InitializationRuleT
                     for(mlpack::Layer<MatType> *layer : layers) {
                         this->Add(layer);
                     }
-                    this->Reset(inputDimension);
+  //                  this->Reset(inputDimension);
                 }
 
 
@@ -68,14 +68,17 @@ class FeedForwardNeuralNet: public mlpack::FFN<ObjectiveType,InitializationRuleT
 
         /** Train on a batch of <domain,range> pairs.
          *
-         * @param trainingPairs domain points on which we're training. Packed into columns of a matrix
+         * @param trainingPairs domain points on which we're training. Packed into columns of a matrix.
+         *                      These can be matrices, references, const references etc. If matrices,
+         *                      be sure to use std::move when passing if you don't want to keep the values.
          */
-        void train(const observations::InputOutput<MatType,MatType> &trainingPairs) {
-            assert(trainingPairs.input.n_rows == INPUT_DIMENSION);
-            assert(trainingPairs.output.n_rows == OUTPUT_DIMENSION);
+         template<class IN, class OUT> requires std::convertible_to<IN,MatType> && std::convertible_to<OUT,MatType>
+        void train(observations::InputOutput<IN,OUT> trainingPairs) {
+            assert(trainingPairs.input.n_rows == this->InputDimenstions());
+            assert(trainingPairs.output.n_rows == this->network.outputDimensions());
             assert(trainingPairs.input.n_cols == trainingPairs.output.n_cols);
 //            optimiser.MaxIterations() = trainingPairs.input.n_cols; // ensure we stop after one epoch TODO: put this in the higher level.
-            this->train(trainingPairs.input, trainingPairs.output, optimiser);
+            this->train(std::forward<IN>(trainingPairs.input), std::forward<OUT>(trainingPairs.output), optimiser);
         }
     };
 }

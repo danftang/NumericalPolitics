@@ -93,61 +93,104 @@ namespace experiment5 {
     typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
 
-    std::function<body_type()> bodyHiddenStateSampler(bool hasSugar, bool hasSpice) {
-        return [hasSugar, hasSpice]() {
-            return body_type(hasSugar, hasSpice, deselby::Random::nextBool());
-        };
+//    std::function<body_type()> bodyHiddenStateSampler(bool hasSugar, bool hasSpice) {
+//        return [hasSugar, hasSpice]() {
+//            return body_type(hasSugar, hasSpice, deselby::Random::nextBool());
+//        };
+//    }
+
+//    /** Creates a sampler of agent pairs to play in an episode. A single unit of sugar
+//     * and a single unit of spice are distributed randomly amongst the agents.
+//     * Their preference is also randomly assigned
+//     */
+//    template<class MIND>
+//    std::function<std::pair<abm::Agent<body_type,MIND>,abm::Agent<body_type,MIND>>()>
+//    startStateSampler(MIND mind) {
+//        return [mind]() {
+//            bool hasSugar = deselby::Random::nextBool();
+//            bool hasSpice = deselby::Random::nextBool();
+//            return std::pair(
+//                    abm::Agent(body_type( hasSugar, hasSpice, deselby::Random::nextBool()), mind),
+//                    abm::Agent(body_type(!hasSugar,!hasSpice, deselby::Random::nextBool()), mind)
+//                    );
+//        };
+//    }
+
+    /** Sets an agent pair to a given joint body state by index.
+     * The total amount of sugar and spice is 1 sugar and 1 spice.
+     * @param stateID binary number in 0..1111 that identifies the state
+     */
+    template<class MIND1, class MIND2>
+    void
+    setStartState(abm::Agent<body_type,MIND1> &firstAgent, abm::Agent<body_type,MIND2> &secondAgent, std::bitset<4> startState) {
+        firstAgent.body.sugar() = startState[0];
+        secondAgent.body.sugar() = 1.0 - firstAgent.body.sugar();
+        firstAgent.body.spice() = startState[1];
+        secondAgent.body.spice() = 1.0 - firstAgent.body.spice();
+        firstAgent.body.prefersSugar() = startState[2];
+        secondAgent.body.prefersSugar() = startState[3];
     }
 
 
-    auto makeEpisode(bool firstMoverHasSugar, bool firstMoverHasSpice) {
-        return abm::episodes::SimpleEpisode(bodyHiddenStateSampler(firstMoverHasSugar, firstMoverHasSpice),
-                                            bodyHiddenStateSampler(!firstMoverHasSugar, !firstMoverHasSpice));
+
+//    auto makeEpisode(bool firstMoverHasSugar, bool firstMoverHasSpice) {
+//        return abm::episodes::SimpleEpisode(bodyHiddenStateSampler(firstMoverHasSugar, firstMoverHasSpice),
+//                                            bodyHiddenStateSampler(!firstMoverHasSugar, !firstMoverHasSpice));
+//    }
+
+
+    template<class AGENT1, class AGENT2>
+    void train(AGENT1 &agent1, AGENT2 &agent2, size_t nTrainingEpisodes) {
+        abm::episodes::runAsync(agent1, agent2, nTrainingEpisodes,
+                                abm::episodes::callbacks::OnEpisodeStartCallback([](auto &agent1, auto &agent2) {
+                                    setStartState(agent1, agent2, deselby::Random::nextInt(32));
+                                }));
+//        bool verbose = false;
+//        abm::episodes::sampleAndRunAsync(startStateSampler(mind),nTrainingEpisodes,verbose);
+//        for(int iterations = 0; iterations < nTrainingEpisodes; ++iterations) {
+//            if(iterations%100 == 0) {
+//                std::cout << iterations << " "
+//                          << agents[0].mind.meanReward << " "
+//                          << agents[1].mind.meanReward << " "
+//                          << agents[0].mind.meanReward + agents[1].mind.meanReward
+//                          << std::endl;
+//            }
+//            // set random initial state
+////            bool firstMoverHasSugar = deselby::Random::nextBool();
+////            bool firstMoverHasSpice = deselby::Random::nextBool();
+////            auto episode = makeEpisode(firstMoverHasSugar, firstMoverHasSpice);
+////            int firstMoverIndex = deselby::Random::nextBool();
+////            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1], verbose);
+//        }
     }
 
-
-    template<class AGENT>
-    void train(std::vector<AGENT> &agents, size_t nTrainingEpisodes) {
-        bool verbose = false;
-        for(int iterations = 0; iterations < nTrainingEpisodes; ++iterations) {
-            if(iterations%100 == 0) {
-                std::cout << iterations << " "
-                          << agents[0].mind.meanReward << " "
-                          << agents[1].mind.meanReward << " "
-                          << agents[0].mind.meanReward + agents[1].mind.meanReward
-                          << std::endl;
-            }
-            // set random initial state
-            bool firstMoverHasSugar = deselby::Random::nextBool();
-            bool firstMoverHasSpice = deselby::Random::nextBool();
-            auto episode = makeEpisode(firstMoverHasSugar, firstMoverHasSpice);
-            int firstMoverIndex = deselby::Random::nextBool();
-            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1], verbose);
-        }
-    }
-
-    template<class AGENT>
-    void showBehaviour(std::vector<AGENT> &agents) {
-        bool verbose = true;
-        for(int state = 0; state < 32; ++state) {
-            // set random initial state
-            int firstMoverIndex = state & 1;
-            bool firstMoverHasSugar = state & 2;
-            bool firstMoverHasSpice = state & 4;
-            bool firstMoverPrefersSugar = state & 8;
-            bool secondMoverPrefersSugar = state & 16;
-            auto episode = makeEpisode(firstMoverHasSugar, firstMoverHasSpice);
-
-            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1],
-                        body_type(firstMoverHasSugar, firstMoverHasSpice, firstMoverPrefersSugar),
-                        body_type(!firstMoverHasSugar, !firstMoverHasSpice, secondMoverPrefersSugar),
-                        verbose);
-        }
+    template<class AGENT1, class AGENT2>
+    void showBehaviour(AGENT1 &agent1, AGENT2 &agent2) {
+        abm::episodes::runAsync(agent1, agent2, 32,
+                                abm::episodes::callbacks::OnEpisodeStartCallback(
+                                        [startState = 0](auto &agent1, auto &agent2) mutable {
+                                            setStartState(agent1, agent2, startState++);
+                                        }),
+                                abm::episodes::callbacks::Verbose());
+//        bool verbose = true;
+//        for(int state = 0; state < 32; ++state) {
+//            // set random initial state
+//            int firstMoverIndex = state & 1;
+//            bool firstMoverHasSugar = state & 2;
+//            bool firstMoverHasSpice = state & 4;
+//            bool firstMoverPrefersSugar = state & 8;
+//            bool secondMoverPrefersSugar = state & 16;
+//
+//            abm::episodes::runAsyncEpisode()
+//            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1],
+//                        body_type(firstMoverHasSugar, firstMoverHasSpice, firstMoverPrefersSugar),
+//                        body_type(!firstMoverHasSugar, !firstMoverHasSpice, secondMoverPrefersSugar),
+//                        verbose);
+//        }
     }
 
 
     /** Test a QTable on binary, repeated SugarSpiceTrading
-     *
      */
     void runA() {
         const int NTRAININGEPISODES = 200000; // 4000000;
@@ -157,22 +200,23 @@ namespace experiment5 {
                 abm::minds::QMind(
                         abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
                         abm::GreedyPolicy<body_type::action_type>(
-                                abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                                abm::minds::qLearning::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
                         )
                 )
         );
 
-        std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
-        train(agents,NTRAININGEPISODES);
+        auto agent1 = abm::Agent(body_type(), mind);
+        auto agent2 = abm::Agent(body_type(), mind);
+        train(agent1,agent2,NTRAININGEPISODES);
         body_type::pBanditAttack = 0.002;
-        agents[0].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
-        agents[1].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
-        showBehaviour(agents);
+        agent1.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
+        agent2.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
+        showBehaviour(agent1,agent2);
     }
 
     /** Test a Deep Q-network on binary, repeated SugarSpiceTrading
- * (spoiler: doesn't learn to cooperate)
- */
+    * (spoiler: doesn't learn to cooperate)
+    */
     void runB() {
         const int NTRAININGEPISODES = 200000; // 4000000;
 
@@ -199,8 +243,8 @@ namespace experiment5 {
         showBehaviour(agents);
     }
 
-    /** Test a Deep Q-network on binary, repeated SugarSpiceTrading
-    * (spoiler: doesn't learn to cooperate)
+
+    /** Test a Incomplete Information Monte-Carlo tree search on binary, repeated SugarSpiceTrading
     */
     void runC() {
         std::cout << "starting experiment" << std::endl;

@@ -26,23 +26,23 @@ namespace abm {
 //    template<class ACTION, class MASK>
 //    concept FitsMask = ActionMask<MASK,ACTION>;
 
-    /** Samples uniformly from a discrete legal-action mask.
-     * @param legalMoves the mask from which we wish to sample
-     * @return a legal index into legalMoves chosen with uniform probability.
-     */
-    template<DiscreteActionMask MASK>
-    static size_t sampleUniformly(const MASK &legalMoves) {
-        size_t chosenMove = 0;
-        size_t nLegalMoves = legalMoves.count();
-        assert(nLegalMoves > 0);
-        int legalMovesToGo = deselby::Random::nextInt(0, nLegalMoves);
-        while(legalMovesToGo > 0 || legalMoves[chosenMove] == false) {
-            if(legalMoves[chosenMove] == true) --legalMovesToGo;
-            ++chosenMove;
-            assert(chosenMove < legalMoves.size());
-        }
-        return chosenMove;
-    }
+//    /** Samples uniformly from a discrete legal-action mask.
+//     * @param legalMoves the mask from which we wish to sample
+//     * @return a legal index into legalMoves chosen with uniform probability.
+//     */
+//    template<DiscreteActionMask MASK>
+//    static size_t sampleUniformly(const MASK &legalMoves) {
+//        size_t chosenMove = 0;
+//        size_t nLegalMoves = legalMoves.count();
+//        assert(nLegalMoves > 0);
+//        int legalMovesToGo = deselby::Random::nextInt(0, nLegalMoves);
+//        while(legalMovesToGo > 0 || legalMoves[chosenMove] == false) {
+//            if(legalMoves[chosenMove] == true) --legalMovesToGo;
+//            ++chosenMove;
+//            assert(chosenMove < legalMoves.size());
+//        }
+//        return chosenMove;
+//    }
 
 
     /** Takes a discrete legal-action mask and turns it into a vector of indices of true bits
