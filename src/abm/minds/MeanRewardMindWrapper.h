@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include "../Mind.h"
+#include "../Agent.h"
 
 
 namespace abm::minds {
@@ -36,70 +37,73 @@ namespace abm::minds {
      * have one unit of time between actions, even between episodes.
      *
      */
-    template<Mind MIND>
-    class MeanRewardMindWrapper : public MIND {
-    public:
-        typedef MIND::observation_type observation_type;
-        typedef MIND::action_mask action_mask;
-        typedef MIND::reward_type reward_type;
+     //// USE abm::callbacks::Meaneward
+//    template<class MIND>
+//    class MeanRewardMindWrapper : public MIND {
+//    public:
+//        typedef MIND::observation_type observation_type;
+//        typedef MIND::action_mask action_mask;
+//        typedef MIND::reward_type reward_type;
+//
+//        /** The exponentialy weighted mean reward */
+//        double  meanReward = 0.0;
+//        int     nSamples = 0;
+//    private:
+//        double  endOfEpisodeReward = 0.0;
+//        const double meanRewardDecay;
+//    public:
+//
+//        /** Default constructed mind.
+//         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
+//         * (note that this is distinct from the discount used to calculate expected rewards into the future)
+//         */
+//        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction) requires std::is_default_constructible_v<MIND> :
+//        meanRewardDecay(exponentialDecayRatePerTransaction) { }
+//
+//        /** Use this to construct a Mind in place, send arguments for a constructor of MIND.
+//         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
+//         * (note that this is distinct from the discount used to calculate expected rewards into the future)
+//         */
+//        template<typename... MindConstructorArgs> requires std::is_constructible_v<MIND,MindConstructorArgs...>
+//        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction, MindConstructorArgs &&... mindConstructorArgs):
+//                meanRewardDecay(exponentialDecayRatePerTransaction),
+//                MIND(std::forward<MindConstructorArgs>(mindConstructorArgs)...) { }
+//
+//        /** Use this to save having to define the temlated type of Mind. Moves the supplied mind into this.
+//         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
+//         * (note that this is distinct from the discount used to calculate expected rewards into the future)
+//         * @param mind Mind to move into this.
+//         */
+//        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction, MIND && mind):
+//                meanRewardDecay(exponentialDecayRatePerTransaction),
+//                MIND(std::move(mind)) { }
+//
+//        /** Use this to save having to define the temlated type of Mind. Copies the supplies mind to this.
+//         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
+//         * (note that this is distinct from the discount used to calculate expected rewards into the future)
+//         * @param mind Mind to copy into this.
+//         */
+//        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction, const MIND & mind):
+//                meanRewardDecay(exponentialDecayRatePerTransaction),
+//                MIND(mind) { }
+//
+//
+//        void endEpisode(double residualReward) {
+//            endOfEpisodeReward = residualReward;
+//            MIND::endEpisode(residualReward);
+//        }
+//
+//
+//        auto act(observation_type observation, action_mask actMask, reward_type reward) {
+//            double a_n = (1.0-meanRewardDecay)/(1.0-std::pow(meanRewardDecay, ++nSamples));
+//            meanReward *= 1.0-a_n;
+//            meanReward += a_n*(reward + endOfEpisodeReward);
+//            endOfEpisodeReward = 0.0;
+//            return MIND::act(observation, actMask, reward);
+//        }
+//    };
 
-        /** The exponentialy weighted mean reward */
-        double  meanReward = 0.0;
-        int     nSamples = 0;
-    private:
-        double  endOfEpisodeReward = 0.0;
-        const double meanRewardDecay;
-    public:
 
-        /** Default constructed mind.
-         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
-         * (note that this is distinct from the discount used to calculate expected rewards into the future)
-         */
-        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction) requires std::is_default_constructible_v<MIND> :
-        meanRewardDecay(exponentialDecayRatePerTransaction) { }
-
-        /** Use this to construct a Mind in place, send arguments for a constructor of MIND.
-         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
-         * (note that this is distinct from the discount used to calculate expected rewards into the future)
-         */
-        template<typename... MindConstructorArgs> requires std::is_constructible_v<MIND,MindConstructorArgs...>
-        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction, MindConstructorArgs &&... mindConstructorArgs):
-                meanRewardDecay(exponentialDecayRatePerTransaction),
-                MIND(std::forward<MindConstructorArgs>(mindConstructorArgs)...) { }
-
-        /** Use this to save having to define the temlated type of Mind. Moves the supplied mind into this.
-         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
-         * (note that this is distinct from the discount used to calculate expected rewards into the future)
-         * @param mind Mind to move into this.
-         */
-        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction, MIND && mind):
-                meanRewardDecay(exponentialDecayRatePerTransaction),
-                MIND(std::move(mind)) { }
-
-        /** Use this to save having to define the temlated type of Mind. Copies the supplies mind to this.
-         * @param exponentialDecayRatePerTransaction this is the discount of rewards into the past applied when calculating the mean reward
-         * (note that this is distinct from the discount used to calculate expected rewards into the future)
-         * @param mind Mind to copy into this.
-         */
-        MeanRewardMindWrapper(double exponentialDecayRatePerTransaction, const MIND & mind):
-                meanRewardDecay(exponentialDecayRatePerTransaction),
-                MIND(mind) { }
-
-
-        void endEpisode(double residualReward) {
-            endOfEpisodeReward = residualReward;
-            MIND::endEpisode(residualReward);
-        }
-
-
-        auto act(observation_type observation, action_mask actMask, reward_type reward) {
-            double a_n = (1.0-meanRewardDecay)/(1.0-std::pow(meanRewardDecay, ++nSamples));
-            meanReward *= 1.0-a_n;
-            meanReward += a_n*(reward + endOfEpisodeReward);
-            endOfEpisodeReward = 0.0;
-            return MIND::act(observation, actMask, reward);
-        }
-    };
 }
 
 #endif //MULTIAGENTGOVERNMENT_MEANREWARDMINDWRAPPER_H

@@ -8,7 +8,17 @@
 #include <cstdlib>
 #include <utility>
 #include <variant>
+#include <vector>
+#include <list>
+#include <iterator>
+#include <map>
+#include <set>
+#include <deque>
 #include <forward_list>
+#include <unordered_set>
+#include <tuple>
+#include <ranges>
+#include <valarray>
 
 namespace deselby {
     /** true if T is a type of the from TEMPLATE<class...> for some set of classes */

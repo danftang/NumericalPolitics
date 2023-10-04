@@ -77,7 +77,6 @@
 #include <ranges>
 
 #include "../Agent.h"
-#include "../bodies/MessageRecorder.h"
 #include "../societies/RandomEncounterSociety.h"
 #include "../QVector.h"
 #include "../UpperConfidencePolicy.h"
@@ -122,12 +121,13 @@ namespace abm::minds {
     class IncompleteInformationMCTS {
     public:
 
-        typedef BODY observation_type;
-        typedef BODY::action_mask action_mask;
+//        typedef BODY observation_type;
+//        typedef BODY::action_mask action_mask;
+//        typedef BODY body_type;
+
         typedef double reward_type;
         typedef BODY::action_type action_type;
         typedef BODY::message_type message_type; // in and out messages must be the same for self-play to be possible
-        typedef BODY body_type;
 //        typedef const episodes::SimpleEpisode<BODY,BODY> & init_type;
 
         inline static std::default_random_engine randomGenerator = std::default_random_engine();
@@ -138,22 +138,20 @@ namespace abm::minds {
          **/
         class TreeNode {
         public:
-            typedef std::map<BODY, QVector<action_type::size>>::iterator iterator;
-
-            std::map<BODY,QVector<action_type::size>>   qEntries; // qVectors for current player
+            std::map<BODY,QVector<action_type::size>>   qEntries; // qVectors for current player.
             std::map<BODY,uint>     otherPlayerDistribution; // posterior of other player body states given move history
         private:
-            std::array<TreeNode *, static_cast<size_t>(message_type::size)> children;   // ...indexed by actId. nullptr if child not present.
+            std::map<message_type, TreeNode *> children;
+//            std::array<TreeNode *, static_cast<size_t>(message_type::size)> children;   // ...indexed by actId. nullptr if child not present.
         public:
 
             TreeNode() { children.fill(nullptr); }
             ~TreeNode() { for (TreeNode *child: children) delete (child); }
 
             TreeNode *getChildOrCreate(message_type message);
-            TreeNode *getChildOrNull(message_type message) { return children[static_cast<size_t>(message)]; }
+            TreeNode *getChildOrNull(message_type message);
             TreeNode *unlinkChild(message_type message);
-            iterator addQEntry(const BODY &agent);
-//            size_t nCurrentPlayerSamples();
+            auto addQEntry(const BODY &agent);
             const BODY *sampleActorBodyGivenMessage(message_type actorMessage);
         };
 
@@ -161,31 +159,19 @@ namespace abm::minds {
          * It can be thought of as a smart pointer into the tree that moves from the root
          * to a leaf then back-propagates to update Q-values.
          * During self-play, two SelfPlayMinds simultaneously navigate the same tree.
-         * Each mind can add at most a single qEntry on their turn to act.
-         * While a Mind hasn't yet added a qEntry, it may also create new TreeNodes in which
-         * to put the new qEntry.
+         * Each mind can add at most a single qEntry on their turn to act, creating new
+         * TreeNodes in which to put the new qEntry if necessary.
          * [So, there are three states, onTree/notAddedQEntry, onTree/AddedQentry. offTree]
-         * @tparam POLICY for choosing an action given a QVector
+         *
+         * The parameters LEAVETRACE and DOBACKPROP allow normal leraning (<true.true> plays against <true,true>)
+         * or targeted improvement of Q-values without invalidating the posterior distributions or Q-values via
+         * leaking information about the state of other player (<false,true> plays against <true,false>)
+         *
+         * @tparam LEAVETRACE   If true, the mind will increment counts in otherPlayerDistribution
+         *                      as it passes through TreeNodes as the other player.
+         * @tparam DOBACKPROP   If true, after the end of an episode, the mind will backpropogate and
+         *                      update the Q-values of the TreeNodes it passed through as currentPlayer.
          */
-        // TODO: In order to increase the number of samples in self's actual state without leaking information to other,
-        //  add "leave trace" and "do backprop" booleans to SelfPlayMid. At decision point, if the number of samples of own state
-        //  is too low, add samples using SelfPlayMinds starting with own actual state and samples from other with
-        //  leave-trace set to false for both payers and do-backprop set to false for other.
-        //  or, we importance-sample when building the tree so as to ensure we end up with the right number of samples
-        //  in actual state.
-        //  We'll need to keep a separate vector of body-state weights for the current player in each node, so that
-        //  we can continue to update Q-values, while updating prior distributions in a weighted fashion.
-        //  We could draw all the "extra" samples at the end:
-        //  Suppose P(x) is our target distribution and we draw N samples from a proposal distribution
-        //  P'(x) = kP(x) + (1-k)delta_{X}(x)
-        //  If we weight each sample with w = P(x)/P'(x) then we can draw from P(x) by drawing from the
-        //  weighted set of samples.
-        //  However, we can draw from P'(x) by drawing NK samples from P(x) then N(1-k) samples x=X
-        //  Suppose we want to end up with m samples with x=X after N total samples taken. We draw from P(x)
-        //  until n_X = m + n - N, where n_X is the number of samples with x=X so far and n is the total number
-        //  of samples, then add N-n samples with x=X. In this case, k = m/N so we weight all samples x != X
-        //  by N/m and all samples x=X by NP(x)/(mP(x) + (N-m)). If we approximate P(x) with n_x/n then
-        //  w_x = Nn_x/(mn_x + n(N-m))
         template<bool LEAVETRACE, bool DOBACKPROP>
         class SelfPlayMind {
         public:
@@ -199,65 +185,56 @@ namespace abm::minds {
             std::vector<double>                         rewards; // reward between choice points of the player
             bool                                        hasAddedQEntry;
 
-//            SelfPlayMind(TreeNode *treeNode, double discount,const POLICY &policy, OffTreeMind &offTreeMind):
-//                    treeNode(treeNode), discount(discount), onTreePolicy(policy), offTreeMind(offTreeMind), hasAddedQEntry(false) {}
-
             SelfPlayMind(IncompleteInformationMCTS<BODY,OffTreeMind, SelfPlayPolicy> &tree):
                     tree(tree), treeNode(tree.rootNode), hasAddedQEntry(!DOBACKPROP) {}
 
             action_type act(const observation_type &body, action_mask legalActs, reward_type rewardFromLastAct);
-            // train(Reward);
-            void endEpisode(double rewardFromFinalAct);
-            void onOutgoingMessage(message_type outgoingMessage, const BODY &body);
-//            void halfStepObservationHook(const observation_type &body);
-            void onIncomingMessage(message_type incomingMessage, const BODY &body);
-            void onInit() {
-                treeNode = tree.rootNode;
-                qValues.clear();
-                rewards.clear();
-                hasAddedQEntry = false;
-            }
 
+            // ==== Mind interface
 
+            action_type operator()(const BODY &);
+
+            void on(const events::OutgoingMessage<message_type,BODY> &outgoingMessage);
+            void on(const events::IncomingMessage<message_type,BODY> &incomingMessage);
+            template<class AGENT1, class AGENT2>
+            void on(const events::EndEpisode<AGENT1,AGENT2> &startEpisode);
+            void on(const events::Reward &);
+
+            // =====
+
+            bool isOnTree() { return treeNode != nullptr; }
         };
 
 
-        TreeNode *rootNode;                                 // points to the rootNode. nullptr signifies no acts this episode yet.
-//        std::function<BODY()>     firstMoverPrior;
-//        std::function<BODY()>     secondMoverPrior;
-        size_t nSamplesPerTree;                             // number of samples taken to build the tree before a decision is made
-        double discount;                                    // discount of rewards into the future
-//        GreedyPolicy<action_type> finalDecisionPolicy;      // policy used to make final decision once the tree is built
-        SelfPlayPolicy  selfPlayPolicy; // policy used when building tree
-        OffTreeMind     offTreeQMind;    // mind to decide acts during self-play when off the tree.
-        std::map<BODY,uint>     currentPlayerDistribution;  // posterior of current player state given move history
-        // N.B. keys may differ from qEntries keys in  due to sample boosting
-        // [but should be equal to other player distribution of parent]
-        // So, when boosting we shouldn't back-prop the opponent,
-        // but we can leave a trace in otherPlayerDistribution.
-        // For the self in self-play boosting, we back-prop but don't leave a trace
-        // So, we can keep this but only fill the root.
+        TreeNode *rootNode;                 // points to the rootNode. nullptr signifies no acts this episode yet.
+        size_t nSamplesPerTree;             // number of samples taken to build the tree before a decision is made
+        double discount;                    // discount of rewards into the future
+        SelfPlayPolicy  selfPlayPolicy;     // policy used when building tree
+        OffTreeMind     offTreeQMind;       // mind to decide acts during self-play when off the tree.
+        std::map<BODY,uint> currentPlayerDistribution;  // posterior of rootNode current player state, given move history
+                                            // N.B. entries may differ from info in qEntries due to sample boosting
+                                            // but should be equal to other player distribution of parent.
 
-        IncompleteInformationMCTS(
-                size_t nSamplesPerTree,
-                double discount,
-                OffTreeMind offTreeQFunction = qLearning::GreedyPolicy(qLearning::explorationStrategies::NoExploration(),
-                                                                       approximators::FeedForwardNeuralNet(
-                                                                               {new mlpack::Linear(100),
-                                                                                new mlpack::ReLU(),
-                                                                                new mlpack::Linear(50),
-                                                                                new mlpack::ReLU(),
-                                                                                new mlpack::Linear(BODY::action_type::size)
-                                                                               }))
-                );
+        inline static const auto defaultOffTreeMind =
+                qLearning::GreedyPolicy(qLearning::explorationStrategies::NoExploration(),
+                                        approximators::FeedForwardNeuralNet(
+                                                {new mlpack::Linear(100),
+                                                 new mlpack::ReLU(),
+                                                 new mlpack::Linear(50),
+                                                 new mlpack::ReLU(),
+                                                 new mlpack::Linear(BODY::action_type::size)
+                                                }));
+
+        IncompleteInformationMCTS(size_t nSamplesPerTree, double discount, OffTreeMind offTreeMind = defaultOffTreeMind);
+
         ~IncompleteInformationMCTS() { delete (rootNode); }
 
-        // ----- Mind interface -----
+        // ----- Q-value function interface -----
 
 //        action_type act(const observation_type &body, action_mask legalActs, [[maybe_unused]] reward_type rewardFromLastAct);
-//
-        template<class MESSAGE>
-        void on(const events::IncomingMessage<MESSAGE> &incomingMessage) {
+
+
+        void on(const events::IncomingMessage<message_type,BODY> &incomingMessage) {
             assert(rootNode != nullptr);
             // learn from opponent move
             const BODY *sampledOpponentBodyPtr = rootNode->sampleActorBodyGivenMessage(incomingMessage);
@@ -268,9 +245,9 @@ namespace abm::minds {
 
             shiftRoot(incomingMessage);
         }
-//
-        template<class MESSAGE>
-        void on(const events::OutgoingMessage<MESSAGE> &outgoingMessage) {
+
+
+        void on(const events::OutgoingMessage<message_type,BODY> &outgoingMessage) {
             assert(rootNode != nullptr);
             shiftRoot(outgoingMessage);
         }
@@ -284,8 +261,10 @@ namespace abm::minds {
 //            rootNode = nullptr;
 //        }
 //
+        /** rebuilds the tree using a new set of posterior distributions of player states.
+         * Should be called at the start of an episode with priors */
         template<class CURRENTPLAYERSAMPLER, class OTHERPLAYERSAMPLER>
-        void initPriors(CURRENTPLAYERSAMPLER currentPlayerBodySampler, OTHERPLAYERSAMPLER otherPlayerBodySampler) {
+        void startEpisode(CURRENTPLAYERSAMPLER currentPlayerBodySampler, OTHERPLAYERSAMPLER otherPlayerBodySampler) {
             delete(rootNode);
             rootNode = new TreeNode();
             for (int nSamples = 0; nSamples < nSamplesPerTree; ++nSamples) {
@@ -321,25 +300,12 @@ namespace abm::minds {
             return qVec;
         }
 
-        // ------- training --------
-
-        /** Do all the training in one place, and update the function for the next move.
-         *
-         * @param step
-         */
-        void train(const observations::ActionResponseReward<BODY> &step) {
-            // more efficient to do it on callbacks, then we don't need to copy body
-        }
-
-
-
     protected:
         template<bool LEAVETRACE, bool DOBACKPROP> auto createAgentSampler(const std::map<BODY,uint> &);
         template<bool LEAVETRACE, bool DOBACKPROP> auto createAgentSampler(BODY);
-//        void buildTree(const episodes::SimpleEpisode<BODY> &episode);
         void shiftRoot(message_type message);
-
     };
+
 
 
     template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy>
@@ -348,7 +314,6 @@ namespace abm::minds {
             rootNode(nullptr),
             nSamplesPerTree(nSamplesPerTree),
             discount(discount),
-//            finalDecisionPolicy(explorationStrategies::NoExploration()),
             offTreeQMind(std::move(offTreeMind)) { }
 
 
@@ -451,6 +416,14 @@ namespace abm::minds {
 //        if(treeNode != nullptr && !hasAddedQEntry) treeNode->otherPlayerDistribution[body]++;
 //    }
 
+    template<Body BODY, class OffTreeMind, class SelfPlayPolicy>
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode *
+    IncompleteInformationMCTS<BODY, OffTreeMind, SelfPlayPolicy>::TreeNode::getChildOrNull(message_type message) {
+        auto childIt = children.find(message);
+        return childIt==children.end()?nullptr:childIt->second;
+    }
+
+
     /**
      *
      * @param message identifies the child to unlink
@@ -459,10 +432,13 @@ namespace abm::minds {
     template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy>
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::TreeNode *
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::TreeNode::unlinkChild(message_type message) {
-        const size_t childIndex = static_cast<size_t>(message);
-        TreeNode *child = children[childIndex];
-        children[childIndex] = nullptr;
-        return child;
+        auto childIt = children.find(message);
+        if(childIt != children.end()) {
+            TreeNode *child = childIt->second;
+            children.erase(childIt);
+            return child;
+        }
+        return nullptr;
     }
 
     /** Make an entry for a new body state.
@@ -471,7 +447,7 @@ namespace abm::minds {
     * @return
     */
     template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy>
-    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::TreeNode::iterator
+    auto
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::TreeNode::addQEntry(const BODY &agent) {
         auto [newEntry, wasInserted] = qEntries.try_emplace(
                 agent); // insert uniform quality with zero sample count
@@ -490,12 +466,9 @@ namespace abm::minds {
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::TreeNode *
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::TreeNode::
     getChildOrCreate(message_type message) {
-        TreeNode *childNode = children[static_cast<size_t>(message)];
-        if (childNode == nullptr) {
-            childNode = new TreeNode();
-            children[static_cast<size_t>(message)] = childNode;
-        }
-        return childNode;
+        auto [it, didInsert] = children.try_emplace(message, nullptr);
+        if (didInsert) it->second = new TreeNode();
+        return it->second;
     }
 
 
@@ -599,34 +572,45 @@ namespace abm::minds {
 
     template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy> template<bool LEAVETRACE, bool DOBACKPROP>
     void    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
-    onIncomingMessage(message_type incomingMessage, const BODY &body) {
-        if(treeNode != nullptr) {
-            if(hasAddedQEntry)
-                treeNode = treeNode->getChildOrNull(incomingMessage);
-            else
-                treeNode = treeNode->getChildOrCreate(incomingMessage);
-        }
-        if constexpr (LEAVETRACE) if(treeNode != nullptr) treeNode->currentPlayerDistribution[body]++;
-    }
-
-    template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy> template<bool LEAVETRACE, bool DOBACKPROP>
-    void    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
-    onOutgoingMessage(message_type outgoingMessage, const BODY &body) {
-        if(treeNode != nullptr) {
-            if(hasAddedQEntry) {
-                treeNode = treeNode->getChildOrNull(outgoingMessage);
+    on(const events::IncomingMessage<message_type,BODY> &event) {
+        if(isOnTree()) {
+            if constexpr (DOBACKPROP) {
+                if(hasAddedQEntry)
+                    treeNode = treeNode->getChildOrNull(event.message);
+                else
+                    treeNode = treeNode->getChildOrCreate(event.message);
             } else {
-                treeNode = treeNode->getChildOrCreate(outgoingMessage);
+                treeNode = treeNode->getChildOrNull(event.message);
             }
-            if constexpr (LEAVETRACE) if(treeNode != nullptr) treeNode->otherPlayerDistribution[body]++;
         }
     }
 
+
     template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy> template<bool LEAVETRACE, bool DOBACKPROP>
     void    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
-    endEpisode(double rewardFromFinalAct) { // back propagate rewards
+    on(const events::OutgoingMessage<message_type,BODY> &event) {
+        if(isOnTree()) {
+            if constexpr (DOBACKPROP) {
+                if(hasAddedQEntry)
+                    treeNode = treeNode->getChildOrNull(event.message);
+                else
+                    treeNode = treeNode->getChildOrCreate(event.message);
+            } else {
+                treeNode = treeNode->getChildOrNull(event.message);
+            }
+            if constexpr (LEAVETRACE) treeNode->otherPlayerDistribution[event.body]++;
+        }
+        rewards.push_back(0.0); // new reward entry
+    }
+
+
+    template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy>
+    template<bool LEAVETRACE, bool DOBACKPROP>
+    template<class AGENT1, class AGENT2>
+    void    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
+    on(const events::EndEpisode<AGENT1,AGENT2> &event) { // back propagate rewards
         if constexpr (DOBACKPROP) {
-            double cumulativeReward = rewardFromFinalAct;
+            double cumulativeReward = 0.0;
             while (rewards.size() > qValues.size()) {
                 cumulativeReward = cumulativeReward * tree.discount + rewards.back();
                 rewards.pop_back();
@@ -638,30 +622,40 @@ namespace abm::minds {
                 qValues.pop_back();
             }
         }
+        // reset for next episode
+        treeNode = tree.rootNode;
+        qValues.clear();
+        rewards.clear();
+        hasAddedQEntry = false;
+    }
+
+    template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy>
+    template<bool LEAVETRACE, bool DOBACKPROP>
+    void    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
+    on(const events::Reward &event) {
+        rewards.back() += event.value;
     }
 
     template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy> template<bool LEAVETRACE,bool DOBACKPROP>
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::action_type
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
-    act(const observation_type &body, action_mask legalActs,IncompleteInformationMCTS::reward_type rewardFromLastAct) {
-//        std::cout << "rewardFromLastAct " << rewardFromLastAct << std::endl;
+    act(const observation_type &body, action_mask legalActs, IncompleteInformationMCTS::reward_type rewardFromLastAct) {
         QVector<action_type::size> *qEntry = nullptr; // if null, choose at random
-        if(treeNode != nullptr) {
+        if(isOnTree()) {
             if (hasAddedQEntry) {
                 // onTree but can't add new qEntry, so look for existing entry or null
-                auto qIt = treeNode->currentPlayerInfo.find(body);
+                auto qIt = treeNode->qEntries.find(body);
                 if(qIt != treeNode->qEntries.end()) qEntry = &(qIt->second.qVector);
             } else {
                 auto [qIt, insertedNewEntry] = treeNode->qEntries.try_emplace(body);
                 if (insertedNewEntry) {
-//                    std::cout << "Added QEntry " << std::endl;
                     hasAddedQEntry = true;
                 }
                 qEntry = &(qIt->second);
             }
         }
         action_type action;
-        if(qEntry != nullptr) { // on tree
+        if(qEntry != nullptr) { // still on tree
             action = tree.selfPlayPolicy.sample(*qEntry, legalActs);
             if constexpr (DOBACKPROP) {
                 rewards.push_back(rewardFromLastAct);
@@ -671,6 +665,36 @@ namespace abm::minds {
             action = tree.offTreeQMind(body);
             // static_cast<action_type>(sampleUniformly(legalActs));
             if constexpr (DOBACKPROP) rewards.push_back(rewardFromLastAct);
+        }
+        return action;
+    }
+
+    template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy> template<bool LEAVETRACE,bool DOBACKPROP>
+    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::action_type
+    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
+    operator ()(const BODY &body) {
+        QVector<action_type::size> *qEntry = nullptr;
+        if(isOnTree()) {
+            if (hasAddedQEntry) {
+                // onTree but can't add new qEntry, so look for existing entry or null
+                auto qIt = treeNode->qEntries.find(body);
+                if(qIt != treeNode->qEntries.end()) qEntry = &(qIt->second.qVector);
+            } else {
+                auto [qIt, insertedNewEntry] = treeNode->qEntries.try_emplace(body);
+                if (insertedNewEntry) {
+                    hasAddedQEntry = true;
+                }
+                qEntry = &(qIt->second);
+            }
+        }
+        action_type action;
+        if(qEntry != nullptr) { // still on tree
+            action = tree.selfPlayPolicy.sample(*qEntry, body.legalActs);
+            if constexpr (DOBACKPROP) {
+                qValues.push_back(&(*qEntry)[static_cast<size_t>(action)]);
+            }
+        } else { // off-tree
+            action = tree.offTreeQMind(body);
         }
         return action;
     }

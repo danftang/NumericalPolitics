@@ -7,25 +7,27 @@
 
 #include <cassert>
 #include "../ActionMask.h"
+#include "../../DeselbyStd/random.h"
 
 namespace abm::minds {
     class ZeroIntelligence {
     public:
         template<class BODY>
-        int operator()(const BODY &body) {
+        size_t act(const BODY &body) {
             return sampleUniformly(body.legalActs());
         }
+
 
         /** Samples uniformly from a discrete legal-action mask.
          * @param legalMoves the mask from which we wish to sample
          * @return a legal index into legalMoves chosen with uniform probability.
          */
         template<DiscreteActionMask MASK>
-        static int sampleUniformly(const MASK &legalMoves) {
-            int chosenMove = 0;
-            int nLegalMoves = legalMoves.count();
+        static size_t sampleUniformly(const MASK &legalMoves) {
+            size_t chosenMove = 0;
+            auto nLegalMoves = legalMoves.count();
             assert(nLegalMoves > 0);
-            int legalMovesToGo = deselby::Random::nextInt(0, nLegalMoves);
+            size_t legalMovesToGo = deselby::Random::nextSizeT(0, nLegalMoves);
             while(legalMovesToGo > 0 || legalMoves[chosenMove] == false) {
                 if(legalMoves[chosenMove] == true) --legalMovesToGo;
                 ++chosenMove;

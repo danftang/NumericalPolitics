@@ -1,4 +1,4 @@
-#include "mlpack.hpp"
+//#include "mlpack.hpp"
 //#include "abm/agents/agents.h"
 //#include "Experiment1.h"
 //#include "Experiment2.h"
@@ -10,6 +10,7 @@
 #include "abm/societies/RandomEncounterSociety.h"
 #include "abm/PingPongAgent.h"
 
+#include "tests/PrisonersDilemma.h"
 
 //#include "tests/tests.h"
 //#include "tests/mlpacktests.cpp"
@@ -33,9 +34,10 @@ int main() {
 //    pingPongTest();
 //    tests::incompleteInformationMCTSTest();
 
-    abm::societies::RandomEncounterSociety mySociety(abm::PingPongAgent{}, abm::PingPongAgent{});
+//    abm::societies::RandomEncounterSociety mySociety(abm::PingPongAgent{}, abm::PingPongAgent{});
+//    mySociety.run(2, abm::callbacks::Verbose());
 
-    mySociety.run(2, abm::episodes::callbacks::Verbose());
+    tests::zeroIntelligencePrisonersDilemma();
 
     return 0;
 }

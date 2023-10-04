@@ -54,7 +54,7 @@ namespace abm {
     template<DiscreteActionMask MASK>
     static std::vector<size_t> legalIndices(const MASK &legalActs) {
         std::vector<size_t> indices;
-        for(int i=0; i<legalActs.size(); ++i)
+        for(uint i=0; i<legalActs.size(); ++i)
             if(legalActs[i]) indices.push_back(i);
         return indices;
     }

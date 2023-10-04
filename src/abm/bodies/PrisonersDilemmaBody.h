@@ -7,48 +7,44 @@
 
 #include <bitset>
 #include "../../DeselbyStd/random.h"
+#include "../Agent.h"
 
-class PrisonersDilemmaBody {
-public:
-    enum message_type {
-        Cooperate,
-        Defect,
-        size
-    };
+namespace abm::bodies {
+    class PrisonersDilemmaBody {
+    public:
+        enum message_type {
+            Cooperate,
+            Defect,
+            size
+        };
 
-    typedef message_type action_type;   // incoming message type
-    typedef message_type in_message_type;   // incoming message type
+        message_type    myLastMove;
+    private:
+        double          pEndEpisode;
+        static constexpr int moveId(message_type myMove, message_type yourMove) { return myMove*2 + yourMove; }
 
-    action_type     myLastMove;
-private:
-    double          pEndEpisode;
-    static constexpr int moveId(message_type myMove, message_type yourMove) { return myMove*2 + yourMove; }
+    public:
 
-public:
+        PrisonersDilemmaBody(double pEndEpisode): pEndEpisode(pEndEpisode) { }
 
-    PrisonersDilemmaBody(double pEndEpisode): pEndEpisode(pEndEpisode) { }
+        events::OutgoingMessage<message_type, PrisonersDilemmaBody> handleAct(uint actFromMind) {
+            myLastMove = static_cast<message_type>(actFromMind);
+            return {*this, deselby::Random::nextBool(pEndEpisode) ? std::nullopt : std::optional(myLastMove)};
+        };
 
-    message_type actToMessage(action_type actFromMind) {
-        myLastMove = actFromMind;
-        return actFromMind;
-    };
-
-    double messageToReward(in_message_type incomingMessage) {
-        switch(moveId(myLastMove, incomingMessage)) {
-            case moveId(Cooperate, Cooperate):  return 3.0;
-            case moveId(Cooperate, Defect):     return 0.0;
-            case moveId(Defect,    Cooperate):  return 4.0;
-            case moveId(Defect,    Defect):     return 1.0;
+        double handleMessage(message_type incomingMessage) {
+            switch(moveId(myLastMove, incomingMessage)) {
+                case moveId(Cooperate, Cooperate):  return 3.0;
+                case moveId(Cooperate, Defect):     return 0.0;
+                case moveId(Defect,    Cooperate):  return 4.0;
+                case moveId(Defect,    Defect):     return 1.0;
+            }
+            throw(std::out_of_range("unknown incomming message"));
         }
-        throw(std::out_of_range("unknown incomming message"));
-    }
 
-    std::bitset<2> legalActs() {
-        return deselby::Random::nextBool(pEndEpisode)?0:3;
-    }
-
-    double endEpisode() { return 0.0; }
-};
+        static inline auto legalActs() { return std::bitset<2>(3); }
+    };
+}
 
 
 #endif //MULTIAGENTGOVERNMENT_PRISONERSDILEMMABODY_H

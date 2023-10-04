@@ -12,44 +12,39 @@
 #include "ActionMask.h"
 
 namespace abm {
-    template<class ACTION>
+
+    template<class T>
+    concept GenericQVector = requires(T obj, size_t i) {
+        { obj[i] < obj[i] } -> std::convertible_to<bool>;
+    };
+
     class GreedyPolicy {
     public:
-
-        typedef ACTION action_type;
-
         std::function<bool()> explorationStrategy;
 
-        //  d^steps = (minimum/initialExp)^{1/steps}
+        /** exploration strategies can be found in abm::explorationStrategies */
         explicit GreedyPolicy(std::function<bool()> explorationStrategy) : explorationStrategy(std::move(explorationStrategy)) {}
 
-
-        template<class QVECTOR, DiscreteActionMask ACTIONMASK>
-        ACTION sample(const QVECTOR &qValues, const ACTIONMASK &legalMoves) {
-            size_t chosenMove = action_type::size;
+        /** QVector must have operator[] and elements must have an ordering  */
+        template<GenericQVector QVECTOR, DiscreteActionMask ACTIONMASK>
+        size_t sample(const QVECTOR &qValues, const ACTIONMASK &legalMoves) {
+            size_t chosenMove;
             assert(legalMoves.count() >= 1);
             if (explorationStrategy()) {
                 // choose a legal move at random
                 chosenMove = sampleUniformly(legalMoves);
             } else {
                 // choose a legal move with highest Q
-                std::vector<size_t> indices = legalIndices(legalMoves);
+                auto indices = legalIndices(legalMoves);
                 std::shuffle(indices.begin(), indices.end(), deselby::Random::gen); // ...in-case of multiple max values
-                double bestQ = -std::numeric_limits<double>::infinity();
-                for (size_t i : indices) {
-                    double q = qValues[i];
-                    assert(!isnan(q));
-                    if (q > bestQ) {
-                        bestQ = q;
-                        chosenMove = i;
-                    }
+                chosenMove = indices[0];
+                for(size_t ii = 1; ii < indices.size(); ++ii) {
+                    auto act = indices[ii];
+                    if(qValues[chosenMove] < qValues[act]) chosenMove = act;
                 }
             }
-            assert(chosenMove < action_type::size);
-            return static_cast<ACTION>(chosenMove);
+            return chosenMove;
         }
-
-
 
     };
 }

@@ -7,6 +7,7 @@
 
 #include "ActionMask.h"
 #include "QVector.h"
+#include "../DeselbyStd/random.h"
 #include <bitset>
 #include <cassert>
 #include <ranges>

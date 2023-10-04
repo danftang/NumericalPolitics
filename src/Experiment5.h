@@ -86,35 +86,13 @@
 #include "abm/DQN.h"
 #include "abm/RandomReplay.h"
 #include "abm/minds/MeanRewardMindWrapper.h"
+#include "abm/GreedyPolicy.h"
 
 namespace experiment5 {
     const bool HASLANGUAGE = true;
 
     typedef abm::bodies::SugarSpiceTradingBody<HASLANGUAGE> body_type;
 
-
-//    std::function<body_type()> bodyHiddenStateSampler(bool hasSugar, bool hasSpice) {
-//        return [hasSugar, hasSpice]() {
-//            return body_type(hasSugar, hasSpice, deselby::Random::nextBool());
-//        };
-//    }
-
-//    /** Creates a sampler of agent pairs to play in an episode. A single unit of sugar
-//     * and a single unit of spice are distributed randomly amongst the agents.
-//     * Their preference is also randomly assigned
-//     */
-//    template<class MIND>
-//    std::function<std::pair<abm::Agent<body_type,MIND>,abm::Agent<body_type,MIND>>()>
-//    startStateSampler(MIND mind) {
-//        return [mind]() {
-//            bool hasSugar = deselby::Random::nextBool();
-//            bool hasSpice = deselby::Random::nextBool();
-//            return std::pair(
-//                    abm::Agent(body_type( hasSugar, hasSpice, deselby::Random::nextBool()), mind),
-//                    abm::Agent(body_type(!hasSugar,!hasSpice, deselby::Random::nextBool()), mind)
-//                    );
-//        };
-//    }
 
     /** Sets an agent pair to a given joint body state by index.
      * The total amount of sugar and spice is 1 sugar and 1 spice.
@@ -132,66 +110,32 @@ namespace experiment5 {
     }
 
 
-
-//    auto makeEpisode(bool firstMoverHasSugar, bool firstMoverHasSpice) {
-//        return abm::episodes::SimpleEpisode(bodyHiddenStateSampler(firstMoverHasSugar, firstMoverHasSpice),
-//                                            bodyHiddenStateSampler(!firstMoverHasSugar, !firstMoverHasSpice));
-//    }
-
-
+    /** trains agents by running nTrainingEpisodes with random start state and random first-mover */
     template<class AGENT1, class AGENT2>
     void train(AGENT1 &agent1, AGENT2 &agent2, size_t nTrainingEpisodes) {
-        abm::episodes::runAsync(agent1, agent2, nTrainingEpisodes,
-                                abm::episodes::callbacks::OnEpisodeStartCallback([](auto &agent1, auto &agent2) {
-                                    setStartState(agent1, agent2, deselby::Random::nextInt(32));
-                                }));
-//        bool verbose = false;
-//        abm::episodes::sampleAndRunAsync(startStateSampler(mind),nTrainingEpisodes,verbose);
-//        for(int iterations = 0; iterations < nTrainingEpisodes; ++iterations) {
-//            if(iterations%100 == 0) {
-//                std::cout << iterations << " "
-//                          << agents[0].mind.meanReward << " "
-//                          << agents[1].mind.meanReward << " "
-//                          << agents[0].mind.meanReward + agents[1].mind.meanReward
-//                          << std::endl;
-//            }
-//            // set random initial state
-////            bool firstMoverHasSugar = deselby::Random::nextBool();
-////            bool firstMoverHasSpice = deselby::Random::nextBool();
-////            auto episode = makeEpisode(firstMoverHasSugar, firstMoverHasSpice);
-////            int firstMoverIndex = deselby::Random::nextBool();
-////            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1], verbose);
-//        }
+        while(nTrainingEpisodes-- > 0) {
+            setStartState(agent1, agent2, deselby::Random::nextInt(32));
+            if(deselby::Random::nextBool()) {
+                abm::episodes::runAsync(agent1, agent2);
+            } else {
+                abm::episodes::runAsync(agent2, agent1);
+            }
+        }
     }
 
+
+    /** Iterates through all 64 games between two agents (32 joint start states times two possible first movers) */
     template<class AGENT1, class AGENT2>
     void showBehaviour(AGENT1 &agent1, AGENT2 &agent2) {
-        abm::episodes::runAsync(agent1, agent2, 32,
-                                abm::episodes::callbacks::OnEpisodeStartCallback(
-                                        [startState = 0](auto &agent1, auto &agent2) mutable {
-                                            setStartState(agent1, agent2, startState++);
-                                        }),
-                                abm::episodes::callbacks::Verbose());
-//        bool verbose = true;
-//        for(int state = 0; state < 32; ++state) {
-//            // set random initial state
-//            int firstMoverIndex = state & 1;
-//            bool firstMoverHasSugar = state & 2;
-//            bool firstMoverHasSpice = state & 4;
-//            bool firstMoverPrefersSugar = state & 8;
-//            bool secondMoverPrefersSugar = state & 16;
-//
-//            abm::episodes::runAsyncEpisode()
-//            episode.run(agents[firstMoverIndex], agents[firstMoverIndex^1],
-//                        body_type(firstMoverHasSugar, firstMoverHasSpice, firstMoverPrefersSugar),
-//                        body_type(!firstMoverHasSugar, !firstMoverHasSpice, secondMoverPrefersSugar),
-//                        verbose);
-//        }
+        for(int startState = 0; startState < 32; ++startState) {
+            setStartState(agent1, agent2, startState);
+            abm::episodes::runAsync(agent1, agent2, abm::episodes::callbacks::Verbose());
+            abm::episodes::runAsync(agent2, agent1, abm::episodes::callbacks::Verbose());
+        }
     }
 
 
-    /** Test a QTable on binary, repeated SugarSpiceTrading
-     */
+    /** Test a QTable on binary, repeated SugarSpiceTrading */
     void runA() {
         const int NTRAININGEPISODES = 200000; // 4000000;
 
@@ -200,13 +144,13 @@ namespace experiment5 {
                 abm::minds::QMind(
                         abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
                         abm::GreedyPolicy<body_type::action_type>(
-                                abm::minds::qLearning::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                                abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
                         )
                 )
         );
 
-        auto agent1 = abm::Agent(body_type(), mind);
-        auto agent2 = abm::Agent(body_type(), mind);
+        auto agent1 = abm::Agent(body_type{}, mind);
+        auto agent2 = abm::Agent(body_type{}, mind);
         train(agent1,agent2,NTRAININGEPISODES);
         body_type::pBanditAttack = 0.002;
         agent1.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();

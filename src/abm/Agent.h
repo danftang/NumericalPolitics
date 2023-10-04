@@ -22,62 +22,81 @@
 #include <utility>
 #include "Body.h"
 #include "Mind.h"
-#include "Events.h"
+#include "CallbackUtils.h"
+
+namespace abm::events {
+    struct Reward {
+        Reward(double reward = 0.0): reward(reward) {}
+        double reward;
+    };
+
+    template<class MESSAGE, class BODY>
+    struct IncomingMessage : Reward {
+        MESSAGE message;
+        BODY &  body;     // state of body after handling message
+
+        IncomingMessage(MESSAGE &&message, BODY &body) : message(std::move<MESSAGE>(message)), body(body) {};
+        IncomingMessage(const MESSAGE &message, BODY &body): message(message), body(body) {};
+    };
+
+    template<class MESSAGE,class BODY>
+    struct OutgoingMessage : Reward {
+        std::optional<MESSAGE> message;
+        BODY &body; // state of body after sending message
+
+        OutgoingMessage(BODY &body, std::optional<MESSAGE> &&message = std::nullopt, double rewaard = 0.0) :
+            Reward(rewaard),
+            message(message),
+            body(body) { };
+    };
+}
+
+
+namespace abm::callbacks {
+    /** Use this class to record the exponentially weighted mean
+     *  reward, which we define as
+     *
+     * E_n[R] = a_n.R_n + a_n.r.R_{n-1} + a_n.r^2.R_{n-2} + ... + a_n.r^{n-1}.R_1
+     *
+     * where
+     * R_t is the reward at time t,
+     * r is a supplied constant decay rate
+     * a_n = (1-r)/(1-r^n)
+     *
+     * This gives the recurrence relation
+     * E_n[R] = a_n.R_n + (a_n.r/a_{n-1}).E_{n-1}[R]
+     * and, by expansion
+     * a_n.r/a_{n-1} + a_n = (r-r^n)/(1-r^n) + (1-r)/(1-r^n) = 1
+     * so
+     * a_n.r/a_{n-1} = 1-a_n
+     * and
+     * E_n[R] = a_n.R_n + (1-a_n).E_{n-1}[R]
+     *
+     * The mean is just the weighted mean of the intercepted Reward messages.
+     */
+    class MeanReward {
+    public:
+        const double decayRate;
+        size_t nSamples     = 0;
+        double meanReward   = 0.0;
+
+        MeanReward(double decayRate) : decayRate(decayRate) {}
+
+        void on(const events::Reward &event) {
+            double a_n = (1.0 - decayRate) / (1.0 - std::pow(decayRate, ++nSamples));
+            meanReward *= 1.0-a_n;
+            meanReward += a_n * event.reward;
+        }
+    };
+
+}
 
 namespace abm {
-
-    // TODO: A body handles
-    //    acts from the mind
-    //    messages from the environment
-    //  and emits
-    //    rewards to the mind
-    //    messages to the environment
-    //  A mind handles
-    //    rewards from the body
-    //  and emits
-    //    acts to the body.
-    //  An Agent is just a body with a mind
-    //
-    //
     template<class BODY, class MIND>
     concept BodyMindPair = requires(BODY body, MIND mind) {
-        body.actToMessageAndReward(mind.act(body));
+        { body.handleAct(mind.act(body)) } -> deselby::IsClassTemplateOf<events::OutgoingMessage>;
+        // and handleMessage(.) on some type of incoming message, depending on which agent it is paired with
     };
-
-    namespace events {
-        template<class MESSAGE>
-        struct IncomingMessage {
-            IncomingMessage(MESSAGE &&message) : message(std::move<MESSAGE>(message)) {};
-            IncomingMessage(const MESSAGE &message): message(message) {};
-            MESSAGE message;
-        };
-
-        template<class MESSAGE>
-        struct OutgoingMessage {
-            OutgoingMessage(MESSAGE &&message) : message(std::move<MESSAGE>(message)) {};
-            OutgoingMessage(const MESSAGE &message): message(message) {};
-            MESSAGE &message;
-        };
-
-        struct Reward { double value; };
-
-    };
-
-    template<Body BODY, Mind<BODY> MIND>
-    class BodyMindTraits {
-    public:
-        typedef decltype(std::declval<MIND>().act(std::declval<BODY>())) action_type;
-        typedef decltype(std::declval<BODY>().actToMessageAndReward(std::declval<action_type>()).first) out_message_type;
-        typedef decltype(std::declval<BODY>().actToMessageAndReward(std::declval<action_type>()).second) reward_type;
-        typedef decltype(std::declval<BODY>().legalActs()) action_mask;
-    };
-
-//    template<class T>
-//    concept AgentChannel = requires(T agentChannel, typename T::in_message_type incomingMessage) {
-//        typename T::in_message_type;
-//        { agentChannel.startEpisode() };
-//        { agentChannel.handleMEssage(incomingMessage) };
-//    };
 
 
     /**
@@ -98,20 +117,7 @@ namespace abm {
 
         typedef BODY body_type;
         typedef MIND mind_type;
-        typedef typename decltype(mind.optionalAct(body))::value_type action_type;           // N.B. these are not intrinsic to mind or body
-        typedef typename decltype(body.optionalMessage(declval<action_type>()))::value_type out_message_type; // but only defined given the pair
 
-
-    private:
-        double reward = 0.0;
-    public:
-//        /** the sum of actual received rewards, exponentially discounted into the past
-//         * (for monitoring purposes only, doesn't affect behaviour) */
-//        double meanReward = 0.0;
-//    private:
-//        double meanRewardDecay; // rate of exponential decay of the weight of rewards into the past when calculating the mean
-//        double halfStepRewardDecay; // exponential decay of the mean weight for half a step (at beginning or end of an episode)
-//    public:
 
         /**
          *
@@ -142,48 +148,26 @@ namespace abm {
          *   TODO: this could be inplemented as an agent that is listening for open channel requests, which upon
          *     request, returns an open channel to which the opening agent can send the first message.
          */
-//        template<class BODYARG, class MINDARG>
-//        inline void init(BODYARG &&bodyArg, MINDARG &&mindArg) { // TODO: init is better in the episode
-//            initCallback(body,std::forward<BODYARG>(bodyArg));
-//            initCallback(mind,std::forward<MINDARG>(mindArg)); // mind had better have this otherwise sharedInformation is not used
-////            callInitEpisodeHook(mind, body, sharedinformation);
-//        }
 
 
-//        inline void initEpisode(BODY initBodyState) {
-//            body = std::move(initBodyState);
-//            callInitEpisodeHook(mind, body);
-//        }
+        /** Pass on events to body and mind */
+        template<class EVENT> requires HasCallback<BODY, EVENT> || HasCallback<MIND, EVENT>
+        inline void on(const EVENT &event) {
+            callback(event, body);
+            callback(event, mind);
+        }
+
 
         /** This method is called after initiation.
          * If the episode is turns-based it is called on the first mover only in order to start the episode.
          * If the episode is synchronous (e.g. rock-paper-scisors) it is called on both agents.
          * @return message that begins the episode
          */
-        std::optional<out_message_type> startEpisode() {
-            std::optional<out_message_type> result;
-            std::optional<action_type> act = mind.optionalAct(body);
-            if(!act.has_value()) return result;
-            std::optional<out_message_type> initialMessage = body.optionalMessage(*act);
-            if(!initialMessage.has_value()) return result;
-            events::callback(events::OutgoingMessage(*initialMessage),mind);
-            return initialMessage;
+        auto startEpisode() {
+            events::OutgoingMessage outMessageEvent = body.handleAct(mind.act(body));
+            callback(outMessageEvent, mind);
+            return outMessageEvent.message;
         }
-
-//        out_message_type startEpisode() {
-//            action_type lastAct = mind.act(body, body.legalActs(), 0);
-//            out_message_type initialMessage = body.actToMessage(lastAct);
-//            callOutgoingMessageHook(mind, initialMessage);
-//            if(body.isEndOfEpisode()) {
-//                const double residualReward = body.endEpisode();
-////                const double residualFlux = 2.0*residualReward;
-////                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
-//                callHalfStepObservationHook(mind,body);
-//                mind.endEpisode(residualReward);
-//            }
-//            return initialMessage;
-//        }
-
 
 
         /** This method is called when the agent receives a message from another agent
@@ -191,70 +175,22 @@ namespace abm {
          * @return response to incoming message. If unset, the agent has (perhaps unilaterally)
          *   ended the episode.
          */
-         template<class INMESSAGE>
-        std::optional<out_message_type> handleMessage(INMESSAGE incomingMessage) {
-            std::optional<out_message_type> response;
-            events::callback(events::IncomingMessage(incomingMessage),mind);
-            reward = body.handle(incomingMessage);
-            events::callback(events::Reward(reward),mind);
-            std::optional lastAct = mind.act(body);
-            if(!lastAct.has_value()) return response;
-//            reward = 0.0;
-            response = body.optionalMessage(*lastAct);
-            if(response.has_value()) events::callback(events::OutgoingMessage(*response));
-            return response;
+        template<class INMESSAGE>
+        auto handleMessage(INMESSAGE &&incomingMessage) {
+            auto inMessageEvent = events::IncomingMessage(std::forward<INMESSAGE>(incomingMessage), body);
+            inMessageEvent.reward = body.handleMessage(incomingMessage);
+            callback(inMessageEvent,mind);
+            events::OutgoingMessage outMessageEvent = body.handleAct(mind.act(body));
+            callback(outMessageEvent, mind);
+            return outMessageEvent.message;
         }
 
-//        std::optional<out_message_type> handleMessage(in_message_type incomingMessage) {
-//            callHalfStepObservationHook(mind,body);
-//            double reward = body.messageToReward(incomingMessage);
-////            std::cout << "reward = " << reward << std::endl;
-//            callIncomingMessageHook(mind,incomingMessage);
-////            meanReward = meanReward*meanRewardDecay + (1.0-meanRewardDecay)*reward;
-//            if(body.isEndOfEpisode()) {
-//                double residualReward = body.endEpisode();
-//                assert(residualReward == 0.0);
-//                mind.endEpisode(reward);
-//                return {};
-//            }
-//            action_type lastAct = mind.act(body, body.legalActs(), reward);
-//            out_message_type response = body.actToMessage(lastAct);
-//            callOutgoingMessageHook(mind,response);
-//            if (body.isEndOfEpisode()) {
-//                const double residualReward = body.endEpisode();
-////                const double residualFlux = 2.0*residualReward;
-////                meanReward = meanReward * halfStepRewardDecay + (1.0 - halfStepRewardDecay) * residualFlux;
-////                std::cout << "Residual reward = " << residualReward << std::endl;
-//                mind.endEpisode(residualReward);
-//            }
-//            return response;
-//        }
-
-
-
-        /** This method is called when any agent ends the episode.
-         * It is called on both agents, irrespective of who ended the episode.
-         * TODO: can the environment end an episode, or should this be modelled as an
-         *   intermediary agent with two open communication channels [yes, better this way]?
-         * TODO: should this be done in handleMessage with an unset optional?...or with an EndEpisode() message?
-         *   or even as optional callback? [probably this as it may be null of no learning]
-         */
-        void endEpisode() {
-            double residualReward = body.endEpisode();
-            mind.endEpisode(reward + residualReward);
-            // std::cout << "Got final reward " << reward << " + " << residualReward << " = " << reward + residualReward << " for " << this << std::endl;
-        }
 
         friend std::ostream &operator <<(std::ostream &out, const Agent<BODY,MIND> &agent) {
             deselby::constexpr_if<deselby::IsStreamable<MIND>>([&out](auto &mind) { out << mind << std::endl; }, agent.mind);
             deselby::constexpr_if<deselby::IsStreamable<BODY>>([&out](auto &body) { out << body << std::endl; }, agent.body);
             return out;
         }
-
-//        void setMeanRewardDecay(double exponentialDecayRatePerTransaction) {
-//            meanRewardDecay = exponentialDecayRatePerTransaction;
-//            halfStepRewardDecay = sqrt(exponentialDecayRatePerTransaction);
-//        }
     };
 
 

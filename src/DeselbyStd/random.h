@@ -45,9 +45,14 @@ namespace deselby {
             return std::uniform_int_distribution<int>(from, until - 1)(gen);
         }
 
-        static int nextLong(long from, long until) {
+        static long nextLong(long from, long until) {
             assert(from < until);
             return std::uniform_int_distribution<long>(from, until - 1)(gen);
+        }
+
+        static size_t nextSizeT(size_t from, size_t until) {
+            assert(from < until);
+            return std::uniform_int_distribution<size_t>(from, until - 1)(gen);
         }
 
         static bool nextBool() {

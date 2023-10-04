@@ -8,89 +8,33 @@
 #include <bitset>
 #include <optional>
 
+namespace abm::events {
+    template<class STATE>
+    struct QLearningStep {
+        STATE startState;
+        size_t action;
+        double reward;
+        STATE endState;
+    };
+}
+
 namespace abm::minds {
 
-    template<class T>
-    concept HasPredict = requires(T qFunction, typename T::input_type input) {
-        { qFunction.predict(input) };
-    };
-
-    template<class T>
-    concept HasTimestepTraining = requires(T qFunction, typename T::input_type input, typename T::action_type act) {
-        { qFunction.train(input, act, 1.0, input, true) };
-    };
-
-
-/**
+    /**
      *
      * @tparam QFUNCTION    class that approximates a Q-function from body states to vectors of Q-values over acts
-     *                      and implements a train function
      * @tparam POLICY       class that converts a vector of Q-values and a legal-act mask to an act to perform.
      */
-    template<HasPredict QFUNCTION, class POLICY>
-    class QMind: public QFUNCTION { // A QMind is a QFunction with an act member
+    template<class QFUNCTION, class POLICY>
+    class QMind: public QFUNCTION { // A QMind is a QFunction with an act member so we inherit all event handlers
     public:
-
-        typedef typename QFUNCTION::input_type   observation_type;
-        typedef typename POLICY::action_type  action_type;
-        typedef double  reward_type;
-        typedef std::bitset<action_type::size> action_mask;
-
         POLICY      policy;
-
-    private:
-        std::optional<observation_type> lastState;
-        action_type lastAction;
-    public:
 
         QMind(QFUNCTION qfunction, POLICY policy): QFUNCTION(std::move(qfunction)), policy(std::move(policy)) { }
 
-        // --- Mind interface
-
-        /**
-         * @param body  current state of the body from which we base our decision to act
-         * @param legalActs mask indicating which acts are physically possible from this state
-         * @param reward reward since the last decision point
-         * @return decision how to act in the current situation
-         **/
-        action_type act(observation_type observation, const action_mask &legalActs, reward_type rewardFromLastChoice) requires HasTimestepTraining<QFUNCTION> {
-            if(lastState.has_value()) this->train(std::move(lastState.value()), lastAction, rewardFromLastChoice, observation, false);
-            lastAction = policy.sample(this->predict(observation), legalActs);
-            lastState = std::move(observation);
-            return lastAction;
+        auto act(const QFUNCTION::input_type &body) {
+            return policy.sample(this->QVector(body), body.legalMoves());
         }
-
-
-        /** act with no training
-         *
-         * @param observation
-         * @param legalActs
-         * @return
-         */
-        action_type act(observation_type observation, const action_mask &legalActs) {
-            lastAction = policy.sample(this->predict(observation), legalActs);
-            lastState = std::move(observation);
-            return lastAction;
-        }
-
-
-        template<Body BODY> requires std::convertible_to<BODY,observation_type>
-        action_type operator()(BODY body) {
-            return act(body, body.legalActs());
-        }
-
-
-        void endEpisode(double finalReward) requires HasTimestepTraining<QFUNCTION> {
-            if(lastState.has_value()) this->train(lastState.value(), lastAction, finalReward, lastState.value(), true);
-            lastState.reset();
-            assert(!lastState.has_value());
-        }
-
-//        template<class STATE> requires(std::is_convertible_v<STATE,observation_type>)
-//        void train(const STATE &startState, action_type action, const double &reward, const STATE &endState, bool isEnd) {
-//            qFunction.train(startState, action, reward, endState, isEnd);
-//        }
-
     };
 }
 
