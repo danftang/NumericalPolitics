@@ -18,22 +18,24 @@ namespace abm::bodies {
             size
         };
 
-        message_type    myLastMove;
+        uint    myLastMove      = Cooperate;
+        uint    yourLastMove    = Cooperate;
     private:
         double          pEndEpisode;
-        static constexpr int moveId(message_type myMove, message_type yourMove) { return myMove*2 + yourMove; }
+        static constexpr int moveId(uint myMove, uint yourMove) { return myMove*2 + yourMove; }
 
     public:
 
         PrisonersDilemmaBody(double pEndEpisode): pEndEpisode(pEndEpisode) { }
 
-        events::OutgoingMessage<message_type, PrisonersDilemmaBody> handleAct(uint actFromMind) {
-            myLastMove = static_cast<message_type>(actFromMind);
-            return {*this, deselby::Random::nextBool(pEndEpisode) ? std::nullopt : std::optional(myLastMove)};
+        events::MessageReward<std::optional<message_type>> handleAct(size_t actFromMind) {
+            myLastMove = actFromMind;
+            return {(deselby::Random::nextBool(pEndEpisode) ? std::nullopt : std::optional(static_cast<message_type>(myLastMove))), 0.0};
         };
 
-        double handleMessage(message_type incomingMessage) {
-            switch(moveId(myLastMove, incomingMessage)) {
+        double handleMessage(uint incomingMessage) {
+            yourLastMove = incomingMessage;
+            switch(moveId(myLastMove, yourLastMove)) {
                 case moveId(Cooperate, Cooperate):  return 3.0;
                 case moveId(Cooperate, Defect):     return 0.0;
                 case moveId(Defect,    Cooperate):  return 4.0;
@@ -41,6 +43,8 @@ namespace abm::bodies {
             }
             throw(std::out_of_range("unknown incomming message"));
         }
+
+        operator size_t() const { return 2*myLastMove + yourLastMove; }
 
         static inline auto legalActs() { return std::bitset<2>(3); }
     };

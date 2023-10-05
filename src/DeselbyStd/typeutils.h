@@ -240,6 +240,16 @@ namespace deselby {
 template<class T>
     concept IsStreamable = requires(std::ostream out, T obj) { out << obj; };
 
+    /** A simple box that allows native types (such as double) to be used as template parameters
+     * which seems not to be supported (as of 2023, clang gives
+     * error: sorry, non-type template argument of type 'double' is not yet supported)
+     * But ConstExpr<double> is fine!
+     */
+    template<class T> struct ConstExpr {
+        const T value;
+        consteval ConstExpr(T val) : value(std::move(val)) {}
+        consteval operator const T &() const { return value; }
+    };
 
 }
 

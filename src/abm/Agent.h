@@ -23,32 +23,69 @@
 #include "Body.h"
 #include "Mind.h"
 #include "CallbackUtils.h"
+#include "episodes/SimpleEpisode.h"
 
 namespace abm::events {
+
+    template<class BODY>
+    struct AgentStartEpisode {
+        BODY &body;
+
+        explicit AgentStartEpisode(BODY &body): body(body) {}
+    };
+
+    template<class BODY>
+    struct AgentEndEpisode {
+        BODY &body;
+
+        explicit AgentEndEpisode(BODY &body): body(body) {}
+    };
+
     struct Reward {
-        Reward(double reward = 0.0): reward(reward) {}
         double reward;
+
+        explicit Reward(const double &reward = 0.0): reward(reward) {}
+        explicit Reward(double &&reward): reward(std::move(reward)) {}
+    };
+
+    template<class T>
+    struct Action {
+        T act;
+
+        explicit Action(const T &act): act(act) {}
+        explicit Action(T &&act): act(std::move(act)) {}
+    };
+
+
+    template<class MESSAGE>
+    struct MessageReward : Reward {
+        MESSAGE message;
+
+        MessageReward(MESSAGE &&message, double &&reward): Reward(std::move(reward)), message(std::move(message)) {}
+        MessageReward(MessageReward<MESSAGE> &&)=default;
     };
 
     template<class MESSAGE, class BODY>
-    struct IncomingMessage : Reward {
-        MESSAGE message;
+    struct IncomingMessage : MessageReward<MESSAGE> {
         BODY &  body;     // state of body after handling message
 
-        IncomingMessage(MESSAGE &&message, BODY &body) : message(std::move<MESSAGE>(message)), body(body) {};
-        IncomingMessage(const MESSAGE &message, BODY &body): message(message), body(body) {};
+        IncomingMessage(BODY &body, MESSAGE &&message, double &&reward): MessageReward<MESSAGE>(std::move(message),std::move(reward)), body(body) {};
     };
 
-    template<class MESSAGE,class BODY>
-    struct OutgoingMessage : Reward {
-        std::optional<MESSAGE> message;
-        BODY &body; // state of body after sending message
+    template<class BODY, class ACTION, class MESSAGE>
+    struct OutgoingMessage : Action<ACTION>, MessageReward<MESSAGE> {
+        BODY &body;     // state of body after sending message
 
-        OutgoingMessage(BODY &body, std::optional<MESSAGE> &&message = std::nullopt, double rewaard = 0.0) :
-            Reward(rewaard),
-            message(message),
-            body(body) { };
+        /** generates an outgoing message in-place given a body and mind */
+        template<class MIND>
+        OutgoingMessage(BODY &body, MIND &mind):
+                Action<ACTION>(mind.act(body)),
+                MessageReward<MESSAGE>(body.handleAct(this->act)),
+                body(body) { }
     };
+    template<class BODY, class MIND>
+    OutgoingMessage(BODY &body, MIND &mind) -> OutgoingMessage<BODY,decltype(mind.act(body)), decltype(body.handleAct(mind.act(body)).message)>;
+
 }
 
 
@@ -88,13 +125,12 @@ namespace abm::callbacks {
             meanReward += a_n * event.reward;
         }
     };
-
 }
 
 namespace abm {
     template<class BODY, class MIND>
     concept BodyMindPair = requires(BODY body, MIND mind) {
-        { body.handleAct(mind.act(body)) } -> deselby::IsClassTemplateOf<events::OutgoingMessage>;
+        { body.handleAct(mind.act(body)) } -> deselby::IsClassTemplateOf<events::MessageReward>;
         // and handleMessage(.) on some type of incoming message, depending on which agent it is paired with
     };
 
@@ -118,6 +154,10 @@ namespace abm {
         typedef BODY body_type;
         typedef MIND mind_type;
 
+        // This design implies single action and message types
+        typedef decltype(mind.act(body)) action_type;
+        typedef decltype(body.handleAct(std::declval<action_type>()).message) message_type;
+//        typedef events::OutgoingMessage<BODY,action_type, message_type> outgoing_message_type;
 
         /**
          *
@@ -157,16 +197,19 @@ namespace abm {
             callback(event, mind);
         }
 
+        template<class AGENT1,class AGENT2>
+        void on(const events::EndEpisode<AGENT1,AGENT2> & /* event */) {
+            callback(events::AgentEndEpisode(body), mind);
+        }
 
         /** This method is called after initiation.
          * If the episode is turns-based it is called on the first mover only in order to start the episode.
          * If the episode is synchronous (e.g. rock-paper-scisors) it is called on both agents.
          * @return message that begins the episode
          */
-        auto startEpisode() {
-            events::OutgoingMessage outMessageEvent = body.handleAct(mind.act(body));
-            callback(outMessageEvent, mind);
-            return outMessageEvent.message;
+        message_type startEpisode() {
+            callback(events::AgentStartEpisode(body), mind);
+            return getNextOutMessage();
         }
 
 
@@ -176,13 +219,13 @@ namespace abm {
          *   ended the episode.
          */
         template<class INMESSAGE>
-        auto handleMessage(INMESSAGE &&incomingMessage) {
-            auto inMessageEvent = events::IncomingMessage(std::forward<INMESSAGE>(incomingMessage), body);
-            inMessageEvent.reward = body.handleMessage(incomingMessage);
+        message_type handleMessage(INMESSAGE incomingMessage) {
+            events::IncomingMessage inMessageEvent(
+                    body,
+                    std::move(incomingMessage),
+                    body.handleMessage(incomingMessage));
             callback(inMessageEvent,mind);
-            events::OutgoingMessage outMessageEvent = body.handleAct(mind.act(body));
-            callback(outMessageEvent, mind);
-            return outMessageEvent.message;
+            return getNextOutMessage();
         }
 
 
@@ -191,7 +234,15 @@ namespace abm {
             deselby::constexpr_if<deselby::IsStreamable<BODY>>([&out](auto &body) { out << body << std::endl; }, agent.body);
             return out;
         }
+    protected:
+
+        message_type getNextOutMessage() {
+            events::OutgoingMessage outMessageEvent(body,mind);
+            callback(outMessageEvent, mind);
+            return outMessageEvent.message;
+        }
     };
+
 
 
 

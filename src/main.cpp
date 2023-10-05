@@ -36,8 +36,8 @@ int main() {
 
 //    abm::societies::RandomEncounterSociety mySociety(abm::PingPongAgent{}, abm::PingPongAgent{});
 //    mySociety.run(2, abm::callbacks::Verbose());
-
-    tests::zeroIntelligencePrisonersDilemma();
+//    tests::zeroIntelligencePrisonersDilemma();
+    tests::tabularQMindPrisonersDilemma();
 
     return 0;
 }

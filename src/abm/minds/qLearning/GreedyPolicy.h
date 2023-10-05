@@ -1,119 +1,105 @@
 //
-// Created by daniel on 07/09/23.
+// Created by daniel on 18/07/23.
 //
 
-#ifndef MULTIAGENTGOVERNMENT_QL_GREEDYPOLICY_H
-#define MULTIAGENTGOVERNMENT_QL_GREEDYPOLICY_H
+#ifndef MULTIAGENTGOVERNMENT_GREEDYPOLICY_H
+#define MULTIAGENTGOVERNMENT_GREEDYPOLICY_H
 
+#include <bitset>
+#include <concepts>
 #include <functional>
-#include "../../Body.h"
+
 #include "../../../DeselbyStd/random.h"
+#include "../../ActionMask.h"
+#include "../ZeroIntelligence.h"
 
-namespace abm::minds::qLearning {
+namespace abm::minds {
 
-    /** A QFunction is a class that is callable on a BODY and returns a vector which
-     * implements operator[] on size_t and returns something convertible to double
-     */
-    template<class BODY, class QFUNCTION>
-    concept QCompatible = requires(QFUNCTION qFunc, BODY body, size_t i) {
-        { qFunc(body)[i] } -> std::convertible_to<double>;
-        { qFunc(body).size() } -> std::convertible_to<size_t>;
+    template<class T>
+    concept GenericQVector = requires(T obj, size_t i) {
+        { obj[i] < obj[i] } -> std::convertible_to<bool>;
     };
 
-    size_t sampleMaxQ(const auto &qValues, const auto &legalMoves) {
-        size_t chosenMove = qValues.size();
-        assert(legalMoves.count() >= 1);
-        // choose a legal move with highest Q
-        std::vector<size_t> indices = legalIndices(legalMoves);
-        double bestQ = -std::numeric_limits<double>::infinity();
-        size_t nMaxEntries = 1; // for randomly choosing between multiple maxQ
-        for (size_t i : indices) {
-            double q = qValues[i];
-            assert(!isnan(q));
-            if (q > bestQ) {
-                bestQ = q;
-                chosenMove = i;
-                nMaxEntries = 1;
-            } else if(q == bestQ) { // break tied max by drawing from uniform probability
-                if(deselby::Random::nextBool(1.0/++nMaxEntries)) {
-                    chosenMove = i;
-                }
-            }
-        }
-        assert(chosenMove < qValues.size());
-        return chosenMove;
-    }
-
-    /** This class wraps a QFunction to provide a function from a Body to an act
-     *
-     * @tparam BODY         Body for which this policy is creating actions
-     * @tparam QFUNCTION    A function from Body states to Q-values which implement operator[], returning
-     *                      something convertible to double
-     */
-    template<class QFUNCTION>
-    class GreedyPolicy: public QFUNCTION {
+    class GreedyPolicy {
     public:
-        std::function<bool()> explorationStrategy;
+        std::function<bool()> explore;
 
-        explicit GreedyPolicy(std::function<bool()> explorationStrategy, QFUNCTION &&qFunc) :
-        QFUNCTION(std::move(qFunc)),
-        explorationStrategy(std::move(explorationStrategy)) {}
+        /** exploration strategies can be found in abm::explorationStrategies */
+        explicit GreedyPolicy(std::function<bool()> explorationStrategy) : explore(std::move(explorationStrategy)) {}
 
-        template<class BODY> requires QCompatible<BODY,QFUNCTION>
-        BODY::action_type operator()(const BODY &body) {
-            return explorationStrategy()?ZeroIntelligence(body):static_cast<BODY::action_type>(sample(QFUNCTION(body), body.legalActs()));
+        /** QVector must have operator[] and elements must have an ordering  */
+        template<GenericQVector QVECTOR, DiscreteActionMask ACTIONMASK>
+        size_t sample(const QVECTOR &qValues, const ACTIONMASK &legalActs) {
+            size_t chosenMove;
+            assert(legalActs.count() >= 1);
+            return explore() ? minds::ZeroIntelligence::sampleUniformly(legalActs) : max(qValues, legalActs);
         }
+
+        template<GenericQVector QVECTOR, DiscreteActionMask ACTIONMASK>
+        static size_t max(const QVECTOR &qValues, const ACTIONMASK &legalActs) {
+            // choose a legal move with highest Q
+            auto indices = legalIndices(legalActs);
+            std::shuffle(indices.begin(), indices.end(), deselby::Random::gen); // ...in-case of multiple max values
+            auto chosenMove = indices[0];
+            for(size_t ii = 1; ii < indices.size(); ++ii) {
+                auto act = indices[ii];
+                if(qValues[chosenMove] < qValues[act]) chosenMove = act;
+            }
+            return chosenMove;
+        }
+
     };
-
-    namespace explorationStrategies {
-
-
-        class LinearDecay {
-        public:
-            double pExplore;
-            double exploreDecay;
-            double pExploreMin;
-
-            LinearDecay(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
-                    pExplore(initialExploration),
-                    exploreDecay((initialExploration - initialExploration)/stepsToDecayToMinimum),
-                    pExploreMin(minimumExploration) {}
-
-            bool operator()() {
-                if (pExplore > pExploreMin) pExplore -= exploreDecay;
-                return deselby::Random::nextBool(pExplore);
-            }
-        };
-
-
-        class ExponentialDecay {
-        public:
-            double pExplore;
-            double exploreDecay;
-            double pExploreMin;
-
-            ExponentialDecay(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
-                    pExplore(initialExploration),
-                    exploreDecay(pow(minimumExploration/initialExploration, 1.0/stepsToDecayToMinimum)),
-                    pExploreMin(minimumExploration) {}
-
-            bool operator()() {
-                if (pExplore > pExploreMin) pExplore *= exploreDecay;
-                return deselby::Random::nextBool(pExplore);
-            }
-        };
-
-        struct NoExploration { bool operator()() { return false; } };
-
-        class FixedExploration {
-        public:
-            double pExplore;
-            FixedExploration(double pExplore): pExplore(pExplore) {}
-            bool operator()() { return deselby::Random::nextBool(pExplore); }
-        };
-    }
-
 }
 
+/** Some exploration strategies for use with GreedyPolicy
+ *
+ */
+namespace abm::explorationStrategies {
 
-#endif //MULTIAGENTGOVERNMENT_QL_GREEDYPOLICY_H
+
+    class LinearDecay {
+    public:
+        double pExplore;
+        double exploreDecay;
+        double pExploreMin;
+
+        LinearDecay(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
+                pExplore(initialExploration),
+                exploreDecay((initialExploration - minimumExploration)/stepsToDecayToMinimum),
+                pExploreMin(minimumExploration) {}
+
+        bool operator()() {
+            if (pExplore > pExploreMin) pExplore -= std::min(exploreDecay, pExplore - pExploreMin);
+            return deselby::Random::nextBool(pExplore);
+        }
+    };
+
+
+    class ExponentialDecay {
+    public:
+        double pExplore;
+        double exploreDecay;
+        double pExploreMin;
+
+        ExponentialDecay(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
+                pExplore(initialExploration),
+                exploreDecay(pow(minimumExploration/initialExploration, 1.0/stepsToDecayToMinimum)),
+                pExploreMin(minimumExploration) {}
+
+        bool operator()() {
+            if (pExplore > pExploreMin) pExplore *= exploreDecay;
+            return deselby::Random::nextBool(pExplore);
+        }
+    };
+
+    struct NoExploration { bool operator()() { return false; } };
+
+    class FixedExploration {
+    public:
+        double pExplore;
+        FixedExploration(double pExplore): pExplore(pExplore) {}
+        bool operator()() { return deselby::Random::nextBool(pExplore); }
+    };
+}
+
+#endif //MULTIAGENTGOVERNMENT_GREEDYPOLICY_H

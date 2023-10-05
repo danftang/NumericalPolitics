@@ -20,7 +20,7 @@ namespace abm::events {
 
 namespace abm::minds {
 
-    /**
+    /** A QMind is just a QFunction with a policy to create an act(body) function
      *
      * @tparam QFUNCTION    class that approximates a Q-function from body states to vectors of Q-values over acts
      * @tparam POLICY       class that converts a vector of Q-values and a legal-act mask to an act to perform.
@@ -32,8 +32,9 @@ namespace abm::minds {
 
         QMind(QFUNCTION qfunction, POLICY policy): QFUNCTION(std::move(qfunction)), policy(std::move(policy)) { }
 
-        auto act(const QFUNCTION::input_type &body) {
-            return policy.sample(this->QVector(body), body.legalMoves());
+        template<class BODY>
+        auto act(const BODY &body) {
+            return policy.sample(this->QVector(body), body.legalActs());
         }
     };
 }

@@ -11,9 +11,8 @@
 #include <numeric>
 #include <iostream>
 #include <cassert>
-#include "mlpack.hpp"
 
-namespace abm {
+namespace abm::minds {
     /** A QValue stores sum of samples and number of samples to give the mean over all samples */
     class QValue {
     public:
@@ -62,15 +61,13 @@ namespace abm {
       * and
       * E_n[Q] = (1-a_n)E_{n-1}[Q] + a_n.Q_n
       *
-      * As n->infinity, a_n->1-r so half life is when r = exp(log(0.5)/n)
       */
-    template<size_t sampleHalfLife>
+    template<deselby::ConstExpr<double> sampleDecay>
     class ExponentiallyWeightedQValue {
     public:
         double  qValue      = 0.0;  // weighted average of samples
         uint    sampleCount = 0;    // number of samples
 
-        static constexpr double sampleDecay = exp(log(0.5)/sampleHalfLife);
 
         void addSample(double cumulativeReward) {
             const double a_n = (1.0-sampleDecay)/(1.0-std::pow(sampleDecay, ++sampleCount));
@@ -81,6 +78,11 @@ namespace abm {
 
         bool operator <(const ExponentiallyWeightedQValue &other) const {
             return qValue < other.qValue;
+        }
+
+        friend std::ostream &operator <<(std::ostream &out, const ExponentiallyWeightedQValue<sampleDecay> &qVal) {
+            out << qVal.sampleCount << ": " << qVal.qValue;
+            return out;
         }
     };
 
@@ -135,15 +137,16 @@ namespace abm {
             return sum;
         }
 
-        arma::mat::fixed<SIZE,1> toVector() {
-            arma::mat::fixed<SIZE,1> Qvec;
-            for(int i=0; i<SIZE; ++i) Qvec(i) = (*this)[i].mean();
-            return Qvec;
-        }
-
-        operator arma::mat::fixed<SIZE,1>() {
-            return toVector();
-        }
+        std::array<QVALUE,SIZE> &asArray() { return *this; }
+//        arma::mat::fixed<SIZE,1> toVector() {
+//            arma::mat::fixed<SIZE,1> Qvec;
+//            for(int i=0; i<SIZE; ++i) Qvec(i) = (*this)[i].mean();
+//            return Qvec;
+//        }
+//
+//        operator arma::mat::fixed<SIZE,1>() {
+//            return toVector();
+//        }
     };
 }
 

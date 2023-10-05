@@ -7,7 +7,8 @@
 
 #include <functional>
 #include <concepts>
-#include "../Agent.h"
+#include <utility>
+
 #include "../CallbackUtils.h"
 
 namespace abm::events {
@@ -102,7 +103,7 @@ namespace abm::episodes {
         template<class FIRSTAGENT, class SECONDAGENT>
         Runner(FIRSTAGENT &&firstMover, SECONDAGENT &&secondMover, CALLBACKS &&...callbacks):
                 agent0(std::forward<AGENT0>(firstMover)),
-                agent1(std::forward<AGENT0>(secondMover)),
+                agent1(std::forward<AGENT1>(secondMover)),
                 callbacks(std::forward<CALLBACKS>(callbacks)...) { }
 
          /** Runs a number of episodes asynchronously (i.e. agents take turns to send messages)
@@ -121,7 +122,7 @@ namespace abm::episodes {
          */
         void runSync() {
             callback(events::StartEpisode{agent0, agent1}, callbacks);
-            passMessagesSynchronously(agent0.startEpisode(), agent1.startEpisode());
+            passMessagesSynchronously(agent1.startEpisode(), agent0.startEpisode());
             callback(events::EndEpisode{agent0, agent1}, agent0, agent1, callbacks);
         }
 
@@ -130,14 +131,14 @@ namespace abm::episodes {
         void passMessageRightAndRecurse(MESSAGE message) {
             if(isEmptyOptional(message)) return;
             callback(events::Message{agent0,agent1,valueIfOptional(message)},callbacks);
-            passMessageLeftAndRecurse(agent1.handleMessage(valueIfOptional(message))); // tail-recursion will be optimised out (if optimisation is on)
+            passMessageLeftAndRecurse(agent1.handleMessage(std::move(valueIfOptional(message)))); // tail-recursion will be optimised out (if optimisation is on)
         }
 
         template<class MESSAGE>
         void passMessageLeftAndRecurse(MESSAGE message) {
             if(isEmptyOptional(message)) return;
             callback(events::Message{agent1,agent0,valueIfOptional(message)},callbacks);
-            passMessageRightAndRecurse(agent0.handleMessage(valueIfOptional(message)));
+            passMessageRightAndRecurse(agent0.handleMessage(std::move(valueIfOptional(message))));
         }
 
         template<class MESSAGE0, class MESSAGE1>
@@ -145,7 +146,9 @@ namespace abm::episodes {
             if(isEmptyOptional(messageFor0) || isEmptyOptional(messageFor1)) return;
             callback(events::Message{agent0,agent1,valueIfOptional(messageFor1)},callbacks);
             callback(events::Message{agent1,agent0,valueIfOptional(messageFor0)},callbacks);
-            passMessagesSynchronously(agent1.handleMessage(valueIfOptional(messageFor1)), agent0.handleMessage(valueIfOptional(messageFor0)));
+            passMessagesSynchronously(
+                    agent1.handleMessage(std::move(valueIfOptional(messageFor1))),
+                    agent0.handleMessage(std::move(valueIfOptional(messageFor0))));
         }
 
         template<class T>

@@ -61,8 +61,8 @@ template<class... T> std::ostream &operator <<(std::ostream &out, const std::tup
 template<class T, typename = std::enable_if_t<deselby::is_stl_container_v<T>>>
 std::ostream &operator <<(std::ostream &out, const T &container) {
     out << "{";
-    auto it = container.begin();
-    if(it != container.end()) {
+    auto it = std::begin(container);
+    if(it != std::end(container)) {
             if constexpr (deselby::is_stl_associative_container_v<T>) {
                 out << it->first << "->" << it->second;
                 while (++it != container.end()) out << ", " << it->first << "->" << it->second;

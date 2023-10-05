@@ -86,7 +86,7 @@
 #include "../../approximators/FeedForwardNeuralNet.h"
 #include "../../approximators/Concepts.h"
 #include "../../observations/InputOutput.h"
-#include "qLearning/GreedyPolicy.h"
+#include "qLearning/InheritingGreedyPolicy.h"
 #include "../../observations/ActionResponseReward.h"
 
 namespace abm::minds {
