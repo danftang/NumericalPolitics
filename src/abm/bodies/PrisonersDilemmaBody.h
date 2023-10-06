@@ -20,8 +20,8 @@ namespace abm::bodies {
 
         uint    myLastMove      = Cooperate;
         uint    yourLastMove    = Cooperate;
+        double  pEndEpisode;
     private:
-        double          pEndEpisode;
         static constexpr int moveId(uint myMove, uint yourMove) { return myMove*2 + yourMove; }
 
     public:

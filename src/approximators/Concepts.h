@@ -1,4 +1,4 @@
-//
+`//
 // Created by daniel on 06/09/23.
 //
 
@@ -149,16 +149,16 @@ namespace approximators {
 //        { f.observe(evidence) };
 //    };
 
-    template<class T, class OBSERVATION>
-    concept Trainable1 = requires(T f, OBSERVATION observation) {
-        { f.train(observation) };
-    };
-
-    template<class T, class... OBSERVATION>
-    concept Trainable = (Trainable1<T,OBSERVATION> && ...);
-
-    template<class T, class IOSIGNATURE, class... OBSERVATIONTYPES>
-    concept TrainableApproximator = Approximator<T,IOSIGNATURE> && Trainable<T,OBSERVATIONTYPES...>;
+//    template<class T, class OBSERVATION>
+//    concept Trainable1 = requires(T f, OBSERVATION observation) {
+//        { f.train(observation) };
+//    };
+//
+//    template<class T, class... OBSERVATION>
+//    concept Trainable = (Trainable1<T,OBSERVATION> && ...);
+//
+//    template<class T, class IOSIGNATURE, class... OBSERVATIONTYPES>
+//    concept TrainableApproximator = Approximator<T,IOSIGNATURE> && Trainable<T,OBSERVATIONTYPES...>;
 
 }
 

@@ -9,66 +9,38 @@
 #include "QVector.h"
 #include "../../Agent.h"
 #include "../../../DeselbyStd/stlstream.h"
+#include "QLearningStepMixin.h"
 
 namespace abm::minds {
     template<int NSTATES, int NACTIONS, class QVALUE = ExponentiallyWeightedQValue<0.999>>
-    class QTable {
+    class QTable : public QLearningStepMixin<QTable<NSTATES,NACTIONS,QVALUE>, size_t> {
     public:
-        static constexpr int output_dimension = NACTIONS;
-
         std::array<QVector<NACTIONS, QVALUE>, NSTATES>  table;
-
         const double discount;     // exponential decay factor of future reward
-        double reward;
-        size_t lastBodyState;
-        std::optional<size_t> lastAction;
+
+        using QLearningStepMixin<QTable<NSTATES,NACTIONS,QVALUE>, size_t>::on; // prevent our handler from hiding mixin
 
 
-        QTable(double discount) : discount(discount), reward(0.0) { }
+        QTable(double discount) : discount(discount) { }
 
 
-        auto QVector(size_t body) const { return table[body]; }
+        auto operator()(size_t body) const { return table[body]; }
 
 
-        template<class BODY>
-        void on(const events::AgentStartEpisode<BODY> & event) {
-            // train on last step
-            lastBodyState = event.body;
-        }
-
-        /** Remember last act, body state and reward */
-        template<class BODY, class ACTION, class MESSAGE>
-        void on(const events::OutgoingMessage<BODY, ACTION, MESSAGE> &outMessage) {
-            lastAction = outMessage.act;
-            reward = outMessage.reward;
-        }
-
-
-        /** Learn from last call/response step */
-        template<class BODY, class MESSAGE>
-        void on(const events::IncomingMessage<MESSAGE, BODY> &inMessage) {
-            if(lastAction.has_value()) {
-                reward += inMessage.reward;
-                const double endStateQValue = *std::ranges::max_element(table[inMessage.body]); // assumes non-legal Q-values are never max
-                const double forwardQ = reward + discount * endStateQValue;
-//                std::cout << "Training on " << lastBodyState << " " << *lastAction << " " << reward << " " << forwardQ << std::endl;
-                table[lastBodyState][*lastAction].addSample(forwardQ);
+        void on(const events::QLearningStep<size_t> &event) {
+            if(event.isEndOfEpisode()) {
+                table[*event.startStatePtr][event.action].addSample(event.reward);
+            } else {
+                const double endStateQValue = *std::ranges::max_element(table[*event.endStatePtr]); // assumes non-legal Q-values are never max
+                const double forwardQ = event.reward + discount * endStateQValue;
+                table[*event.startStatePtr][event.action].addSample(forwardQ);
             }
-            lastBodyState = inMessage.body;
         }
 
-
-        /** learn from residual reward of end-game */
-        template<class BODY>
-        void on(const events::AgentEndEpisode<BODY> & /* event */) {
-            // train on last step
-            table[lastBodyState][*lastAction].addSample(reward);
-            lastAction.reset();
-        }
 
         friend std::ostream &operator <<(std::ostream &out, const QTable<NSTATES,NACTIONS,QVALUE> &qTable) {
             for(uint i=0; i<NSTATES; ++i) {
-                out << i << " -> " << qTable.QVector(i).asArray() << '\n';
+                out << i << " -> " << qTable(i).asArray() << '\n';
             }
             return out;
         }

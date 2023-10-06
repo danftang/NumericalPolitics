@@ -35,9 +35,12 @@ namespace abm {
 
     // ====================== callback mechanism ===================================
 
+    /** true if T has a callback handler for EVENT */
     template<class T, class EVENT>
     concept HasCallback = requires(T obj, EVENT event) { obj.on(event); };
 
+
+    /** true if T is a tuple or a reference to a tuple (possibly cv-qualified) */
     template<class T>
     concept IsTupleOrRef = deselby::IsClassTemplateOf<std::remove_reference_t<T>, std::tuple>;
 

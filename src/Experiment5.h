@@ -79,14 +79,13 @@
 #include "abm/societies/RandomEncounterSociety.h"
 #include "abm/Agent.h"
 #include "abm/minds/QMind.h"
-#include "abm/QTable.h"
+#include "abm/minds/qLearning/QTable.h"
 #include "abm/minds/IncompleteInformationMCTS.h"
 #include "abm/episodes/SimpleEpisode.h"
 #include "abm/bodies/SugarSpiceTradingBody.h"
 #include "abm/DQN.h"
 #include "abm/RandomReplay.h"
-#include "abm/minds/MeanRewardMindWrapper.h"
-#include "abm/GreedyPolicy.h"
+#include "abm/minds/qLearning/GreedyPolicy.h"
 
 namespace experiment5 {
     const bool HASLANGUAGE = true;

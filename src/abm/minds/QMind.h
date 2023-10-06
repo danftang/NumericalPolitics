@@ -8,15 +8,15 @@
 #include <bitset>
 #include <optional>
 
-namespace abm::events {
-    template<class STATE>
-    struct QLearningStep {
-        STATE startState;
-        size_t action;
-        double reward;
-        STATE endState;
-    };
-}
+//namespace abm::events {
+//    template<class STATE>
+//    struct QLearningStep {
+//        STATE startState;
+//        size_t action;
+//        double reward;
+//        STATE endState;
+//    };
+//}
 
 namespace abm::minds {
 
@@ -34,7 +34,7 @@ namespace abm::minds {
 
         template<class BODY>
         auto act(const BODY &body) {
-            return policy.sample(this->QVector(body), body.legalActs());
+            return policy.sample(QFUNCTION::operator()(body), body.legalActs());
         }
     };
 }

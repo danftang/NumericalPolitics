@@ -23,7 +23,7 @@ namespace tests {
     }
 
     void tabularQMindPrisonersDilemma() {
-        double pEndEpisode = 0.0001;
+        double pEndEpisode = 0.001;
         auto agent1 = abm::Agent(
                 abm::bodies::PrisonersDilemmaBody(pEndEpisode),
                 abm::minds::QMind(
@@ -39,10 +39,17 @@ namespace tests {
                 )
 //                abm::minds::LambdaMind([](auto body) -> size_t { return 0; })
         );
-        auto verboseCallback = abm::callbacks::Verbose{};
-        for(int i=0; i < 10; ++i) {
-            abm::episodes::runSync(agent1, agent2, verboseCallback);
+
+
+        // train
+        std::cout << "Training..." << std::endl;
+        for(int i=0; i < 10000; ++i) {
+            abm::episodes::runSync(agent1, agent2);
         }
+
+        // show
+        auto verboseCallback = abm::callbacks::Verbose{};
+        abm::episodes::runSync(agent1, agent2, verboseCallback);
     }
 
 

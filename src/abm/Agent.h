@@ -77,14 +77,20 @@ namespace abm::events {
         BODY &body;     // state of body after sending message
 
         /** generates an outgoing message in-place given a body and mind */
-        template<class MIND>
-        OutgoingMessage(BODY &body, MIND &mind):
-                Action<ACTION>(mind.act(body)),
-                MessageReward<MESSAGE>(body.handleAct(this->act)),
+//        template<class MIND>
+//        OutgoingMessage(BODY &body, MIND &mind):
+//                Action<ACTION>(mind.act(body)),
+//                MessageReward<MESSAGE>(body.handleAct(this->act)),
+//                body(body) { }
+
+        OutgoingMessage(BODY &body, ACTION &&act, MessageReward<MESSAGE> &&messageReward):
+                Action<ACTION>(std::move(act)),
+                MessageReward<MESSAGE>(std::move(messageReward)),
                 body(body) { }
+
     };
-    template<class BODY, class MIND>
-    OutgoingMessage(BODY &body, MIND &mind) -> OutgoingMessage<BODY,decltype(mind.act(body)), decltype(body.handleAct(mind.act(body)).message)>;
+//    template<class BODY, class MIND>
+//    OutgoingMessage(BODY &body, MIND &mind) -> OutgoingMessage<BODY,decltype(mind.act(body)), decltype(body.handleAct(mind.act(body)).message)>;
 
 }
 
@@ -237,7 +243,8 @@ namespace abm {
     protected:
 
         message_type getNextOutMessage() {
-            events::OutgoingMessage outMessageEvent(body,mind);
+            action_type act = mind.act(body);
+            events::OutgoingMessage outMessageEvent(body, std::move(act), body.handleAct(act));
             callback(outMessageEvent, mind);
             return outMessageEvent.message;
         }
