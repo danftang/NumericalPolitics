@@ -1,4 +1,4 @@
-`//
+//
 // Created by daniel on 06/09/23.
 //
 
@@ -67,7 +67,7 @@
  *
  *
  */
-namespace approximators {
+namespace abm::approximators {
     // ================  OBJECTIVE CONCEPTS  =====================
     // =================================================
     template<class T>
@@ -159,6 +159,95 @@ namespace approximators {
 //
 //    template<class T, class IOSIGNATURE, class... OBSERVATIONTYPES>
 //    concept TrainableApproximator = Approximator<T,IOSIGNATURE> && Trainable<T,OBSERVATIONTYPES...>;
+
+    /** With respect to a function Y=F(X) and a set of input points (X_1...X_n)
+     * a LossFunction represents a function from outputs (Y_1...Y_n) where Y_i = F(X_i)
+     * to a real. In particular, the gradient of this funciton.
+     *
+     * The loss function may represent a sum of log-probs.
+     *
+     */
+    template<class T> // ensmallen objective?
+    concept LossFunction = requires(T obj, arma::mat &result, arma::mat predictions) {
+        obj.nPoints();  // number of points in the training set
+        obj.trainingSet(result); // put (X_1...X_n) in vec [can C++ optimise the moving of an Array to a memory address?]
+        obj.gradientByPrediction(predictions, result); // ...and input identifiers?
+//        obj.loss(functionOutputs, result); //
+    };
+
+//    template<class T> // ensmallen objective?
+//    concept ViewLossFunction = requires(T obj, arma::mat &result, arma::mat functionOutputs) {
+//        obj.nPoints();  // number of intout/output points
+//        { obj.inputs() } -> std::ranges::view; // returns a lazy evaluated range of input vectors
+//        {obj.gradientByOutputs(functionOutputs) } -> std::ranges::view; // returns a lazy evaluated range of gradients given the function outputs
+////        obj.loss(functionOutputs, result); //
+//    };
+
+
+//    template<class T> // ensmallen objective?
+//    concept LossGradient = requires(T obj, arma::mat &result, arma::mat functionOutputs) {
+//        { obj.inputs(result) } -> std::same_as<void>; // put (X_1...X_n) in vec [can C++ optimise the moving of an Array to a memory address?]
+//        { obj.operator()(functionOutputs, result) } -> std::same_as<void>;
+//    };
+//
+//    template<class T, class RESULTTYPE> // ensmallen objective?
+//    concept ComposableLossGradient = LossGradient<T> && requires(T obj, arma::mat &result, arma::mat functionOutputs) {
+//        obj.nPoints();  // number of intout/output points
+//        obj.inputs(result); // put (X_1...X_n) in vec [can C++ optimise the moving of an Array to a memory address?]
+//        obj.exportGradient(functionOutputs, result); // ...and input identifiers?
+//    };
+
+
+    /** */
+//    template<class T>
+//    concept SumOfLossFunctions = requires(T obj, size_t n) {
+//        obj.size();   // number of terms in the sum that this function represents
+//        obj.batchLoss(n); // generate a loss function consisting of the sum of n terms
+////        obj.on(event); // insert information into the buffer
+//    };
+
+    ////////  A loss function is a set of inputs and an Output layer,
+    /// a stochastic loss function is a generator of loss functions (or a loss function with a sample() member)
+
+    template<class T>
+    concept StochasticLossFunction = requires(T obj) {
+        { obj.getNextLossFunction() } -> LossFunction;
+        obj.setSampleRatio();   // sets the size of a batch as a fraction of the buffer size. (or set batch size?)
+    };
+
+    /** */
+    template<class T, class LOSSFUNCTION>
+    concept ParameterisedFunction = requires(T obj, LOSSFUNCTION loss) {
+        { obj.parameters() } -> std::same_as<arma::mat &>;
+        { obj.gradientByParams(loss) } -> std::same_as<arma::mat>;
+    };
+
+    template<class T, class LOSSFUNCTION>
+    concept OptimisableFunction = requires(T obj, LOSSFUNCTION loss) {
+        obj.updateParameters(loss);
+    };
+
+
+//    /** */
+//    template<class T, class PARAMETERISEDFUNC>
+//    concept TrainingStrategy = requires(T obj, PARAMETERISEDFUNC parameterisedFunction) {
+//        obj.doTrainingStep(parameterisedFunction);   // number of terms in the sum that this function represents
+////        obj.on(event); // insert information into the buffer
+//    };
+
+//    /** For use with a trainable function */
+    template<class T, class EVENT>
+    concept TrainingPolicy = requires(T obj, const EVENT &event) {
+        { obj(event) } -> std::same_as<bool>; // true if we should execute a training step
+    };
+//
+//    template<class T>
+//    concept OptimisationStep = requires(T obj) {
+//        obj.update(Parameters, parameterGradient); // true if we should execute a training step
+//    };
+//
+
+
 
 }
 

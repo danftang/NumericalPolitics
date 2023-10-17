@@ -15,12 +15,14 @@
 #include "../abm/minds/LambdaMind.h"
 
 namespace tests {
+
     void zeroIntelligencePrisonersDilemma() {
         double pEndEpisode = 0.01;
         auto agent1 = abm::Agent(abm::bodies::PrisonersDilemmaBody(pEndEpisode), abm::minds::ZeroIntelligence{});
         auto agent2 = abm::Agent(abm::bodies::PrisonersDilemmaBody(pEndEpisode), abm::minds::ZeroIntelligence{});
         abm::episodes::runSync(agent1, agent2, abm::callbacks::Verbose{});
     }
+
 
     void tabularQMindPrisonersDilemma() {
         double pEndEpisode = 0.001;
@@ -31,15 +33,7 @@ namespace tests {
                         abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(0.25, 20000, 0.05))
                         )
                 );
-        auto agent2 = abm::Agent(
-                abm::bodies::PrisonersDilemmaBody(pEndEpisode),
-                abm::minds::QMind(
-                        abm::minds::QTable<4,2>(1.0),
-                        abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(0.25, 20000, 0.05))
-                )
-//                abm::minds::LambdaMind([](auto body) -> size_t { return 0; })
-        );
-
+        auto agent2 = agent1;
 
         // train
         std::cout << "Training..." << std::endl;
@@ -51,6 +45,33 @@ namespace tests {
         auto verboseCallback = abm::callbacks::Verbose{};
         abm::episodes::runSync(agent1, agent2, verboseCallback);
     }
+
+
+//    void neuralQMindPrisonersDilemma() {
+//        double pEndEpisode = 0.001;
+//        auto agent1 = abm::Agent(
+//                abm::bodies::PrisonersDilemmaBody(pEndEpisode),
+//                abm::minds::QMind(
+//                        abm::minds::LambdaMind(
+//                                approximators::FeedForwardNeuralNet(
+//                                        {new mlpack::Linear(100),
+//                                        new mlpack::ReLU()})
+//                                ),
+//                        abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(0.25, 20000, 0.05))
+//                )
+//        );
+//        auto agent2 = agent1;
+//
+//        // train
+//        std::cout << "Training..." << std::endl;
+//        for(int i=0; i < 10000; ++i) {
+//            abm::episodes::runSync(agent1, agent2);
+//        }
+//
+//        // show
+//        auto verboseCallback = abm::callbacks::Verbose{};
+//        abm::episodes::runSync(agent1, agent2, verboseCallback);
+//    }
 
 
 }

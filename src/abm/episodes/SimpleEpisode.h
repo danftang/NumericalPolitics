@@ -171,22 +171,14 @@ namespace abm::episodes {
     template<class AGENT0, class AGENT1, class...CALLBACKS>
     Runner(AGENT0 &&agent0, AGENT1 &&agent1, CALLBACKS &&...callbacks) -> Runner<AGENT0,AGENT1,CALLBACKS...>;
 
-    /** Execute some number of turns-based episodes between two agents
-     * @param agent0 first mover agent
-     * @param agent1 second mover agent
-     * @param verbose it true, prints the passed messages to stdout
-     * @return total number of messages sent in the episode
+    /** Execute a turns-based episode between two agents
      */
     template<class AGENT0, class AGENT1, class... CALLBACKS>
     inline void runAsync(AGENT0 &&agent0, AGENT1 &&agent1, CALLBACKS &&...callbacks) {
         Runner(std::forward<AGENT0>(agent0), std::forward<AGENT1>(agent1), std::forward<CALLBACKS>(callbacks)...).runAsync();
     }
 
-    /** Execute some number of turns-based episodes between two agents
-     * @param agent0 first mover agent
-     * @param agent1 second mover agent
-     * @param verbose it true, prints the passed messages to stdout
-     * @return total number of messages sent in the episode
+    /** Execute a synchronous episode between two agents (i.e. agents swap messages at the same time)
      */
     template<class AGENT0, class AGENT1, class... CALLBACKS>
     inline void runSync(AGENT0 &&agent0, AGENT1 &&agent1, CALLBACKS &&...callbacks) {

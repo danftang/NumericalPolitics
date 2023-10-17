@@ -1,20 +1,20 @@
 //
-// Created by daniel on 26/07/23.
+// Created by daniel on 10/10/23.
 //
 
 #ifndef MULTIAGENTGOVERNMENT_CARTPOLE_H
 #define MULTIAGENTGOVERNMENT_CARTPOLE_H
 
-#include <random>
+#include <cmath>
 #include <bitset>
-#include "mlpack.hpp"
-#include "../abm/Mind.h"
+#include <random>
+#include <armadillo>
 
-// TODO: make this just take a Mind and provides a step?
-namespace tests {
-    class CartPoleEnvironment {
+#include "../Agent.h"
+
+namespace abm::bodies {
+    class CartPole {
     public:
-
         enum action_type {
             left,
             right,
@@ -22,11 +22,6 @@ namespace tests {
         };
 
         typedef std::bitset<action_type::size> action_mask;
-
-//        enum message_type {
-//            close,
-//            step
-//        };
 
         static constexpr int dimension = 4;
 
@@ -44,7 +39,7 @@ namespace tests {
          * @param thetaThresholdRadians The maximum angle.
          * @param xThreshold The maximum position.
          */
-        CartPoleEnvironment(const size_t maxSteps = 200,
+        CartPole(const size_t maxSteps = 200,
                             const double gravity = 9.8,
                             const double massCart = 1.0,
                             const double massPole = 0.1,
@@ -66,14 +61,12 @@ namespace tests {
                 thetaThresholdRadians(thetaThresholdRadians),
                 xThreshold(xThreshold),
                 successReward(successReward),
-                stepsPerformed(0) {
-            reset();
-        }
+                stepsPerformed(0) { }
 
         /**
          * Sets the state to a random start state and sets stepsPerformed to 0
          */
-        void reset() {
+        void on(const events::AgentStartEpisode<CartPole> & /* start episode event */) {
             std::uniform_real_distribution<double> rand(-0.05, 0.05);
             std::default_random_engine gen;
             position = rand(gen);
@@ -90,7 +83,7 @@ namespace tests {
          * @param action The current action.
          * @return reward, it's 1.0
          */
-        double actToReward(int action) {
+        events::Reward handleAct(int action) {
             // Update the number of steps performed.
             stepsPerformed++;
 
@@ -110,29 +103,29 @@ namespace tests {
             angle += tau * angularVelocity,
             angularVelocity += tau * thetaAcc;
             bool isEndOfEpisode = isTerminal();
-            if (isEndOfEpisode) reset();
-            return isEndOfEpisode ? 0.0 : 1.0;
+            return isEndOfEpisode ? events::Reward(std::nullopt) : events::Reward(1.0);
         }
 
-        template<class MIND>
-        int episode(MIND &mind) {
-            int nSteps = 0;
-            std::bitset<2> actionMask = 3;
-            reset();
-            double reward = 0.0;
-            do {
-                int nextAct = mind.act(*this, actionMask, 0);
-                reward = actToReward(nextAct);
-                ++nSteps;
-            } while(reward == 1.0);
-            mind.endEpisode(1.0);
-            return nSteps;
-        }
+//        template<class MIND>
+//        int episode(MIND &mind) {
+//            int nSteps = 0;
+//            reset();
+//            double reward;
+//            do {
+//                int nextAct = mind.act(*this);
+//                reward = handleAct(nextAct);
+//                ++nSteps;
+//            } while(reward == 1.0);
+////            mind.endEpisode(1.0);
+//            return nSteps;
+//        }
 
 
         operator arma::mat::fixed<4, 1>() const {
             return {position, velocity, angle, angularVelocity};
         }
+
+        static action_mask legalMoves() { return 3; }
 
         /**
          * This function checks if the cart has reached the terminal state.
@@ -140,12 +133,10 @@ namespace tests {
          * @return true if state is a terminal state, otherwise false.
          */
         bool isTerminal() const {
-//            std::cout << position << " " << angle << std::endl;
             if (maxSteps != 0 && stepsPerformed >= maxSteps) return true;
             if (std::abs(position) > xThreshold ||
                 std::abs(angle) > thetaThresholdRadians)
                 return true;
-
             return false;
         }
 
@@ -158,7 +149,7 @@ namespace tests {
         //! Set the maximum number of steps allowed.
         size_t &MaxSteps() { return maxSteps; }
 
-        friend std::ostream &operator<<(std::ostream &out, const CartPoleEnvironment &cartPole) {
+        friend std::ostream &operator<<(std::ostream &out, const CartPole &cartPole) {
             out << "{" << cartPole.position << ", " << cartPole.angle << ", " << cartPole.velocity << ", "
                 << cartPole.angularVelocity << "}";
             return out;

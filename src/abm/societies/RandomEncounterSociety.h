@@ -9,7 +9,7 @@
 #include <functional>
 
 #include "../../DeselbyStd/random.h"
-#include "../../DeselbyStd/runtimetupleutils.h"
+#include "../../DeselbyStd/tupleutils.h"
 #include "../episodes/SimpleEpisode.h"
 
 /** A society consists of a number of agents that can communicate with eachother. The object that represents

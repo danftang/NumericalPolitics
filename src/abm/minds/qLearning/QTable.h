@@ -13,12 +13,12 @@
 
 namespace abm::minds {
     template<int NSTATES, int NACTIONS, class QVALUE = ExponentiallyWeightedQValue<0.999>>
-    class QTable : public QLearningStepMixin<QTable<NSTATES,NACTIONS,QVALUE>, size_t> {
+    class QTable : public QLearningStepMixin<size_t> {
     public:
         std::array<QVector<NACTIONS, QVALUE>, NSTATES>  table;
         const double discount;     // exponential decay factor of future reward
 
-        using QLearningStepMixin<QTable<NSTATES,NACTIONS,QVALUE>, size_t>::on; // prevent our handler from hiding mixin
+        using QLearningStepMixin<size_t>::on; // prevent our handler from hiding mixin
 
 
         QTable(double discount) : discount(discount) { }

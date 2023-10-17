@@ -78,16 +78,17 @@
 
 #include "../Agent.h"
 #include "../societies/RandomEncounterSociety.h"
-#include "../QVector.h"
+#include "../minds/qLearning/QVector.h"
+#include "../minds/qLearning/GreedyPolicy.h"
 #include "../UpperConfidencePolicy.h"
 #include "ZeroIntelligence.h"
 #include "../../DeselbyStd/stlstream.h"
 #include "../episodes/SimpleEpisode.h"
 #include "../../approximators/FeedForwardNeuralNet.h"
 #include "../../approximators/Concepts.h"
-#include "../../observations/InputOutput.h"
-#include "qLearning/InheritingGreedyPolicy.h"
-#include "../../observations/ActionResponseReward.h"
+//#include "../../observations/InputOutput.h"
+//#include "../../observations/ActionResponseReward.h"
+#include "../../approximators/InputOutput.h"
 
 namespace abm::minds {
 
@@ -194,7 +195,7 @@ namespace abm::minds {
 
             action_type operator()(const BODY &);
 
-            void on(const events::OutgoingMessage<message_type,BODY> &outgoingMessage);
+            void on(const events::Act<BODY,action_type, message_type> &outgoingMessage);
             void on(const events::IncomingMessage<message_type,BODY> &incomingMessage);
             template<class AGENT1, class AGENT2>
             void on(const events::EndEpisode<AGENT1,AGENT2> &startEpisode);
@@ -216,7 +217,7 @@ namespace abm::minds {
                                             // but should be equal to other player distribution of parent.
 
         inline static const auto defaultOffTreeMind =
-                qLearning::GreedyPolicy(qLearning::explorationStrategies::NoExploration(),
+                GreedyPolicy(explorationStrategies::NoExploration(),
                                         approximators::FeedForwardNeuralNet(
                                                 {new mlpack::Linear(100),
                                                  new mlpack::ReLU(),
@@ -240,14 +241,14 @@ namespace abm::minds {
             const BODY *sampledOpponentBodyPtr = rootNode->sampleActorBodyGivenMessage(incomingMessage);
             if(sampledOpponentBodyPtr != nullptr) {
                 QVector<action_type::size> qVec = rootNode->qEntries[*sampledOpponentBodyPtr];
-                offTreeQMind.train(observations::InputOutput((const BODY &)*sampledOpponentBodyPtr, qVec.toVector()));
+                callback(approximators::events::InputOutput((const BODY &)*sampledOpponentBodyPtr, qVec.toVector()), offTreeQMind);
             }
 
             shiftRoot(incomingMessage);
         }
 
 
-        void on(const events::OutgoingMessage<message_type,BODY> &outgoingMessage) {
+        void on(const events::Act<BODY,action_type, message_type> &outgoingMessage) {
             assert(rootNode != nullptr);
             shiftRoot(outgoingMessage);
         }
@@ -588,7 +589,7 @@ namespace abm::minds {
 
     template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy> template<bool LEAVETRACE, bool DOBACKPROP>
     void    IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::SelfPlayMind<LEAVETRACE,DOBACKPROP>::
-    on(const events::OutgoingMessage<message_type,BODY> &event) {
+    on(const events::Act<message_type,BODY> &event) {
         if(isOnTree()) {
             if constexpr (DOBACKPROP) {
                 if(hasAddedQEntry)

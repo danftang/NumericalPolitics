@@ -8,7 +8,7 @@
 
 #include "mlpack.hpp"
 #include "RandomNoReplacementReplayBuffer.h"
-#include "RandomReplay.h"
+#include "RandomQStepReplay.h"
 #include "../DeselbyStd/BoundedInteger.h"
 
 namespace abm {
@@ -16,7 +16,7 @@ namespace abm {
             size_t INPUT_DIMENSION,
             size_t OUTPUT_DIMENSION,
             class network_type = mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>,
-            class replay_buffer_type = RandomReplay>
+            class replay_buffer_type = RandomQStepReplay>
     class DQN {
     public:
         static constexpr int output_dimension = OUTPUT_DIMENSION;

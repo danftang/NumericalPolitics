@@ -84,7 +84,7 @@
 #include "abm/episodes/SimpleEpisode.h"
 #include "abm/bodies/SugarSpiceTradingBody.h"
 #include "abm/DQN.h"
-#include "abm/RandomReplay.h"
+#include "abm/RandomQStepReplay.h"
 #include "abm/minds/qLearning/GreedyPolicy.h"
 
 namespace experiment5 {
@@ -169,7 +169,7 @@ namespace experiment5 {
                         abm::DQN<body_type::dimension, body_type::action_type::size>(
                                 mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(
                                         50, 25, body_type::action_type::size),
-                                abm::RandomReplay(16, 128, body_type::dimension),
+                                abm::RandomQStepReplay(16, 128, body_type::dimension),
                                 2,
                                 1.0),
                         abm::GreedyPolicy<body_type::action_type>(

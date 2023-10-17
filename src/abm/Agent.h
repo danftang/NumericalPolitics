@@ -44,17 +44,21 @@ namespace abm::events {
     struct Reward {
         double reward;
 
-        explicit Reward(const double &reward = 0.0): reward(reward) {}
-        explicit Reward(double &&reward): reward(std::move(reward)) {}
+        Reward(const double &reward = 0.0): reward(reward) {}
+        Reward(double &&reward): reward(std::move(reward)) {}
+        Reward(std::nullopt_t /* signals unset */): reward(std::numeric_limits<double>::quiet_NaN()) {}
+
+        bool has_value() { return !std::isnan(reward); }
     };
 
-    template<class T>
-    struct Action {
-        T act;
 
-        explicit Action(const T &act): act(act) {}
-        explicit Action(T &&act): act(std::move(act)) {}
-    };
+//    template<class T>
+//    struct Action {
+//        T act;
+//
+//        explicit Action(const T &act): act(act) {}
+//        explicit Action(T &&act): act(std::move(act)) {}
+//    };
 
 
     template<class MESSAGE>
@@ -65,32 +69,28 @@ namespace abm::events {
         MessageReward(MessageReward<MESSAGE> &&)=default;
     };
 
-    template<class MESSAGE, class BODY>
+    template<class BODY>
+    struct PreActBodyState {
+        BODY &body;
+        PreActBodyState(BODY &body): body(body) {}
+    };
+
+    template<class MESSAGE>
     struct IncomingMessage : MessageReward<MESSAGE> {
-        BODY &  body;     // state of body after handling message
-
-        IncomingMessage(BODY &body, MESSAGE &&message, double &&reward): MessageReward<MESSAGE>(std::move(message),std::move(reward)), body(body) {};
+        IncomingMessage(MESSAGE &&message, double &&reward): MessageReward<MESSAGE>(std::move(message),std::move(reward)) {};
     };
 
-    template<class BODY, class ACTION, class MESSAGE>
-    struct OutgoingMessage : Action<ACTION>, MessageReward<MESSAGE> {
-        BODY &body;     // state of body after sending message
+    /** Mind acts and body responds */
+    template<class ACTION, class RESPONSE>
+    struct Act : RESPONSE {
+        ACTION act;
 
-        /** generates an outgoing message in-place given a body and mind */
-//        template<class MIND>
-//        OutgoingMessage(BODY &body, MIND &mind):
-//                Action<ACTION>(mind.act(body)),
-//                MessageReward<MESSAGE>(body.handleAct(this->act)),
-//                body(body) { }
+        Act(ACTION &&act, RESPONSE &&messageReward):
+                RESPONSE(std::move(messageReward)),
+                act(std::move(act)) { }
 
-        OutgoingMessage(BODY &body, ACTION &&act, MessageReward<MESSAGE> &&messageReward):
-                Action<ACTION>(std::move(act)),
-                MessageReward<MESSAGE>(std::move(messageReward)),
-                body(body) { }
-
+        const RESPONSE &response() const { return *this; }
     };
-//    template<class BODY, class MIND>
-//    OutgoingMessage(BODY &body, MIND &mind) -> OutgoingMessage<BODY,decltype(mind.act(body)), decltype(body.handleAct(mind.act(body)).message)>;
 
 }
 
@@ -141,6 +141,14 @@ namespace abm {
     };
 
 
+    /** A body/mind monad is one where the body doesn't send any messages out or handle any
+     * incoming messages. So the communication is entirely act/reward between mind and body. */
+    template<class BODY, class MIND>
+    concept BodyMindMonad = requires(BODY body, MIND mind) {
+        { body.handleAct(mind.act(body)) } -> std::same_as<events::Reward>;
+    };
+
+
     /**
      *  An agent consists of a body and a mind.
      *  The body stores any local state, handles incoming
@@ -151,8 +159,7 @@ namespace abm {
      * @tparam BODY
      * @tparam MIND
      */
-    template<class BODY, class MIND> requires BodyMindPair<BODY,MIND>
-    class Agent {
+    template<class BODY, class MIND> class Agent {
     public:
         BODY body;
         MIND mind;
@@ -213,9 +220,21 @@ namespace abm {
          * If the episode is synchronous (e.g. rock-paper-scisors) it is called on both agents.
          * @return message that begins the episode
          */
-        message_type startEpisode() {
+        message_type startEpisode() requires BodyMindPair<BODY,MIND> {
             callback(events::AgentStartEpisode(body), mind);
-            return getNextOutMessage();
+            return getNextActEvent().message;
+        }
+
+        /** If this body/mind pair is a monad (i.e. body never sends outgoing messages) then an episode
+         * consists of act/reward between mind and body until body returns a not-a-number as reward */
+        void runEpisode() requires BodyMindMonad<BODY,MIND> {
+            callback(events::AgentStartEpisode(body), mind);
+            events::Reward reward = getNextActEvent();
+            while(reward.has_value()) {
+                callback(events::PreActBodyState(body),mind);
+                reward = getNextActEvent();
+            };
+            callback(events::AgentEndEpisode(body), mind);
         }
 
 
@@ -224,14 +243,12 @@ namespace abm {
          * @return response to incoming message. If unset, the agent has (perhaps unilaterally)
          *   ended the episode.
          */
-        template<class INMESSAGE>
+        template<class INMESSAGE> requires BodyMindPair<BODY,MIND>
         message_type handleMessage(INMESSAGE incomingMessage) {
-            events::IncomingMessage inMessageEvent(
-                    body,
-                    std::move(incomingMessage),
-                    body.handleMessage(incomingMessage));
+            events::IncomingMessage inMessageEvent(std::move(incomingMessage), body.handleMessage(incomingMessage));
             callback(inMessageEvent,mind);
-            return getNextOutMessage();
+            callback(events::PreActBodyState(body),mind);
+            return getNextActEvent().message;
         }
 
 
@@ -242,17 +259,13 @@ namespace abm {
         }
     protected:
 
-        message_type getNextOutMessage() {
+        auto getNextActEvent() {
             action_type act = mind.act(body);
-            events::OutgoingMessage outMessageEvent(body, std::move(act), body.handleAct(act));
-            callback(outMessageEvent, mind);
-            return outMessageEvent.message;
+            events::Act actEvent(std::move(act), body.handleAct(act));
+            callback(actEvent, mind);
+            return actEvent;
         }
     };
-
-
-
-
 }
 
 

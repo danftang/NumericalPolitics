@@ -21,28 +21,35 @@
 #include <valarray>
 
 namespace deselby {
+
     /** true if T is a type of the from TEMPLATE<class...> for some set of classes */
     template<class T, template<class...> class TEMPLATE>
-    struct is_class_template_of {
+    struct is_specialization_of {
         static constexpr bool value = false;
     };
 
     template<template<class...> class TEMPLATEDCLASS, class...TEMPLATES>
-    struct is_class_template_of<TEMPLATEDCLASS<TEMPLATES...>, TEMPLATEDCLASS> {
+    struct is_specialization_of<TEMPLATEDCLASS<TEMPLATES...>, TEMPLATEDCLASS> {
         static constexpr bool value = true;
     };
 
     template<template<class...> class TEMPLATEDCLASS, class...TEMPLATES>
-    struct is_class_template_of<const TEMPLATEDCLASS<TEMPLATES...>, TEMPLATEDCLASS> {
+    struct is_specialization_of<const TEMPLATEDCLASS<TEMPLATES...>, TEMPLATEDCLASS> {
         static constexpr bool value = true;
     };
 
     template<class T, template<class...> class TEMPLATE>
-    static constexpr bool is_class_template_of_v = is_class_template_of<T, TEMPLATE>::value;
+    static constexpr bool is_specialization_of_v = is_specialization_of<T, TEMPLATE>::value;
 
     template<class T, template<class...> class TEMPLATE>
-    concept IsClassTemplateOf = is_class_template_of_v<T, TEMPLATE>;
+    concept IsSpecializationOf = is_specialization_of_v<T, TEMPLATE>;
 
+//    template<class T> inline constexpr bool is_pair_v = is_specialization_of_v<T,std::pair>;
+//    template<class T> inline constexpr bool is_optional_v = is_specialization_of_v<T,std::optional>;
+//    template<class T> inline constexpr bool is_tuple_v = is_specialization_of_v<T,std::tuple>;
+
+    /** ConvertsToTemplateType is true if a type can be used to call to a function that takes that template type,
+     * templated on any templates */
     template<template<class...> class TEMPLATE, class... TS>
     TEMPLATE<TS...> is_uniquely_convertible_to_template_helper(TEMPLATE<TS...> objToTest) { return objToTest; };
 
@@ -55,12 +62,12 @@ namespace deselby {
     using ConvertsToTemplateType = decltype(is_uniquely_convertible_to_template_helper(std::declval<T>()));
 
     /** Expresses a number as a sequence of digits in a given base
- *
- * @tparam N        the number to express
- * @tparam digits   how many digits to expand
- * @tparam base     the base to use in expansion
- * @tparam suffix   an optional suffix which will be added to the end of the expansion
- */
+     *
+     * @tparam N        the number to express
+     * @tparam digits   how many digits to expand
+     * @tparam base     the base to use in expansion
+     * @tparam suffix   an optional suffix which will be added to the end of the expansion
+     */
     template<size_t N, size_t digits, size_t base, size_t...suffix>
     struct base_n_expansion : base_n_expansion<N / base, digits - 1, base, N % base, suffix...> {
     };
@@ -73,11 +80,11 @@ namespace deselby {
     template<size_t N, size_t digits, size_t base>
     using base_n_expansion_t = typename base_n_expansion<N, digits, base>::type;
 
-/** True if T is a member of OTHERS */
+    /** True if T is a member of OTHERS */
     template<class T, class... OTHERS>
     concept IsIn = (std::same_as<std::remove_cvref_t<T>, std::remove_cvref_t<OTHERS>> || ...);
 
-/** AlldifferentAndNotEmpty<class...TS> is true if all classes TS... are distinct and TS is not empty */
+    /** AlldifferentAndNotEmpty<class...TS> is true if all classes TS... are distinct and TS is not empty */
     template<class T, class...OTHERS> requires(!IsIn<T, OTHERS...>)
     struct AllDifferentHelper : AllDifferentHelper<OTHERS...> {
     };
@@ -93,7 +100,7 @@ namespace deselby {
     template<class T, class... CLASSES>
     concept AllSameAndNotEmpty = (std::same_as<T,CLASSES> && ...);
 
-/** Turns any reference into a reference_wrapper, otherwise returns the original type */
+    /** Turns any reference into a reference_wrapper, otherwise returns the original type */
     template<class T>
     using wrap_if_reference = std::conditional_t<
             std::is_reference_v<T>,
@@ -101,7 +108,7 @@ namespace deselby {
             T>;
 
 
-/** Turn a tuple type into a variant of reference_wrappers to the elements of the tuple */
+    /** Turn a tuple type into a variant of reference_wrappers to the elements of the tuple */
     template<class TUPLE>
     struct reference_variant_type;
     template<class... TELEMENTS>
@@ -116,7 +123,7 @@ namespace deselby {
     using reference_variant_type_t = typename reference_variant_type<TUPLE>::type;
 
 
-/** Turn a tuple type into a variant type with the same elements, but wrapping any referenes in reference_wrapper */
+    /** Turn a tuple type into a variant type with the same elements, but wrapping any referenes in reference_wrapper */
     template<class TUPLE>
     struct variant_type;
     template<class... TELEMENTS>
@@ -130,7 +137,7 @@ namespace deselby {
     template<class TUPLE>
     using variant_type_t = typename variant_type<TUPLE>::type;
 
-/** Provides a compile-time x^y for integer x and unsigned integer y */
+    /** Provides a compile-time x^y for integer x and unsigned integer y */
     template<std::integral T>
     consteval T powi(T base, uint index) {
         if (index == 2) return base * base;
@@ -188,23 +195,22 @@ namespace deselby {
     template<class T> inline constexpr bool is_stl_associative_container_v = is_stl_associative_container<T>::value;
 
 
-    // True if T is any kind of pair
-//    template<class T>
-//    struct is_pair: public is_class {};
-//    template<class A, class B>
-//    struct is_pair<std::pair<A,B>>: public std::true_type { };
-    template<class T> inline constexpr bool is_pair_v = is_class_template_of_v<T,std::pair>;
-    template<class T> inline constexpr bool is_optional_v = is_class_template_of_v<T,std::optional>;
-    template<class T> inline constexpr bool is_tuple_v = is_class_template_of_v<T,std::tuple>;
 
-    /** invokes a function if it is invokable, otherwise does nothing */
-//    template<auto FUNC, class... ARGS> requires requires(ARGS...args) { FUNC(args...); }   //std::is_invocable_v<FUNC, ARGS...>
-//    inline auto try_invoke(ARGS &&...args) {
-//        return std::invoke(FUNC,std::forward<ARGS>(args)...);
-//    }
-//
-//    template<auto FUNC, class... ARGS>
-//    inline void try_invoke(ARGS &&...) { }
+    /** Invokes a function if it is invokable, otherwise does nothing.
+     * N.B. the invokability of a function is defined at declaration
+     * (i.e. on the first compiler pass) so is independent of
+     * the function definition.
+     * N.B. no return value since it's better to put anything we need to
+     * do with the return value inside func.
+     */
+    template<class FUNC, class... ARGS>
+    inline void invoke_if_invocable(FUNC &&func, ARGS &&...args) { }
+
+    template<class FUNC, class... ARGS> requires std::is_invocable_v<FUNC,ARGS...>
+    inline void invoke_if_invocable(FUNC &&func, ARGS &&...args) {
+        std::invoke(std::forward<FUNC>(func), std::forward<ARGS>(args)...);
+    }
+
 //
 //    /** invokes a function if it is invokable, or else it executes an alternative with no arguments
 //     * The else function should be unconditionally executable, so any args can be lambda captured.
@@ -237,8 +243,11 @@ namespace deselby {
         return std::invoke(std::forward<FUNC>(func),std::forward<ARGS>(args)...);
     }
 
-template<class T>
+
+    /** True if T can be streamed to a std::ostream using the << operator */
+    template<class T>
     concept IsStreamable = requires(std::ostream out, T obj) { out << obj; };
+
 
     /** A simple box that allows native types (such as double) to be used as template parameters
      * which seems not to be supported (as of 2023, clang gives
@@ -251,6 +260,47 @@ template<class T>
         consteval operator const T &() const { return value; }
     };
 
+
+    /** use call_signature<T> to extract information from call signatures and function pointers */
+    namespace impl {
+        template<class SIG>
+        struct call_signature_helper {
+            static constexpr bool not_a_valid_call_signature = true;
+        };
+
+        template<class OUTPUT, class... ARGS>
+        struct call_signature_helper<OUTPUT(ARGS...)> {
+            typedef OUTPUT return_type;
+
+            template<uint N>
+            using arg_type = std::tuple_element_t<N, std::tuple<ARGS...>>;
+
+            static constexpr uint n_args = sizeof...(ARGS);
+        };
+
+        template<class OUTPUT, class... ARGS>
+        struct call_signature_helper<OUTPUT(*)(ARGS...)> {
+            typedef OUTPUT return_type;
+
+            template<uint N>
+            using arg_type = std::tuple_element_t<N, std::tuple<ARGS...>>;
+
+            static constexpr uint n_args = sizeof...(ARGS);
+        };
+
+        template<class OUTPUT, class OBJ, class... ARGS>
+        struct call_signature_helper<OUTPUT(OBJ::*)(ARGS...)> {
+            typedef OUTPUT return_type;
+            typedef OBJ containing_class_type;
+
+            template<uint N>
+            using arg_type = std::tuple_element_t<N, std::tuple<ARGS...>>;
+
+            static constexpr uint n_args = sizeof...(ARGS);
+        };
+    }
+
+    template<class T> using call_signature = impl::call_signature_helper<std::remove_cv_t<T>>;
 }
 
 #endif //POLYMORPHICCOLLECTION_TYPEUTILS_H

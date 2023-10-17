@@ -10,72 +10,55 @@
 namespace abm::events {
     template <class STATE>
     struct QLearningStep {
-        STATE *startStatePtr;
+        STATE *startStatePtr = nullptr;
         size_t action;
         double reward;
-        STATE *endStatePtr;
+        STATE *endStatePtr = nullptr;
 
-        bool isEndOfEpisode() const { return endStatePtr == nullptr; }
+        bool isEndOfEpisode() const { return startStatePtr != nullptr && endStatePtr == nullptr; }
+        bool isStartOfEpisode() const { return startStatePtr == nullptr; }
+        void setEndOfEpisode() { assert(startStatePtr != nullptr); endStatePtr = nullptr; }
     };
 }
 
 namespace abm::minds {
 
     /** Mixin class that intercepts AgentStartEpisode, OutgoingMessage, IncomingMessage and AgentEndEpisode
-     * events, and re-emits QTimestep events to PARENT
-     * PARENT should derive from this class, in the 'curiously recurring' pattern.
-     * TODO: We could allow any event handler to raise more events which are delivered only to
-     *  the single object on which the callback was originally raised. When a class passes on events
-     *  to subobjects it has the option to call the handler directly (after requiring it's there)
-     *  or using callback if it doesn't want to receive any re-raised events.
+     * events, and re-emits QTimestep events to the derived class
      */
-    template<class PARENT, class STATE> // assumes action is size_t and BODY is PARENT::arg_type
+    template<class STATE> // assumes action is size_t STATE is body state
     class QLearningStepMixin {
     public:
         typedef STATE arg_type;
 
-        events::QLearningStep<arg_type> event;
-        std::pair<arg_type,arg_type> states;
-        bool actionIsValid;
+        events::QLearningStep<arg_type> learningStepEvent;
+        std::pair<arg_type,arg_type> states;            // circular buffer for start and end states of body
 
-        void myFunc() {}
 
-        /** Setup */
-        template<class BODY>
-        void on(const events::AgentStartEpisode<BODY> &startEvent) {
-            event.startStatePtr = &states.first;
-            event.endStatePtr = &states.second;
-            states.first = startEvent.body;
-            actionIsValid = false;
+        /** Remember last act, body state and reward */
+        template<class BODY, class REEMIT>
+        void on(const events::PreActBodyState<BODY> &event, REEMIT &&reemitCallback) {
+            *learningStepEvent.endStatePtr = event.body;
+            if(!learningStepEvent.isStartOfEpisode()) {
+                callback(learningStepEvent, reemitCallback);
+            }
+            std::swap(learningStepEvent.startStatePtr, learningStepEvent.endStatePtr);
         }
 
 
         /** Remember last act, body state and reward */
-        template<class BODY, class ACTION, class MESSAGE>
-        void on(const events::OutgoingMessage<BODY, ACTION, MESSAGE> &outMessage) {
-            event.reward = outMessage.reward;
-            event.action = outMessage.act;
-            actionIsValid = true;
-        }
-
-
-        /** Learn from last call/response step */
-        template<class BODY, class MESSAGE>
-        void on(const events::IncomingMessage<MESSAGE, BODY> &inMessage) {
-            *event.endStatePtr = inMessage.body;
-            if(actionIsValid) {
-                event.reward += inMessage.reward;
-                callback(event, static_cast<PARENT &>(*this));
-            }
-            std::swap(event.startStatePtr, event.endStatePtr);
+        template<class ACTION, class MESSAGE>
+        void on(const events::Act<ACTION, MESSAGE> &actEvent) {
+            learningStepEvent.reward = actEvent.reward;
+            learningStepEvent.action = actEvent.act;
         }
 
 
         /** learn from residual reward of end-game */
-        template<class BODY>
-        void on(const events::AgentEndEpisode<BODY> & /* event */) {
-            event.endStatePtr = nullptr; // signal end of episode
-            callback(event, static_cast<PARENT &>(*this));
+        template<class BODY, HasCallback<events::QLearningStep<STATE>> DERIVED>
+        void on(const events::AgentEndEpisode<BODY> & /* event */, DERIVED && derived) {
+            learningStepEvent.setEndOfEpisode();
+            callback(learningStepEvent, derived);
         }
     };
 }

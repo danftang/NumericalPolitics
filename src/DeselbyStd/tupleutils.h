@@ -11,9 +11,48 @@
 #include <variant>
 #include <cassert>
 #include <algorithm>
+#include <utility>
 #include "typeutils.h"
 
 namespace deselby {
+
+    ///////////////////////////////////////////////////
+    // General purpose tuple functions
+    ///////////////////////////////////////////////////
+
+    /** iterate over a tuple */
+    template<class FUNCTION, class...TYPES>
+    void for_each(std::tuple<TYPES...> &tuple, FUNCTION &&func) {
+        [&tuple, f = std::forward<FUNCTION>(func)]<size_t... Indices>(std::index_sequence<Indices...>) mutable {
+            (std::forward<FUNCTION>(f)(std::get<Indices>(tuple)), ...);
+        }(std::make_index_sequence<sizeof...(TYPES)>());
+    }
+    template<class FUNCTION, class...TYPES>
+    void for_each(const std::tuple<TYPES...> &tuple, FUNCTION &&func) {
+        [&tuple, f = std::forward<FUNCTION>(func)]<size_t... Indices>(std::index_sequence<Indices...>) mutable {
+            (std::forward<FUNCTION>(f)(std::get<Indices>(tuple)), ...);
+        }(std::make_index_sequence<sizeof...(TYPES)>());
+    }
+
+    /** applies a function to each element of a tuple that function(element) would be valid */
+    template<class FUNCTION, class...TYPES>
+    void for_each_invocable(std::tuple<TYPES...> &tuple, FUNCTION &&func) {
+        [&tuple, f = std::forward<FUNCTION>(func)]<size_t... Indices>(std::index_sequence<Indices...>) mutable {
+            (invoke_if_invocable(std::forward<FUNCTION>(f),std::get<Indices>(tuple)), ...);
+        }(std::make_index_sequence<sizeof...(TYPES)>());
+    }
+    template<class FUNCTION, class...TYPES>
+    void for_each_invocabla(const std::tuple<TYPES...> &tuple, FUNCTION &&func) {
+        [&tuple, f = std::forward<FUNCTION>(func)]<size_t... Indices>(std::index_sequence<Indices...>) mutable {
+            (invoke_if_invocable(std::forward<FUNCTION>(f),std::get<Indices>(tuple)), ...);
+        }(std::make_index_sequence<sizeof...(TYPES)>());
+    }
+
+
+    ///////////////////////////////////////////////////
+    // Runtime tuple functions
+    ///////////////////////////////////////////////////
+
     template<class T>
     concept IsGettableByIndex = requires(T obj) { std::get<0>(obj); };
 
@@ -34,7 +73,7 @@ namespace deselby {
             };
         }
 
-        template<IsClassTemplateOf<std::tuple> TUPLE, class FUNCTION, size_t Arity>
+        template<IsSpecializationOf<std::tuple> TUPLE, class FUNCTION, size_t Arity>
         static constexpr auto tuple_v_table =
                 make_tuple_vtable<TUPLE, FUNCTION, Arity>(
                         std::make_index_sequence<powi(std::tuple_size_v<TUPLE>, Arity)>());
@@ -60,16 +99,6 @@ namespace deselby {
         assert(vtableIndex < (vtable::tuple_v_table<TUPLE, FUNCTION, sizeof...(INDICES)>).size());
         return (vtable::tuple_v_table<TUPLE, FUNCTION, sizeof...(INDICES)>[vtableIndex])(tuple,
                                                                                          std::forward<FUNCTION>(func));
-    }
-
-    /** iterate over a tuple */
-    template<class FUNCTION, class...TYPES>
-    void for_each(std::tuple<TYPES...> &tuple, FUNCTION &&func) {
-        (func(std::get<TYPES>(tuple)), ...);
-    }
-    template<class FUNCTION, class...TYPES>
-    void for_each(const std::tuple<TYPES...> &tuple, FUNCTION &&func) {
-        (func(std::get<TYPES>(tuple)), ...);
     }
 
 
@@ -104,21 +133,25 @@ namespace deselby {
     /** Iterates over all elements of a tuple of ranges */
     template<class FUNCTION, std::ranges::range...TYPES>
     void for_each_element(std::tuple<TYPES...> &tuple, FUNCTION &&func) {
-        (std::for_each(std::get<TYPES>(tuple).begin(), std::get<TYPES>(tuple).end(), func), ...);
+        for_each(tuple, [f = std::forward<>(func)](std::ranges::range auto & range) {
+            std::for_each(std::begin(range), std::end(range), std::forward<FUNCTION>(f));
+        });
     }
     template<class FUNCTION, std::ranges::range...TYPES>
     void for_each_element(const std::tuple<TYPES...> &tuple, FUNCTION &&func) {
-        (std::for_each(std::get<TYPES>(tuple).begin(), std::get<TYPES>(tuple).end(), func), ...);
+        for_each(tuple, [f = std::forward<>(func)](std::ranges::range auto & range) {
+            std::for_each(std::begin(range), std::end(range), std::forward<FUNCTION>(f));
+        });
     }
 
     /** Compile-time typed get of an element from a range in a tuple */
     template<size_t TUPLEINDEX, std::ranges::range...TYPES>
     auto get(std::tuple<TYPES...> &tuple, size_t elementIndex) {
-        return *(std::get<TUPLEINDEX>(tuple).begin() + elementIndex);
+        return *(std::begin(std::get<TUPLEINDEX>(tuple)) + elementIndex);
     }
     template<size_t TUPLEINDEX, std::ranges::range...TYPES>
     auto get(const std::tuple<TYPES...> &tuple, size_t elementIndex) {
-        return *(std::get<TUPLEINDEX>(tuple).begin() + elementIndex);
+        return *(std::begin(std::get<TUPLEINDEX>(tuple)) + elementIndex);
     }
 
     struct ElementID {

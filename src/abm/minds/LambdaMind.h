@@ -15,7 +15,7 @@ namespace abm::minds {
 
         LambdaMind(LAMBDA function): function(std::move(function)) {}
 
-        template<class BODY>
+        template<class BODY> requires std::is_invocable_v<LAMBDA,BODY>
         auto act(BODY &&body) {
             return function(std::forward<BODY>(body));
         }

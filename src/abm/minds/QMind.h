@@ -8,16 +8,6 @@
 #include <bitset>
 #include <optional>
 
-//namespace abm::events {
-//    template<class STATE>
-//    struct QLearningStep {
-//        STATE startState;
-//        size_t action;
-//        double reward;
-//        STATE endState;
-//    };
-//}
-
 namespace abm::minds {
 
     /** A QMind is just a QFunction with a policy to create an act(body) function

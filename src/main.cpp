@@ -11,11 +11,11 @@
 #include "abm/PingPongAgent.h"
 
 #include "tests/PrisonersDilemma.h"
-
 //#include "tests/tests.h"
 //#include "tests/mlpacktests.cpp"
-//#include "tests/DQNtest.cpp"
+#include "tests/DQNtest.cpp"
 //#include "tests/IncompleteInformationMCTSTest.cpp"
+#include "tests/FNN.h"
 
 #include "abm/societies/RandomEncounterSociety.h"
 
@@ -37,7 +37,8 @@ int main() {
 //    abm::societies::RandomEncounterSociety mySociety(abm::PingPongAgent{}, abm::PingPongAgent{});
 //    mySociety.run(2, abm::callbacks::Verbose());
 //    tests::zeroIntelligencePrisonersDilemma();
-    tests::tabularQMindPrisonersDilemma();
+//    tests::tabularQMindPrisonersDilemma();
+    tests::testFNN();
 
     return 0;
 }

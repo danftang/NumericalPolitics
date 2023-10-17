@@ -2,18 +2,18 @@
 // Created by daniel on 25/07/23.
 //
 
-#ifndef MULTIAGENTGOVERNMENT_RANDOMREPLAY_H
-#define MULTIAGENTGOVERNMENT_RANDOMREPLAY_H
+#ifndef MULTIAGENTGOVERNMENT_RANDOMQSTEPREPLAY_H
+#define MULTIAGENTGOVERNMENT_RANDOMQSTEPREPLAY_H
 
 #include "mlpack.hpp"
 
 namespace abm {
-    class RandomReplay {
+    class RandomQStepReplay {
     public:
         typedef arma::mat StateType;
         typedef int ActionType;
 
-        RandomReplay() :
+        RandomQStepReplay() :
                 batchSize(0),
                 capacity(0),
                 position(0),
@@ -29,9 +29,9 @@ namespace abm {
          * @param nSteps Number of steps to look in the future.
          * @param dimension The dimension of an encoded state.
          */
-        RandomReplay(const size_t batchSize,
-                     const size_t capacity,
-                     const size_t state_dimension
+        RandomQStepReplay(const size_t batchSize,
+                          const size_t capacity,
+                          const size_t state_dimension
         ) :
                 batchSize(batchSize),
                 capacity(capacity),
@@ -162,4 +162,4 @@ namespace abm {
     };
 }
 
-#endif //MULTIAGENTGOVERNMENT_RANDOMREPLAY_H
+#endif //MULTIAGENTGOVERNMENT_RANDOMQSTEPREPLAY_H

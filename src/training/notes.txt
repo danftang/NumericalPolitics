@@ -1,0 +1,46 @@
+A Training module is an object that is to be inherited from to provide event handlers for a parameterised approximator.
+On training, it provides a term for the final objective.
+The final objective should be able to generate a set of N input points on which the objective is calculated, and a
+gradient, dObj_dOutput, of the objective in function-output^N space.
+If the observations are independent, this will be a sum of the (log-prob) losses of the individual events.
+
+From a Bayesian perspective, we have a set of events (observations) (E_1...E_m), a set of points in input space (X_1...X_n) and a Bayesian probability P(F(B,X_1...X_n) = Y_1...Y_n | E_1...Em). Where B are the parameters of the function
+
+Let the Loss be L(B, X_1...X_n, Y_1...Y_n | E_1...E_m) = -ln(P(F(B, X_1...X_n) = Y_1...Y_n | E_1...Em)) and we wish to find
+
+min_B (L(B, X_1...X_n, Y_1...Y_n | E_1...E_m))
+
+When there are independence relations between observations, the posterior will factorize
+P(F(B,X_1...X_n) = Y_1...Y_n | E_1...Em) = \prod P(F(B,X_i) = Y_i | E_i)
+so that the loss is the sum over log probs.
+
+Programmatically, we split the observations into types, so we have a set of modules, each representing all the observations of a given type. We assume the observations in a module are independent of those in the other modules. A module, then, must implement:
+
+size()            - the number of observations the module represents.
+[setBatchSize(n) ? allows the module to itself be a loss function, or we distinguish between separable and inseperable loss functions ]
+trainingBatch(n)  - a loss function for n of the observations consisting of
+                        * a set of inputs, X (need a calling convention that these are put in a particular memory location)
+                        * a log-prob loss in output space Y=F(X)
+                        * a gradient of the loss in the output space Y.
+                        * dimension() - the number of inputs for the batch [ per observation? ]
+
+For a given module, we'll often want to have a random replay buffer. Which will be a FIFO that stores observations. If each observation conform to
+the loss concept:
+    * inputs() - the set of inputs upon which this observation depends
+    * loss in output space
+    * gradient of loss in output space
+    * dimension() - the number of inputs [ probably static? ]
+then the replay buffer can be implemented as a template on the concept.
+
+A sum-of-modules can also be templated on a pack of modules, and is itself a loss function.
+
+Once we have the loss function for all observations, we can connect this to a parameterised function to make an objective function which
+gives a set of parameters and a gradient in parameter space [or a trainable function that gives an objective function and a function operator].
+This can be sent to an optimiser to train the funciton, or we can connect this to an optimising step function and a strategy on when to do the step and we have a self-learning function
+
+So:
+
+A self-learning function consists of a trainable function, an update step and a function from nextEvent to bool doTrainingStep
+a trainable function consists of a parameterised function (with a multiplyBydB_dY function) and a loss function to give a function with a gradient in parameter space
+a loss function consists of a set of event handlers and the interface described above.
+
