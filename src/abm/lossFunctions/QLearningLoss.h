@@ -8,65 +8,115 @@
 #include <armadillo>
 #include "../minds/qLearning/QLearningStepMixin.h"
 
+
 namespace abm::lossFunctions {
-    template<class ENDSTATEPREDICTOR>
+    template<approximators::ParameterisedFunction ENDSTATEPREDICTOR>
     class QLearningLoss {
     public:
         // the buffer...
-        arma::mat startStates;
+        arma::mat stateHistory;
+        arma::Row<char> isEndEpisode;
         arma::urowvec actionIndices;
         arma::rowvec rewards;
-        arma::mat endStates;
         size_t insertCol;
         ENDSTATEPREDICTOR endStatePredictor; // a function from end state to qVector
+        size_t endStateParameterUpdateInterval;
+        uint nParameterUpdates;
         double discount;
+        bool bufferIsFull;
 
         arma::ucolvec batchCols;     // columns of the buffer in the current batch
 
 
-        QLearningLoss(size_t bufferSize, size_t stateSize, size_t batchSize, double discount, ENDSTATEPREDICTOR endStatePredictor) :
-                startStates(stateSize, bufferSize),
+        QLearningLoss(size_t bufferSize, size_t stateSize, size_t batchSize, double discount, ENDSTATEPREDICTOR endStatePredictor, size_t endStateParameterUpdateInterval) :
+                stateHistory(stateSize, bufferSize),
                 actionIndices(bufferSize),
                 rewards(bufferSize),
-                endStates(stateSize, bufferSize),
-                insertCol(0),
+                insertCol(-1),
                 batchCols(batchSize),
                 endStatePredictor(std::move(endStatePredictor)),
-                discount(discount) {
+                endStateParameterUpdateInterval(endStateParameterUpdateInterval),
+                nParameterUpdates(0),
+                discount(discount),
+                bufferIsFull(false) {
         }
 
+
+        /** Remember last act, body state and reward */
+        template<class BODY>
+        void on(const events::PreActBodyState<BODY> &event) {
+            if(++insertCol >= bufferSize()) {
+                bufferIsFull = true;
+                insertCol = 0;
+            }
+            isEndEpisode(insertCol) = 0;
+            stateHistory.col(insertCol) = event.body.asMat();
+        }
+
+
+        /** Remember last act, body state and reward */
+        template<class ACTION, class MESSAGE>
+        void on(const events::Act<ACTION, MESSAGE> &actEvent) {
+            rewards(insertCol) = actEvent.reward;
+            actionIndices(insertCol) = actEvent.act;
+        }
+
+
+        /** learn from residual reward of end-game */
+        template<class BODY>
+        void on(const events::AgentEndEpisode<BODY> & /* event */) {
+            isEndEpisode(insertCol) = 1;
+        }
+
+
+        template<class PARAMS>
+        void on(const events::ParameterUpdate<PARAMS> & event) {
+            if(++nParameterUpdates % endStateParameterUpdateInterval == 0) {
+                endStatePredictor.parameters() = event.parameters;
+            }
+        }
+
+        size_t nPoints() { return batchCols.n_rows; }
 
         template<class INPUTS>
         void trainingSet(INPUTS &trainingPoints) {
-            batchCols = arma::randi<arma::ucolvec>(batchCols.n_rows,arma::distr_param(0, bufferSize()-1));
-            trainingPoints = startStates.cols(batchCols);
+            assert(bufferIsFull || insertCol > 0);
+            if(bufferIsFull) {
+                batchCols = arma::randi<arma::ucolvec>(batchCols.n_rows, arma::distr_param(1, bufferSize() - 1)).transform(
+                        [insertCol = insertCol, buffSize = bufferSize()](auto i) {
+                            return (i + insertCol) % buffSize;
+                        });
+            } else {
+                batchCols = arma::randi<arma::ucolvec>(batchCols.n_rows, arma::distr_param(0, insertCol-1));
+            }
+            trainingPoints = stateHistory.cols(batchCols);
         }
+
 
         template<class OUTPUTS, class RESULT>
         void gradientByPrediction(const OUTPUTS &predictions, RESULT &gradient) {
             size_t nActions = predictions.n_rows;
             auto batchedActions = actionIndices.cols(batchCols);
             arma::urowvec batchActionElementIds = batchCols.t()*nActions + batchedActions;
-            auto endStateQVals = endStatePredictor(endStates.cols(batchCols)).elem(batchActionElementIds);
+            auto batchEndStates = stateHistory.cols(batchCols.transform([buffSize = bufferSize()](auto i) { return (i + 1) % buffSize; }));
+            auto endStateQVals = endStatePredictor(batchEndStates).elem(batchActionElementIds);
             gradient.zeros();
-            gradient.elem(batchActionElementIds) = predictions.elem(batchActionElementIds) - rewards(batchCols) - endStateQVals * discount;
+
+            gradient.elem(batchActionElementIds) =
+                    predictions.elem(batchActionElementIds)
+                    - rewards(batchCols)
+                    - endStateQVals %
+                        isEndEpisode
+                            .transform([discount = discount](bool isEnd) {
+                                return isEnd?0.0:discount;
+                            })
+                            .cols(batchCols);
         }
 
 
-        template<class STATE>
-        void on(const events::QLearningStep<STATE> &event) {
-            startStates.col(insertCol) = *event.startStatePtr;
-            actionIndices(insertCol) = event.action;
-            rewards(insertCol) = event.reward;
-            endStates(insertCol) = *event.endStatePtr;
-            insertCol = (insertCol+1)%bufferSize();
-        }
+        size_t bufferSize() const { return stateHistory.n_cols; }
 
-        size_t bufferSize() const {
-            return startStates.n_cols;
-        }
-
-
+    protected:
     };
 }
 

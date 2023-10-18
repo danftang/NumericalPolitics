@@ -209,15 +209,21 @@ namespace abm::approximators {
     ////////  A loss function is a set of inputs and an Output layer,
     /// a stochastic loss function is a generator of loss functions (or a loss function with a sample() member)
 
+//    template<class T>
+//    concept StochasticLossFunction = requires(T obj) {
+//        { obj.getNextLossFunction() } -> LossFunction;
+//        obj.setSampleRatio();   // sets the size of a batch as a fraction of the buffer size. (or set batch size?)
+//    };
+
+    /** */
     template<class T>
-    concept StochasticLossFunction = requires(T obj) {
-        { obj.getNextLossFunction() } -> LossFunction;
-        obj.setSampleRatio();   // sets the size of a batch as a fraction of the buffer size. (or set batch size?)
+    concept ParameterisedFunction = requires(T obj) {
+        { obj.parameters() } -> std::same_as<arma::mat &>;
     };
 
     /** */
     template<class T, class LOSSFUNCTION>
-    concept ParameterisedFunction = requires(T obj, LOSSFUNCTION loss) {
+    concept DifferentiableParameterisedFunction = requires(T obj, LOSSFUNCTION loss) {
         { obj.parameters() } -> std::same_as<arma::mat &>;
         { obj.gradientByParams(loss) } -> std::same_as<arma::mat>;
     };

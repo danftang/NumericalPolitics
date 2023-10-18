@@ -394,7 +394,7 @@ namespace abm::minds {
         std::vector<double>         cumulativeWeights;
         std::vector<const BODY *>   states;
         for(const auto &[body, qVec]: qEntries) {
-            action_type maxQAct = qLearning::sampleMaxQ(qEntries, body.legalMoves());
+            action_type maxQAct = sampleMaxQ(qEntries, body.legalActs());
             double w = body.actToMessageProb(maxQAct, actorMessage);
             totalWeight += w;
             cumulativeWeights.push_back(totalWeight);

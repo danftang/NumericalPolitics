@@ -23,7 +23,6 @@
 #include "Body.h"
 #include "Mind.h"
 #include "CallbackUtils.h"
-#include "episodes/SimpleEpisode.h"
 
 namespace abm::events {
 
@@ -136,7 +135,7 @@ namespace abm::callbacks {
 namespace abm {
     template<class BODY, class MIND>
     concept BodyMindPair = requires(BODY body, MIND mind) {
-        { body.handleAct(mind.act(body)) } -> deselby::IsClassTemplateOf<events::MessageReward>;
+        { body.handleAct(mind.act(body)) } -> deselby::IsSpecializationOf<events::MessageReward>;
         // and handleMessage(.) on some type of incoming message, depending on which agent it is paired with
     };
 
@@ -169,7 +168,7 @@ namespace abm {
 
         // This design implies single action and message types
         typedef decltype(mind.act(body)) action_type;
-        typedef decltype(body.handleAct(std::declval<action_type>()).message) message_type;
+//        typedef decltype(body.handleAct(std::declval<action_type>()).message) message_type;
 //        typedef events::OutgoingMessage<BODY,action_type, message_type> outgoing_message_type;
 
         /**
@@ -220,21 +219,22 @@ namespace abm {
          * If the episode is synchronous (e.g. rock-paper-scisors) it is called on both agents.
          * @return message that begins the episode
          */
-        message_type startEpisode() requires BodyMindPair<BODY,MIND> {
+        auto startEpisode() requires BodyMindPair<BODY,MIND> {
             callback(events::AgentStartEpisode(body), mind);
             return getNextActEvent().message;
         }
 
         /** If this body/mind pair is a monad (i.e. body never sends outgoing messages) then an episode
          * consists of act/reward between mind and body until body returns a not-a-number as reward */
-        void runEpisode() requires BodyMindMonad<BODY,MIND> {
-            callback(events::AgentStartEpisode(body), mind);
+         template<class... CALLBACKS>
+        void runEpisode(CALLBACKS &&... callbacks) requires BodyMindMonad<BODY,MIND> {
+            callback(events::AgentStartEpisode(body), mind, callbacks...);
             events::Reward reward = getNextActEvent();
             while(reward.has_value()) {
-                callback(events::PreActBodyState(body),mind);
+                callback(events::PreActBodyState(body),mind, callbacks...);
                 reward = getNextActEvent();
             };
-            callback(events::AgentEndEpisode(body), mind);
+            callback(events::AgentEndEpisode(body), mind, callbacks...);
         }
 
 
@@ -244,7 +244,7 @@ namespace abm {
          *   ended the episode.
          */
         template<class INMESSAGE> requires BodyMindPair<BODY,MIND>
-        message_type handleMessage(INMESSAGE incomingMessage) {
+        auto handleMessage(INMESSAGE incomingMessage) {
             events::IncomingMessage inMessageEvent(std::move(incomingMessage), body.handleMessage(incomingMessage));
             callback(inMessageEvent,mind);
             callback(events::PreActBodyState(body),mind);

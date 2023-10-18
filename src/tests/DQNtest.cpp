@@ -10,6 +10,8 @@
 #include "mlpack.hpp"
 #include "../abm/approximators/AdaptiveFunction.h"
 #include "../abm/approximators/FNN.h"
+#include "../abm/lossFunctions/QLearningLoss.h"
+#include "../abm/bodies/CartPole.h"
 
 namespace tests {
     void DQNCartPole() {
@@ -43,10 +45,38 @@ namespace tests {
 //        }
 //        std::cout << "Learned to balance a pole in " << episodes << " episodes" << std::endl;
 
-        using namespace abm::approximators;
+        using namespace abm;
 
-        FNN fnn(20, new mlpack::Linear(20));
-        DifferentiableOptimisableFunction net(fnn, ens::AdamUpdate(), 0.001);
+        const size_t bufferSize = 100000;
+        const size_t batchSize = 64;
+        const double discount = 1.0;
+        const size_t endSatateFnnUpdateInterval = 5;
+
+        approximators::FNN fnn(abm::bodies::CartPole::dimension,
+                mlpack::Linear(100),
+                mlpack::ReLU(),
+                mlpack::Linear(50),
+                mlpack::ReLU(),
+                mlpack::Linear(abm::bodies::CartPole::action_type::size)
+                );
+        lossFunctions::QLearningLoss loss(bufferSize, abm::bodies::CartPole::dimension, batchSize,
+                                          discount, fnn, endSatateFnnUpdateInterval);
+        auto trainEveryStep = []<class BODY>(const events::PreActBodyState<BODY> & /* event */) { return true; };
+        auto mind = abm::minds::QMind(
+                approximators::AdaptiveFunction(
+                        approximators::DifferentiableOptimisableFunction(
+                                std::move(fnn),
+                                ens::AdamUpdate(),
+                                0.001),
+                        std::move(loss),
+                        trainEveryStep
+                        ),
+                abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(0.5,50000,0.01))
+                );
+
+        abm::Agent agent(abm::bodies::CartPole(), mind);
+
+        agent.runEpisode();
     }
 }
 

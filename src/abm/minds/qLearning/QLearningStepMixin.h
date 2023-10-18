@@ -10,10 +10,10 @@
 namespace abm::events {
     template <class STATE>
     struct QLearningStep {
-        STATE *startStatePtr = nullptr;
+        STATE * startStatePtr = nullptr;
         size_t action;
         double reward;
-        STATE *endStatePtr = nullptr;
+        STATE * endStatePtr = nullptr;
 
         bool isEndOfEpisode() const { return startStatePtr != nullptr && endStatePtr == nullptr; }
         bool isStartOfEpisode() const { return startStatePtr == nullptr; }

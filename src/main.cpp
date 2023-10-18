@@ -15,9 +15,9 @@
 //#include "tests/mlpacktests.cpp"
 #include "tests/DQNtest.cpp"
 //#include "tests/IncompleteInformationMCTSTest.cpp"
-#include "tests/FNN.h"
+//#include "tests/FNN.h"
 
-#include "abm/societies/RandomEncounterSociety.h"
+//#include "abm/societies/RandomEncounterSociety.h"
 
 int main() {
 //  --- EXPERIMENTS
@@ -38,7 +38,10 @@ int main() {
 //    mySociety.run(2, abm::callbacks::Verbose());
 //    tests::zeroIntelligencePrisonersDilemma();
 //    tests::tabularQMindPrisonersDilemma();
-    tests::testFNN();
+
+//    tests::testFNN();
+    tests::DQNCartPole();
+
 
     return 0;
 }

@@ -122,10 +122,15 @@ namespace abm::bodies {
 
 
         operator arma::mat::fixed<4, 1>() const {
+            return asMat();
+        }
+
+        arma::mat::fixed<4, 1> asMat() const {
             return {position, velocity, angle, angularVelocity};
         }
 
-        static action_mask legalMoves() { return 3; }
+
+        static action_mask legalActs() { return 3; }
 
         /**
          * This function checks if the cart has reached the terminal state.

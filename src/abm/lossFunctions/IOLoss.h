@@ -18,25 +18,11 @@ namespace abm::lossFunctions {
 
         arma::ucolvec batchCols;
 
+
         IOLoss(size_t bufferSize, size_t inputSize, size_t outputSize, size_t batchSize) :
                 inputs(inputSize, bufferSize),
                 outputs(outputSize, bufferSize),
                 batchCols(batchSize) {
-        }
-
-        template<class INPUTS>
-        void trainingSet(INPUTS &trainingPoints) {
-            batchCols = arma::randi<arma::ucolvec>(batchCols.n_rows, arma::distr_param(0, bufferSize() - 1));
-            trainingPoints = inputs.cols(batchCols);
-        }
-
-        template<class OUTPUTS, class RESULT>
-        void gradientByPrediction(const OUTPUTS &predictions, RESULT &gradient) {
-            gradient = predictions - outputs.cols(batchCols);
-        }
-
-        size_t bufferSize() const {
-            return inputs.n_cols;
         }
 
 
@@ -45,6 +31,22 @@ namespace abm::lossFunctions {
             inputs.col(insertCol) = event.input;
             outputs.col(insertCol) = event.output;
             insertCol = (insertCol + 1)%bufferSize();
+        }
+
+
+        size_t bufferSize() const { return inputs.n_cols; }
+
+
+        template<class INPUTS>
+        void trainingSet(INPUTS &trainingPoints) {
+            batchCols = arma::randi<arma::ucolvec>(batchCols.n_rows, arma::distr_param(0, bufferSize() - 1));
+            trainingPoints = inputs.cols(batchCols);
+        }
+
+
+        template<class OUTPUTS, class RESULT>
+        void gradientByPrediction(const OUTPUTS &predictions, RESULT &gradient) {
+            gradient = predictions - outputs.cols(batchCols);
         }
     };
 }

@@ -67,7 +67,7 @@ namespace abm::callbacks {
             std::cout << "------- Ending episode -------" << std::endl;
         }
 
-        // TODO: handle more message types...
+        // TODO: handle more message types...or make messages able to print themselves.
     };
 
     class MessageCounter {
@@ -183,6 +183,13 @@ namespace abm::episodes {
     template<class AGENT0, class AGENT1, class... CALLBACKS>
     inline void runSync(AGENT0 &&agent0, AGENT1 &&agent1, CALLBACKS &&...callbacks) {
         Runner(std::forward<AGENT0>(agent0), std::forward<AGENT1>(agent1), std::forward<CALLBACKS>(callbacks)...).runSync();
+    }
+
+    /** If this body/mind pair is a monad (i.e. body never sends outgoing messages) then the
+     * agent can run a complete episode on its own */
+    template<class AGENT, class... CALLBACKS>
+    inline void runEpisode(AGENT &&agent, CALLBACKS &&... callbacks) {
+        agent.runEpisode(callbacks...);
     }
 }
 

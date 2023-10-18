@@ -9,36 +9,54 @@
 #include "Concepts.h"
 #include "../CallbackUtils.h"
 
+namespace abm::events {
+    template<class PARAM>
+    struct ParameterUpdate {
+        const PARAM &parameters;
+
+        ParameterUpdate(const PARAM &params): parameters(params) {}
+    };
+}
+
 namespace abm::approximators {
 
-    template<StochasticLossFunction STOCHASTICLOSSFUNCTION, OptimisableFunction<STOCHASTICLOSSFUNCTION> APPROXIMATOR, class TRAININGPOLICY>
+    /** A function that intercepts events and adapts to those events.
+     * An instance of this class is the joining together of three objects:
+     *   - A parameterised object that can update its own parameters given a LossFunction
+     *   - A LossFunction describing a loss in the space of all functions
+     *   - A training policy that defines when parameter updates should occur.
+     */
+    template<LossFunction LOSSFUNCTION, OptimisableFunction<LOSSFUNCTION> APPROXIMATOR, class TRAININGPOLICY>
+//    template<LossFunction LOSSFUNCTION, class APPROXIMATOR, class TRAININGPOLICY>
     class AdaptiveFunction : public APPROXIMATOR {
     public:
-        STOCHASTICLOSSFUNCTION  stochasticLossFunction;
-        TRAININGPOLICY          trainingPolicy;
+        LOSSFUNCTION    lossFunction;
+        TRAININGPOLICY  trainingPolicy;
 
 
-        AdaptiveFunction(APPROXIMATOR approximator, STOCHASTICLOSSFUNCTION stochasticLossFunction, TRAININGPOLICY trainingPolicy):
-            APPROXIMATOR(approximator),
-            stochasticLossFunction(std::move(stochasticLossFunction)),
-            trainingPolicy(std::move(trainingPolicy))
-        {
-        }
+        AdaptiveFunction(APPROXIMATOR approximator, LOSSFUNCTION lossFunction, TRAININGPOLICY trainingPolicy):
+                APPROXIMATOR(approximator),
+                lossFunction(std::move(lossFunction)),
+                trainingPolicy(std::move(trainingPolicy))
+        { }
 
-        template<class EVENT> requires HasCallback<STOCHASTICLOSSFUNCTION,EVENT> || std::is_invocable_v<TRAININGPOLICY,EVENT>
+
+        template<class EVENT> requires HasCallback<LOSSFUNCTION,EVENT> || std::is_invocable_v<TRAININGPOLICY,EVENT>
         void on(const EVENT &event) {
-            abm::callback(event, stochasticLossFunction);
+            callback(event, lossFunction);
             deselby::constexpr_if<std::is_invocable_v<TRAININGPOLICY,EVENT>>(
                     [&event, this](auto &policy) {
-                        if(policy(event)) this->updateParameters(stochasticLossFunction.getNextLossFunction());
-
+                        if(policy(event)) {
+                            this->updateParameters(lossFunction);
+                            callback(events::ParameterUpdate(this->parameters()), lossFunction);
+                        }
                     }, trainingPolicy);
         }
-
-        // TODO: Should the function be able to
     };
 
 
+    /** A parameterised function and an update step, giving rise to an OptimisableFunction that can update
+     * its parameters given a LossFunction */
     template<class UPDATESTEP, class APPROXIMATOR>
     class DifferentiableOptimisableFunction: public APPROXIMATOR {
     public:
@@ -55,9 +73,9 @@ namespace abm::approximators {
         stepSize(stepSize) {
         }
 
-        template<LossFunction LOSS> requires ParameterisedFunction<APPROXIMATOR,LOSS>
+        template<LossFunction LOSS> requires DifferentiableParameterisedFunction<APPROXIMATOR,LOSS>
         void updateParameters(LOSS &loss) {
-            updatePolicy.Update(this->parameters(), stepSize, this->parameterGradient(loss));
+            updatePolicy.Update(this->parameters(), stepSize, this->gradientByParams(loss));
         }
     };
 }

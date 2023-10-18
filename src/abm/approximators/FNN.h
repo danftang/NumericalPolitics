@@ -21,8 +21,8 @@ namespace abm::approximators {
 
 
         template<InitializationRule INITRULE, class... LAYERS>
-        FNN(size_t inputDimensions, INITRULE initializeRule, LAYERS... layers) {
-            (network.Add(layers), ... );
+        FNN(size_t inputDimensions, INITRULE initializeRule, LAYERS &&... layers) {
+            (network.Add(new std::remove_cvref_t<LAYERS>(std::forward<LAYERS>(layers))), ... );
             // set dimensionality
             network.InputDimensions() = {inputDimensions};
             network.ComputeOutputDimensions();
@@ -54,7 +54,7 @@ namespace abm::approximators {
         template<LossFunction LOSS>
         MatType gradientByParams(LOSS &&loss) {
             MatType inputs(loss.nPoints(),1);
-            loss.inputs(inputs);
+            loss.trainingSet(inputs);
 
             // Ensure the inputs are of the right dimension
             assert(inputs.n_rows == network.InputDimensions()[0]);
@@ -62,26 +62,26 @@ namespace abm::approximators {
             network.Training() = true;
 
             // Forward pass, storing outputs in Y
-            MatType Y; // Y = F(input)
-            Y.set_size(network.OutputSize(), inputs.n_cols);
-            network.Forward(inputs, Y);
+            MatType prediction; // Prediction = F(input)
+            prediction.set_size(network.OutputSize(), inputs.n_cols);
+            network.Forward(inputs, prediction);
 
             // calculate gradient of loss in output space
-            MatType dObj_dY(loss.nPoints(),1);
-            loss.gradientByOutputs(Y, dObj_dY);
+            MatType dLoss_dPred(loss.nPoints(), 1);
+            loss.gradientByPrediction(prediction, dLoss_dPred);
 
             // Perform the back prop with the gradients in output space
             {
                 MatType dObj_dinputs; // not used.
-                network.Backward(Y, dObj_dY, dObj_dinputs);
+                network.Backward(prediction, dLoss_dPred, dObj_dinputs);
             }
             // Now compute the gradients in parameter space.
             // The gradient should have the same size as the params.
-            MatType dObj_dParams;
-            dObj_dParams.set_size(this->params.n_rows, this->params.n_cols);
-            network.Gradient(inputs, dObj_dY, dObj_dParams);
+            MatType dLoss_dParams;
+            dLoss_dParams.set_size(this->params.n_rows, this->params.n_cols);
+            network.Gradient(inputs, dLoss_dPred, dLoss_dParams);
 
-            return dObj_dParams;
+            return dLoss_dParams;
         }
 
 

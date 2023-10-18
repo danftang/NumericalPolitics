@@ -11,13 +11,13 @@ namespace tests {
 
 
     void testFNN() {
-        abm::approximators::FNN myFNN(2, mlpack::ConstInitialization(2.0), new mlpack::Linear(2));
+        abm::approximators::FNN myFNN(2, mlpack::ConstInitialization(2.0), mlpack::Linear(2));
 
         class MyLossFunction {
         public:
             static constexpr size_t nPoints() { return 2; }
-            void inputs(arma::mat &in) { in = arma::mat{1.0,2.0}.t(); }
-            void gradientByOutputs(arma::mat &y, arma::mat &grad) { grad = arma::mat{1.0,1.0}.t(); }
+            void trainingSet(arma::mat &in) { in = arma::mat{1.0,2.0}.t(); }
+            void gradientByPrediction(arma::mat &y, arma::mat &grad) { grad = arma::mat{1.0,1.0}.t(); }
         };
 
 
