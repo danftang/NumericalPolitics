@@ -59,17 +59,29 @@ namespace tests {
                 mlpack::ReLU(),
                 mlpack::Linear(abm::bodies::CartPole::action_type::size)
                 );
-        lossFunctions::QLearningLoss loss(bufferSize, abm::bodies::CartPole::dimension, batchSize,
-                                          discount, fnn, endSatateFnnUpdateInterval);
+
         auto trainEveryStep = []<class BODY>(const events::PreActBodyState<BODY> & /* event */) { return true; };
+
+        approximators::DifferentialTrainingPolicy trainingPolicy(
+                ens::AdamUpdate(),
+                0.001,
+                fnn.parameters().n_rows,
+                fnn.parameters().n_cols,
+                trainEveryStep);
+
+        lossFunctions::QLearningLoss loss(
+                bufferSize,
+                abm::bodies::CartPole::dimension,
+                batchSize,
+                discount,
+                fnn,
+                endSatateFnnUpdateInterval);
+
         auto mind = abm::minds::QMind(
                 approximators::AdaptiveFunction(
-                        approximators::DifferentiableOptimisableFunction(
-                                std::move(fnn),
-                                ens::AdamUpdate(),
-                                0.001),
-                        std::move(loss),
-                        trainEveryStep
+                        std::move(fnn),
+                        std::move(trainingPolicy),
+                        std::move(loss)
                         ),
                 abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(0.5,50000,0.01))
                 );

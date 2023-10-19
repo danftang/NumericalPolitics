@@ -242,10 +242,10 @@ namespace abm::approximators {
 //    };
 
 //    /** For use with a trainable function */
-    template<class T, class EVENT>
-    concept TrainingPolicy = requires(T obj, const EVENT &event) {
-        { obj(event) } -> std::same_as<bool>; // true if we should execute a training step
-    };
+//    template<class T, class EVENT>
+//    concept TrainingSchedule = requires(T obj, const EVENT &event) {
+//        { obj(event) } -> std::same_as<bool>; // true if we should execute a training step
+//    };
 //
 //    template<class T>
 //    concept OptimisationStep = requires(T obj) {

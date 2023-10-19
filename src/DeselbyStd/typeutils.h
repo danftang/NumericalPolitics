@@ -197,46 +197,92 @@ namespace deselby {
 
 
     /** Invokes a function if it is invokable, otherwise does nothing.
-     * N.B. the invokability of a function is defined at declaration
-     * (i.e. on the first compiler pass) so is independent of
-     * the function definition.
-     * N.B. no return value since it's better to put anything we need to
-     * do with the return value inside func.
+     *
+     * If you want a return value, use invoke_or to specify a default return value
+     * if func is not invokable. (N.B. the return type must be known at compile time.
+     * If the return type is dependent on the argument types, either deal with the results
+     * inside func or return a std::variant).
+     *
+     * N.B. a function is invocable if its declaration type requirements are met on the
+     * first compiler pass, so cannot be used to filter compilability of the function
+     * definition by type. Use constexpr_if or add 'requires' clause to the declaration
+     * instead.
      */
     template<class FUNC, class... ARGS>
-    inline void invoke_if_invocable(FUNC &&func, ARGS &&...args) { }
+    inline void invoke_if_invocable(FUNC && /* func */, ARGS &&... /* args */) { }
 
     template<class FUNC, class... ARGS> requires std::is_invocable_v<FUNC,ARGS...>
     inline void invoke_if_invocable(FUNC &&func, ARGS &&...args) {
         std::invoke(std::forward<FUNC>(func), std::forward<ARGS>(args)...);
     }
 
+    /** Invokes a function if it is invocable, returning its result, otherwise returns a
+     * default value.
+     *
+     * N.B. a function is invocable if its declaration type requirements are met on the
+     * first compiler pass, so cannot be used to filter compilability of the function
+     * definition by type. Use constexpr_if or add 'requires' clause to the declaration
+     * instead.
+     */
+    template<class FUNC, class RETURN, class... ARGS>
+    inline RETURN invoke_or(FUNC && /* func */, RETURN &&defaultValue, ARGS &&... /* args */) {
+        return std::forward<RETURN>(defaultValue);
+    }
+
+    template<class FUNC, class RETURN, class... ARGS> requires std::is_invocable_v<FUNC,ARGS...>
+    inline auto invoke_or(FUNC &&func, RETURN && /* defaultValue */, ARGS &&...args) {
+        return std::invoke(std::forward<FUNC>(func), std::forward<ARGS>(args)...);
+    }
+
 //
-//    /** invokes a function if it is invokable, or else it executes an alternative with no arguments
-//     * The else function should be unconditionally executable, so any args can be lambda captured.
-//     * If necessary, you can nest another try_invoke inside the else function to make it unconditionally
-//     * executable */
-//    template<class FUNC, class ORELSE, class... ARGS> requires std::is_invocable_v<FUNC, ARGS...>
-//    inline auto try_invoke_or(FUNC &&invokeFunc, ORELSE && /*orElseRunnable*/, ARGS &&...args) {
-//        return std::invoke(std::forward<FUNC>(invokeFunc),std::forward<ARGS>(args)...);
-//    }
-//
-//    template<class FUNC, class ORELSE, class... ARGS> requires std::is_invocable_v<ORELSE>
-//    inline auto try_invoke_or(FUNC && /*invokeFunc*/, ORELSE &&orElseRunnable, ARGS &&.../*args*/) {
-//        return std::invoke(orElseRunnable);
-//    }
+    /** invokes a function if it is invokable, or else it executes an alternative with no arguments
+     * The else function should be unconditionally executable, so any args can be lambda captured.
+     * If necessary, you can nest another try_invoke inside the else function to make it unconditionally
+     * executable */
+    template<class FUNC, class ORELSE, class... ARGS> requires std::is_invocable_v<FUNC, ARGS...>
+    inline auto invoke_else(FUNC &&invokeFunc, ARGS &&...args, ORELSE && /*orElseRunnable*/) {
+        return std::invoke(std::forward<FUNC>(invokeFunc),std::forward<ARGS>(args)...);
+    }
+
+    template<class FUNC, class ORELSE, class... ARGS> requires std::is_invocable_v<ORELSE>
+    inline auto invoke_else(FUNC && /*invokeFunc*/, ARGS &&.../*args*/, ORELSE &&orElseRunnable) {
+        return std::invoke(orElseRunnable);
+    }
+
+    /** Static equivalent to (b ? x : y) only x and y don't have to be of the same type
+     */
+    template<bool CONDITION, class IFTRUE, class IFFALSE> requires CONDITION
+    inline IFTRUE choose(IFTRUE &&valueIfTrue, IFFALSE && /* valueIfFalse */) {
+        return std::forward<IFTRUE>(valueIfTrue);
+    }
+
+    template<bool CONDITION, class IFTRUE, class IFFALSE>
+    inline IFFALSE choose(IFTRUE && /* valueIfTrue */, IFFALSE &&valueIfFalse) {
+        return std::forward<IFFALSE>(valueIfFalse);
+    }
+
 
     /** Invokes a function with given arguments if a condition is true.
      *  This replaces
      *  if constexpr(..) {...}
      *  but without the requirement that the expression be compilable
      *  if the constexpr is false.
+     *
+     *  To use this you must:
+     *      - identify the operations that may not be compilable (depending on type assignment)
+     *      - identify a set of "type-sensitive" obejcts such that each of these operations involves at least one
+     *        member of this set.
+     *      - pass a the type-sensitive objects into the function as templated or auto arguments.
+     *      - all other objects can be captured.
+     *  If in doubt, just pass all objects as auto arguments.
+     *
      *  The functionality of if...else can be created using:
      *  constexpr_if<Condition>(...)
      *  constexpr_if<!Condition>(...)
+     *  with no runtime overhead.
      */
     template<bool CONDITION, class FUNC, class... ARGS>
-    inline void constexpr_if(FUNC &&, ARGS &&...) { }
+    inline void constexpr_if(FUNC && /* function */, ARGS &&... /* arguments */) { }
 
     template<bool CONDITION, class FUNC, class... ARGS> requires CONDITION
     inline auto constexpr_if(FUNC &&func, ARGS &&...args) {
@@ -244,9 +290,17 @@ namespace deselby {
     }
 
 
+
+
     /** True if T can be streamed to a std::ostream using the << operator */
-    template<class T>
-    concept IsStreamable = requires(std::ostream out, T obj) { out << obj; };
+//    template<class T>
+//    concept IsStreamable = requires(std::ostream out, T obj) { out << obj; };
+    template<class T, class S = std::ostream>
+    concept IsStreamable = requires(S out, T obj) { out << obj; };
+
+    /** useful lambda for referring to the overloaded stream operator
+     *  is not invocable if not streamable */
+    constexpr auto streamoperator = []<class S, IsStreamable<S> T>(S &out, T &&obj) -> S & { return out << std::forward<T>(obj); };
 
 
     /** A simple box that allows native types (such as double) to be used as template parameters

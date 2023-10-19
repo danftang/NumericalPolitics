@@ -12,6 +12,8 @@
 #include "../CallbackUtils.h"
 
 namespace abm::events {
+
+
     template<class SOURCE, class DEST, class MESSAGE>
     struct Message {
         SOURCE &source;
@@ -21,10 +23,39 @@ namespace abm::events {
     template<class SOURCE, class DEST, class MESSAGE> Message(SOURCE &, DEST &,
                                                               MESSAGE &) -> Message<SOURCE, DEST, MESSAGE>;
 
+    template<class SOURCE, class DEST, class MESSAGE>
+    struct LeftMessage : Message<SOURCE,DEST,MESSAGE> {
+        friend std::ostream &operator <<(std::ostream &out, const LeftMessage<SOURCE,DEST,MESSAGE> &event) {
+            out << "<-- ";
+            deselby::invoke_if_invocable(deselby::streamoperator, out, event.message);
+            return out;
+        }
+    };
+    template<class SOURCE, class DEST, class MESSAGE> LeftMessage(SOURCE &, DEST &,
+                                                              MESSAGE &) -> LeftMessage<SOURCE, DEST, MESSAGE>;
+
+    template<class SOURCE, class DEST, class MESSAGE>
+    struct RightMessage : Message<SOURCE,DEST,MESSAGE> {
+        friend std::ostream &operator <<(std::ostream &out, const RightMessage<SOURCE,DEST,MESSAGE> &event) {
+            out << "--> ";
+            deselby::invoke_if_invocable(deselby::streamoperator, out, event.message);
+            return out;
+        }
+    };
+    template<class SOURCE, class DEST, class MESSAGE> RightMessage(SOURCE &, DEST &,
+                                                                  MESSAGE &) -> RightMessage<SOURCE, DEST, MESSAGE>;
+
     template<class AGENT1, class AGENT2>
     struct StartEpisode {
         AGENT1 &agent1;
         AGENT2 &agent2;
+
+        friend std::ostream &operator <<(std::ostream &out, const StartEpisode<AGENT1,AGENT2> &event) {
+            out << "------- Starting episode -------" << std::endl;
+            deselby::invoke_if_invocable(deselby::streamoperator, out, event.agent1);
+            deselby::invoke_if_invocable(deselby::streamoperator, out, event.agent2);
+            return out;
+        }
     };
     template<class AGENT1, class AGENT2> StartEpisode(AGENT1 &, AGENT2 &) -> StartEpisode<AGENT1, AGENT2>;
 
@@ -32,6 +63,13 @@ namespace abm::events {
     struct EndEpisode {
         AGENT1 &agent1;
         AGENT2 &agent2;
+
+        friend std::ostream &operator <<(std::ostream &out, const EndEpisode<AGENT1,AGENT2> &event) {
+            out << "------- Ending episode -------" << std::endl;
+            deselby::invoke_if_invocable(deselby::streamoperator, out, event.agent1);
+            deselby::invoke_if_invocable(deselby::streamoperator, out, event.agent2);
+            return out;
+        }
     };
     template<class AGENT1, class AGENT2> EndEpisode(AGENT1 &, AGENT2 &) -> EndEpisode<AGENT1, AGENT2>;
 }
@@ -44,30 +82,10 @@ namespace abm::callbacks {
      */
     class Verbose {
     public:
-        void *firstMover;
-
-        template<class AGENT1, class AGENT2>
-        void on(const events::StartEpisode<AGENT1, AGENT2> &event) {
-            firstMover = &event.agent1;
-            std::cout << "------- Starting episode -------" << std::endl;
-            deselby::constexpr_if<deselby::IsStreamable<AGENT1>>(print, event.agent1);
-            deselby::constexpr_if<deselby::IsStreamable<AGENT2>>(print, event.agent2);
+        template<class EVENT>
+        void on(const EVENT &event) {
+            std::cout << deselby::choose<deselby::IsStreamable<EVENT>>(event, "unprintable message") << std::endl;
         }
-
-        template<class SOURCE, class DEST, class MESSAGE>
-        void on(const events::Message<SOURCE, DEST, MESSAGE> &event) {
-            bool isFromFirstMover = (&event.source == firstMover);
-            std::cout << (isFromFirstMover ? "--> " : "<-- ") << event.message << std::endl;
-        }
-
-        template<class AGENT1, class AGENT2>
-        void on(const events::EndEpisode<AGENT1, AGENT2> &event) {
-            deselby::constexpr_if<deselby::IsStreamable<AGENT1>>(print, event.agent1);
-            deselby::constexpr_if<deselby::IsStreamable<AGENT2>>(print, event.agent2);
-            std::cout << "------- Ending episode -------" << std::endl;
-        }
-
-        // TODO: handle more message types...or make messages able to print themselves.
     };
 
     class MessageCounter {
@@ -130,22 +148,22 @@ namespace abm::episodes {
         template<class MESSAGE>
         void passMessageRightAndRecurse(MESSAGE message) {
             if(isEmptyOptional(message)) return;
-            callback(events::Message{agent0,agent1,valueIfOptional(message)},callbacks);
+            callback(events::RightMessage{agent0,agent1,valueIfOptional(message)},callbacks);
             passMessageLeftAndRecurse(agent1.handleMessage(std::move(valueIfOptional(message)))); // tail-recursion will be optimised out (if optimisation is on)
         }
 
         template<class MESSAGE>
         void passMessageLeftAndRecurse(MESSAGE message) {
             if(isEmptyOptional(message)) return;
-            callback(events::Message{agent1,agent0,valueIfOptional(message)},callbacks);
+            callback(events::LeftMessage{agent1,agent0,valueIfOptional(message)},callbacks);
             passMessageRightAndRecurse(agent0.handleMessage(std::move(valueIfOptional(message))));
         }
 
         template<class MESSAGE0, class MESSAGE1>
         void passMessagesSynchronously(MESSAGE0 messageFor0, MESSAGE1 messageFor1) {
             if(isEmptyOptional(messageFor0) || isEmptyOptional(messageFor1)) return;
-            callback(events::Message{agent0,agent1,valueIfOptional(messageFor1)},callbacks);
-            callback(events::Message{agent1,agent0,valueIfOptional(messageFor0)},callbacks);
+            callback(events::RightMessage{agent0,agent1,valueIfOptional(messageFor1)},callbacks);
+            callback(events::LeftMessage{agent1,agent0,valueIfOptional(messageFor0)},callbacks);
             passMessagesSynchronously(
                     agent1.handleMessage(std::move(valueIfOptional(messageFor1))),
                     agent0.handleMessage(std::move(valueIfOptional(messageFor0))));

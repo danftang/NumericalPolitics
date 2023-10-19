@@ -26,58 +26,84 @@ namespace abm::approximators {
      *   - A LossFunction describing a loss in the space of all functions
      *   - A training policy that defines when parameter updates should occur.
      */
-    template<LossFunction LOSSFUNCTION, OptimisableFunction<LOSSFUNCTION> APPROXIMATOR, class TRAININGPOLICY>
-//    template<LossFunction LOSSFUNCTION, class APPROXIMATOR, class TRAININGPOLICY>
+    template<LossFunction LOSSFUNCTION, ParameterisedFunction APPROXIMATOR, class TRAININGPOLICY>
     class AdaptiveFunction : public APPROXIMATOR {
     public:
         LOSSFUNCTION    lossFunction;
         TRAININGPOLICY  trainingPolicy;
 
 
-        AdaptiveFunction(APPROXIMATOR approximator, LOSSFUNCTION lossFunction, TRAININGPOLICY trainingPolicy):
-                APPROXIMATOR(approximator),
+        AdaptiveFunction(APPROXIMATOR approximator, TRAININGPOLICY trainingPolicy, LOSSFUNCTION lossFunction):
+                APPROXIMATOR(std::move(approximator)),
                 lossFunction(std::move(lossFunction)),
                 trainingPolicy(std::move(trainingPolicy))
         { }
 
 
-        template<class EVENT> requires HasCallback<LOSSFUNCTION,EVENT> || std::is_invocable_v<TRAININGPOLICY,EVENT>
+        template<class EVENT>
         void on(const EVENT &event) {
             callback(event, lossFunction);
-            deselby::constexpr_if<std::is_invocable_v<TRAININGPOLICY,EVENT>>(
-                    [&event, this](auto &policy) {
-                        if(policy(event)) {
-                            this->updateParameters(lossFunction);
-                            callback(events::ParameterUpdate(this->parameters()), lossFunction);
-                        }
-                    }, trainingPolicy);
+            bool didTrain = trainingPolicy.train(event, *this, lossFunction);
+            if(didTrain) callback(events::ParameterUpdate(this->parameters()), lossFunction);
         }
     };
 
+
+    /** A training policy decides exactly how and when to update the parameters of a parameterised
+     * function given a loss function.
+     * This class takes an ensmallen update step and a schedule, which should be a function object
+     * which takes events and returns a bool if an update step should be made in response to the
+     * event.
+     */
+    template<class UPDATESTEP, class SCHEDULE, class MatType = arma::mat>
+    class DifferentialTrainingPolicy {
+    public:
+        UPDATESTEP  update;
+        typename UPDATESTEP::template Policy<MatType,MatType> updatePolicy; // requires gradient to be same type as param type
+        double      stepSize;
+        SCHEDULE    schedule;
+
+
+        DifferentialTrainingPolicy(UPDATESTEP update, double stepSize, size_t parameterRows, size_t parameterCols, SCHEDULE schedule) :
+        update(std::move(update)),
+        updatePolicy(this->update, parameterRows, parameterCols),
+        stepSize(stepSize),
+        schedule(std::move(schedule)) {
+        }
+
+
+        template<class EVENT, LossFunction LOSSFUNCTION, DifferentiableParameterisedFunction<LOSSFUNCTION> APPROXIMATOR>
+        inline bool train(const EVENT &event, APPROXIMATOR &&approximator, LOSSFUNCTION &&lossFunction) {
+            bool doTrain = deselby::invoke_or(schedule, false, event);
+            if (doTrain) updatePolicy.Update(approximator.parameters(), stepSize, approximator.gradientByParams(lossFunction));
+            return  doTrain;
+        }
+    };
 
     /** A parameterised function and an update step, giving rise to an OptimisableFunction that can update
      * its parameters given a LossFunction */
-    template<class UPDATESTEP, class APPROXIMATOR>
-    class DifferentiableOptimisableFunction: public APPROXIMATOR {
-    public:
-        typedef std::remove_cvref_t<decltype(std::declval<APPROXIMATOR>().parameters())> MatType;
+//    template<class UPDATESTEP, class APPROXIMATOR>
+//    class DifferentiableOptimisableFunction: public APPROXIMATOR {
+//    public:
+//        typedef std::remove_cvref_t<decltype(std::declval<APPROXIMATOR>().parameters())> MatType;
+//
+//        UPDATESTEP                  updateStep;
+//        typename UPDATESTEP::template Policy<MatType,MatType> updatePolicy; // requires gradient to be same type as param type
+//        double                      stepSize;
+//
+//        DifferentiableOptimisableFunction(APPROXIMATOR approximator, UPDATESTEP updatestep, double stepSize):
+//        APPROXIMATOR(std::move(approximator)),
+//        updateStep(std::move(updatestep)),
+//        updatePolicy(updateStep, this->parameters().n_rows, this->parameters().n_cols),
+//        stepSize(stepSize) {
+//        }
+//
+//        template<LossFunction LOSS> requires DifferentiableParameterisedFunction<APPROXIMATOR,LOSS>
+//        void updateParameters(LOSS &loss) {
+//            updatePolicy.Update(this->parameters(), stepSize, this->gradientByParams(loss));
+//        }
+//    };
 
-        UPDATESTEP                  updateStep;
-        typename UPDATESTEP::template Policy<MatType,MatType> updatePolicy; // requires gradient to be same type as param type
-        double                      stepSize;
-
-        DifferentiableOptimisableFunction(APPROXIMATOR approximator, UPDATESTEP updatestep, double stepSize):
-        APPROXIMATOR(std::move(approximator)),
-        updateStep(std::move(updatestep)),
-        updatePolicy(updateStep, this->parameters().n_rows, this->parameters().n_cols),
-        stepSize(stepSize) {
-        }
-
-        template<LossFunction LOSS> requires DifferentiableParameterisedFunction<APPROXIMATOR,LOSS>
-        void updateParameters(LOSS &loss) {
-            updatePolicy.Update(this->parameters(), stepSize, this->gradientByParams(loss));
-        }
-    };
 }
 
 #endif //MULTIAGENTGOVERNMENT_ADAPTIVEFUNCTION_H
