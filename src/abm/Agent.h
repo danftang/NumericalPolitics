@@ -31,6 +31,11 @@ namespace abm::events {
         BODY &body;
 
         explicit AgentStartEpisode(BODY &body): body(body) {}
+
+        friend std::ostream &operator <<(std::ostream &out, const AgentStartEpisode<BODY> &event) {
+            out << "Starting episode...";
+            return out;
+        }
     };
 
     template<class BODY>
@@ -38,6 +43,11 @@ namespace abm::events {
         BODY &body;
 
         explicit AgentEndEpisode(BODY &body): body(body) {}
+
+        friend std::ostream &operator <<(std::ostream &out, const AgentEndEpisode<BODY> &event) {
+            out << "Ending episode...";
+            return out;
+        }
     };
 
     struct Reward {
@@ -47,7 +57,13 @@ namespace abm::events {
         Reward(double &&reward): reward(std::move(reward)) {}
         Reward(std::nullopt_t /* signals unset */): reward(std::numeric_limits<double>::quiet_NaN()) {}
 
-        bool has_value() { return !std::isnan(reward); }
+        bool has_value() const { return !std::isnan(reward); }
+
+        friend std::ostream &operator <<(std::ostream &out, const Reward &event) {
+            out << "reward: ";
+            if(event.has_value()) out << event.reward; else out << "unset";
+            return out;
+        }
     };
 
 
@@ -66,12 +82,24 @@ namespace abm::events {
 
         MessageReward(MESSAGE &&message, double &&reward): Reward(std::move(reward)), message(std::move(message)) {}
         MessageReward(MessageReward<MESSAGE> &&)=default;
+
+        friend std::ostream &operator <<(std::ostream &out, const MessageReward<MESSAGE> &event) {
+            out << "(message: " << event.message << ", reward: " << event.reward << ")";
+            return out;
+        }
+
     };
 
     template<class BODY>
     struct PreActBodyState {
         BODY &body;
         PreActBodyState(BODY &body): body(body) {}
+
+        friend std::ostream &operator <<(std::ostream &out, const PreActBodyState<BODY> &event) {
+            out << "Preparing to act...";
+            return out;
+        }
+
     };
 
     template<class MESSAGE>
@@ -89,6 +117,12 @@ namespace abm::events {
                 act(std::move(act)) { }
 
         const RESPONSE &response() const { return *this; }
+
+        friend std::ostream &operator <<(std::ostream &out, const Act<ACTION,RESPONSE> &event) {
+            out << "Agent performed act " << event.act << " and body returned " << event.response();
+            return out;
+        }
+
     };
 
 }
@@ -229,11 +263,10 @@ namespace abm {
          template<class... CALLBACKS>
         void runEpisode(CALLBACKS &&... callbacks) requires BodyMindMonad<BODY,MIND> {
             callback(events::AgentStartEpisode(body), mind, callbacks...);
-            events::Reward reward = getNextActEvent();
+            events::Reward reward = getNextActEvent(callbacks...);
             while(reward.has_value()) {
-                callback(events::PreActBodyState(body),mind, callbacks...);
-                reward = getNextActEvent();
-            };
+                reward = getNextActEvent(callbacks...);
+            }
             callback(events::AgentEndEpisode(body), mind, callbacks...);
         }
 
@@ -247,7 +280,6 @@ namespace abm {
         auto handleMessage(INMESSAGE incomingMessage) {
             events::IncomingMessage inMessageEvent(std::move(incomingMessage), body.handleMessage(incomingMessage));
             callback(inMessageEvent,mind);
-            callback(events::PreActBodyState(body),mind);
             return getNextActEvent().message;
         }
 
@@ -258,11 +290,12 @@ namespace abm {
             return out;
         }
     protected:
-
-        auto getNextActEvent() {
+        template<class... EXTRACALLBACKS>
+        auto getNextActEvent(EXTRACALLBACKS... extraCallbacks) {
+            callback(events::PreActBodyState(body), mind, extraCallbacks...);
             action_type act = mind.act(body);
             events::Act actEvent(std::move(act), body.handleAct(act));
-            callback(actEvent, mind);
+            callback(actEvent, mind, extraCallbacks...);
             return actEvent;
         }
     };

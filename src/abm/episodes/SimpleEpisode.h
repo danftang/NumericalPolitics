@@ -76,18 +76,6 @@ namespace abm::events {
 
 
 namespace abm::callbacks {
-    constexpr auto print = [](auto &agent) { std::cout << agent << std::endl; };
-
-    /** Callback object for verbose logging of episodes
-     */
-    class Verbose {
-    public:
-        template<class EVENT>
-        void on(const EVENT &event) {
-            std::cout << deselby::choose<deselby::IsStreamable<EVENT>>(event, "unprintable message") << std::endl;
-        }
-    };
-
     class MessageCounter {
     public:
         size_t nMessages;

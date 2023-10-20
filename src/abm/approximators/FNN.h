@@ -39,6 +39,12 @@ namespace abm::approximators {
         template<class... LAYERS>
         FNN(size_t inputDimensions, LAYERS... layers) : FNN(inputDimensions, mlpack::HeInitialization(), layers...) {}
 
+        FNN(const FNN<MatType> &other) : network(other.network), params(other.params) {
+            // Set alias matrices to point to new parameter matrix
+            network.CustomInitialize(params, network.WeightSize());
+            network.SetWeights(params.memptr());
+        }
+
         /** Calculate network output given input */
         MatType operator()(const MatType &inputs) {
             assert(inputs.n_rows == network.InputDimensions()[0]);

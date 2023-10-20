@@ -86,6 +86,8 @@ namespace abm {
 
 
 namespace abm::callbacks {
+    using namespace std::literals;
+
     // ========================= FUNCTION TO CALLBACK WRAPPER =======================
 
     /** Wraps a lambda, or other function, so that its call operator(s) is(are) moved to the
@@ -108,7 +110,14 @@ namespace abm::callbacks {
         }
     };
 
-
+    /** Callback object for verbose logging of messages */
+    class Verbose {
+    public:
+        template<class EVENT>
+        void on(const EVENT &event) {
+            std::cout << deselby::choose<deselby::IsStreamable<EVENT>>(event, "event: "s + typeid(EVENT).name()) << std::endl;
+        }
+    };
 }
 
 

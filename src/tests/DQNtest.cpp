@@ -60,14 +60,17 @@ namespace tests {
                 mlpack::Linear(abm::bodies::CartPole::action_type::size)
                 );
 
-        auto trainEveryStep = []<class BODY>(const events::PreActBodyState<BODY> & /* event */) { return true; };
+        auto burnInThenTrainEveryStep = [burnin = batchSize]<class BODY>(const events::PreActBodyState<BODY> & /* event */) mutable {
+            if(burnin > 0) --burnin;
+            return burnin == 0;
+        };
 
         approximators::DifferentialTrainingPolicy trainingPolicy(
                 ens::AdamUpdate(),
                 0.001,
                 fnn.parameters().n_rows,
                 fnn.parameters().n_cols,
-                trainEveryStep);
+                burnInThenTrainEveryStep);
 
         lossFunctions::QLearningLoss loss(
                 bufferSize,
@@ -86,9 +89,10 @@ namespace tests {
                 abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(0.5,50000,0.01))
                 );
 
+//        abm::Agent agent(abm::bodies::CartPole(), std::move(mind));
         abm::Agent agent(abm::bodies::CartPole(), mind);
 
-        agent.runEpisode();
+        agent.runEpisode(abm::callbacks::Verbose());
     }
 }
 

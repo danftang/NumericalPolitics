@@ -15,46 +15,49 @@ namespace abm::lossFunctions {
     public:
         // the buffer...
         arma::mat stateHistory;
-        arma::Row<char> isEndEpisode;
+        arma::Row<char> isEpisodeEnd;
         arma::urowvec actionIndices;
         arma::rowvec rewards;
         size_t insertCol;
+        bool bufferIsFull;
+
         ENDSTATEPREDICTOR endStatePredictor; // a function from end state to qVector
         size_t endStateParameterUpdateInterval;
         uint nParameterUpdates;
         double discount;
-        bool bufferIsFull;
 
         arma::ucolvec batchCols;     // columns of the buffer in the current batch
 
 
         QLearningLoss(size_t bufferSize, size_t stateSize, size_t batchSize, double discount, ENDSTATEPREDICTOR endStatePredictor, size_t endStateParameterUpdateInterval) :
                 stateHistory(stateSize, bufferSize),
+                isEpisodeEnd(bufferSize),
                 actionIndices(bufferSize),
                 rewards(bufferSize),
                 insertCol(-1),
-                batchCols(batchSize),
+                bufferIsFull(false),
                 endStatePredictor(std::move(endStatePredictor)),
                 endStateParameterUpdateInterval(endStateParameterUpdateInterval),
                 nParameterUpdates(0),
                 discount(discount),
-                bufferIsFull(false) {
+                batchCols(batchSize)
+        {
         }
 
 
-        /** Remember last act, body state and reward */
+        /** Remember body state directly before act */
         template<class BODY>
         void on(const events::PreActBodyState<BODY> &event) {
             if(++insertCol >= bufferSize()) {
                 bufferIsFull = true;
                 insertCol = 0;
             }
-            isEndEpisode(insertCol) = 0;
+            isEpisodeEnd(insertCol) = 0; // reset pending AgentStartEpisode event
             stateHistory.col(insertCol) = event.body.asMat();
         }
 
 
-        /** Remember last act, body state and reward */
+        /** Remember last act and reward and increment buffer pointer */
         template<class ACTION, class MESSAGE>
         void on(const events::Act<ACTION, MESSAGE> &actEvent) {
             rewards(insertCol) = actEvent.reward;
@@ -62,12 +65,10 @@ namespace abm::lossFunctions {
         }
 
 
-        /** learn from residual reward of end-game */
         template<class BODY>
         void on(const events::AgentEndEpisode<BODY> & /* event */) {
-            isEndEpisode(insertCol) = 1;
+            isEpisodeEnd(insertCol) = 1;
         }
-
 
         template<class PARAMS>
         void on(const events::ParameterUpdate<PARAMS> & event) {
@@ -106,7 +107,7 @@ namespace abm::lossFunctions {
                     predictions.elem(batchActionElementIds)
                     - rewards(batchCols)
                     - endStateQVals %
-                        isEndEpisode
+                        isEpisodeEnd
                             .transform([discount = discount](bool isEnd) {
                                 return isEnd?0.0:discount;
                             })
