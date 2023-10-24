@@ -17,6 +17,8 @@
 //#include "tests/IncompleteInformationMCTSTest.cpp"
 //#include "tests/FNN.h"
 
+#include "tests/mlpacktests.cpp"
+
 //#include "abm/societies/RandomEncounterSociety.h"
 
 int main() {
@@ -40,8 +42,10 @@ int main() {
 //    tests::tabularQMindPrisonersDilemma();
 
 //    tests::testFNN();
+
     tests::DQNCartPole();
 
+//    cartPoleDQNTest();
 
     return 0;
 }

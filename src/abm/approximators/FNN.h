@@ -45,12 +45,17 @@ namespace abm::approximators {
             network.SetWeights(params.memptr());
         }
 
+        FNN(FNN<MatType> &&other) : network(std::move(other.network)), params(std::move(other.params)) {
+            // Set alias matrices to point to new parameter matrix
+            network.CustomInitialize(params, network.WeightSize());
+            network.SetWeights(params.memptr());
+        }
+
         /** Calculate network output given input */
         MatType operator()(const MatType &inputs) {
+            MatType Y(network.OutputSize(), inputs.n_cols);
             assert(inputs.n_rows == network.InputDimensions()[0]);
             network.Training() = false;
-            MatType Y; // Y = F(input)
-            Y.set_size(network.OutputSize(), inputs.n_cols);
             network.Forward(inputs, Y);
             return Y;
         }
@@ -59,32 +64,30 @@ namespace abm::approximators {
 
         template<LossFunction LOSS>
         MatType gradientByParams(LOSS &&loss) {
-            MatType inputs(loss.nPoints(),1);
+            // get the training set on which the loss function is defined
+            MatType inputs(network.InputDimensions()[0], loss.nPoints());
             loss.trainingSet(inputs);
 
             // Ensure the inputs are of the right dimension
             assert(inputs.n_rows == network.InputDimensions()[0]);
 
-            network.Training() = true;
-
             // Forward pass, storing outputs in Y
-            MatType prediction; // Prediction = F(input)
-            prediction.set_size(network.OutputSize(), inputs.n_cols);
+            network.Training() = true;
+            MatType prediction(network.OutputSize(), inputs.n_cols);
             network.Forward(inputs, prediction);
 
             // calculate gradient of loss in output space
-            MatType dLoss_dPred(loss.nPoints(), 1);
+            MatType dLoss_dPred(prediction.n_rows, prediction.n_cols);
             loss.gradientByPrediction(prediction, dLoss_dPred);
 
             // Perform the back prop with the gradients in output space
             {
-                MatType dObj_dinputs; // not used.
+                MatType dObj_dinputs(inputs.n_rows, inputs.n_cols); // not used.
                 network.Backward(prediction, dLoss_dPred, dObj_dinputs);
             }
             // Now compute the gradients in parameter space.
             // The gradient should have the same size as the params.
-            MatType dLoss_dParams;
-            dLoss_dParams.set_size(this->params.n_rows, this->params.n_cols);
+            MatType dLoss_dParams(this->params.n_rows, this->params.n_cols);
             network.Gradient(inputs, dLoss_dPred, dLoss_dParams);
 
             return dLoss_dParams;

@@ -54,19 +54,21 @@ void cartPoleDQNTest() {
     ens::AdamUpdate updater;
     Environment environment;
 
-    mlpack::QLearning<
-            mlpack::CartPole,
-            mlpack::SimpleDQN<>,
-            ens::AdamUpdate,
-            mlpack::GreedyPolicy<Environment>,
-            mlpack::RandomReplay<Environment>> model(config, qNetwork, policy, replay, updater, environment);
+//    mlpack::QLearning<
+//            mlpack::CartPole,
+//            mlpack::SimpleDQN<>,
+//            ens::AdamUpdate,
+//            mlpack::GreedyPolicy<Environment>,
+//            mlpack::RandomReplay<Environment>> model(config, qNetwork, policy, replay, updater, environment);
+
+    mlpack::QLearning model(config, qNetwork, policy, replay, updater, environment);
 
     double smoothedReturn = 20.0;
     int iterations = 0;
     while(smoothedReturn < 199.999) {
         double episodeReturn = model.Episode();
         smoothedReturn = 0.95*smoothedReturn + 0.05*episodeReturn;
-        std::cout << smoothedReturn << std::endl;
+        std::cout << iterations << " " << smoothedReturn << " " << episodeReturn << std::endl;
         ++iterations;
     }
     std::cout << "Learned to balance a pole in " << iterations << " episodes." << std::endl;

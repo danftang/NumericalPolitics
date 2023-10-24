@@ -60,6 +60,8 @@ namespace abm::approximators {
     public:
         UPDATESTEP  update;
         typename UPDATESTEP::template Policy<MatType,MatType> updatePolicy; // requires gradient to be same type as param type
+        const size_t      paramRows;
+        const size_t      paramCols;
         double      stepSize;
         SCHEDULE    schedule;
 
@@ -67,13 +69,35 @@ namespace abm::approximators {
         DifferentialTrainingPolicy(UPDATESTEP update, double stepSize, size_t parameterRows, size_t parameterCols, SCHEDULE schedule) :
         update(std::move(update)),
         updatePolicy(this->update, parameterRows, parameterCols),
+        paramRows(parameterRows),
+        paramCols(parameterCols),
         stepSize(stepSize),
         schedule(std::move(schedule)) {
         }
 
+        DifferentialTrainingPolicy(DifferentialTrainingPolicy<UPDATESTEP,SCHEDULE, MatType> &&other) :
+                update(std::move(other.update)),
+                updatePolicy(this->update, other.paramRows, other.paramCols),
+                paramRows(other.paramRows),
+                paramCols(other.paramCols),
+                stepSize(other.stepSize),
+                schedule(std::move(other.schedule)) {
+        }
+
+
+        DifferentialTrainingPolicy(const DifferentialTrainingPolicy<UPDATESTEP,SCHEDULE, MatType> &other) :
+                update(other.update),
+                updatePolicy(this->update, other.paramRows, other.paramCols),
+                paramRows(other.paramRows),
+                paramCols(other.paramCols),
+                stepSize(other.stepSize),
+                schedule(other.schedule) {
+        }
+
+
 
         template<class EVENT, LossFunction LOSSFUNCTION, DifferentiableParameterisedFunction<LOSSFUNCTION> APPROXIMATOR>
-        inline bool train(const EVENT &event, APPROXIMATOR &&approximator, LOSSFUNCTION &&lossFunction) {
+        inline bool train(const EVENT &event, APPROXIMATOR &approximator, LOSSFUNCTION &lossFunction) {
             bool doTrain = deselby::invoke_or(schedule, false, event);
             if (doTrain) updatePolicy.Update(approximator.parameters(), stepSize, approximator.gradientByParams(lossFunction));
             return  doTrain;

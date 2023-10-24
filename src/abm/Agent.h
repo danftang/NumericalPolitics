@@ -23,6 +23,7 @@
 #include "Body.h"
 #include "Mind.h"
 #include "CallbackUtils.h"
+#include "../DeselbyStd/OptionalDouble.h"
 
 namespace abm::events {
 
@@ -53,15 +54,12 @@ namespace abm::events {
     struct Reward {
         double reward;
 
-        Reward(const double &reward = 0.0): reward(reward) {}
-        Reward(double &&reward): reward(std::move(reward)) {}
-        Reward(std::nullopt_t /* signals unset */): reward(std::numeric_limits<double>::quiet_NaN()) {}
-
-        bool has_value() const { return !std::isnan(reward); }
+        Reward(const double &reward): reward(reward) {}
+//        Reward(const std::nullopt_t &): reward() {}
+//        Reward() : reward() {}
 
         friend std::ostream &operator <<(std::ostream &out, const Reward &event) {
-            out << "reward: ";
-            if(event.has_value()) out << event.reward; else out << "unset";
+            out << "reward: " << event.reward;
             return out;
         }
     };
@@ -76,19 +74,30 @@ namespace abm::events {
 //    };
 
 
+    /** return type for a body's handleAct(.) method */
     template<class MESSAGE>
     struct MessageReward : Reward {
         MESSAGE message;
 
-        MessageReward(MESSAGE &&message, double &&reward): Reward(std::move(reward)), message(std::move(message)) {}
-        MessageReward(MessageReward<MESSAGE> &&)=default;
+        MessageReward(MESSAGE message, const double &reward): Reward(reward), message(std::move(message)) {}
+//        MessageReward(MessageReward<MESSAGE> &&)=default;
 
         friend std::ostream &operator <<(std::ostream &out, const MessageReward<MESSAGE> &event) {
             out << "(message: " << event.message << ", reward: " << event.reward << ")";
             return out;
         }
-
     };
+
+    /** return type for a body's handleAct(.) method
+     * when the body never communicates with any other agent.
+     * In this case, the message is a bool, indicating whether the episode has ended
+     */
+    struct MonadicMessageReward : MessageReward<bool> {
+        MonadicMessageReward(bool isEndEpisode, const double &reward): MessageReward<bool>(isEndEpisode, reward) {}
+
+        bool isEndEpisode() { return message; }
+    };
+
 
     template<class BODY>
     struct PreActBodyState {
@@ -122,8 +131,9 @@ namespace abm::events {
             out << "Agent performed act " << event.act << " and body returned " << event.response();
             return out;
         }
-
     };
+
+
 
 }
 
@@ -160,10 +170,46 @@ namespace abm::callbacks {
 
         void on(const events::Reward &event) {
             double a_n = (1.0 - decayRate) / (1.0 - std::pow(decayRate, ++nSamples));
-            meanReward *= 1.0-a_n;
+            meanReward *= 1.0 - a_n;
             meanReward += a_n * event.reward;
         }
     };
+
+    /** Log the mean reward per episode */
+    class MeanRewardPerEpisode {
+    public:
+        size_t nEpisodes     = 0;
+        double totalReward   = 0.0;
+
+        template<class BODY>
+        void on(const events::AgentStartEpisode<BODY> & /* event */) {
+            ++nEpisodes;
+        }
+
+        void on(const events::Reward &event) {
+            totalReward += event.reward;
+        }
+
+        double mean() { return totalReward / nEpisodes; }
+
+        void reset() { nEpisodes = 0; totalReward = 0.0; }
+    };
+
+    /** Log the mean reward per episode */
+    class RewardPerEpisode {
+    public:
+        double rewardThisEpisode   = 0.0;
+
+        template<class BODY>
+        void on(const events::AgentStartEpisode<BODY> & /* event */) {
+            rewardThisEpisode = 0.0;
+        }
+
+        void on(const events::Reward &event) {
+            rewardThisEpisode += event.reward;
+        }
+    };
+
 }
 
 namespace abm {
@@ -178,7 +224,7 @@ namespace abm {
      * incoming messages. So the communication is entirely act/reward between mind and body. */
     template<class BODY, class MIND>
     concept BodyMindMonad = requires(BODY body, MIND mind) {
-        { body.handleAct(mind.act(body)) } -> std::same_as<events::Reward>;
+        { body.handleAct(mind.act(body)) } -> std::same_as<events::MonadicMessageReward>;
     };
 
 
@@ -262,12 +308,12 @@ namespace abm {
          * consists of act/reward between mind and body until body returns a not-a-number as reward */
          template<class... CALLBACKS>
         void runEpisode(CALLBACKS &&... callbacks) requires BodyMindMonad<BODY,MIND> {
-            callback(events::AgentStartEpisode(body), mind, callbacks...);
-            events::Reward reward = getNextActEvent(callbacks...);
-            while(reward.has_value()) {
-                reward = getNextActEvent(callbacks...);
+            callback(events::AgentStartEpisode(body), mind, body, std::forward<CALLBACKS>(callbacks)...);
+            auto response = getNextActEvent(std::forward<CALLBACKS>(callbacks)...);
+            while(!response.isEndEpisode()) {
+                response = getNextActEvent(std::forward<CALLBACKS>(callbacks)...);
             }
-            callback(events::AgentEndEpisode(body), mind, callbacks...);
+            callback(events::AgentEndEpisode(body), mind, body, std::forward<CALLBACKS>(callbacks)...);
         }
 
 
@@ -291,11 +337,11 @@ namespace abm {
         }
     protected:
         template<class... EXTRACALLBACKS>
-        auto getNextActEvent(EXTRACALLBACKS... extraCallbacks) {
-            callback(events::PreActBodyState(body), mind, extraCallbacks...);
+        auto getNextActEvent(EXTRACALLBACKS &&... extraCallbacks) {
+            callback(events::PreActBodyState(body), mind, std::forward<EXTRACALLBACKS>(extraCallbacks)...);
             action_type act = mind.act(body);
             events::Act actEvent(std::move(act), body.handleAct(act));
-            callback(actEvent, mind, extraCallbacks...);
+            callback(actEvent, mind, std::forward<EXTRACALLBACKS>(extraCallbacks)...);
             return actEvent;
         }
     };

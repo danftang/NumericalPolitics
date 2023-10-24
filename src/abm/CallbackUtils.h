@@ -118,6 +118,8 @@ namespace abm::callbacks {
             std::cout << deselby::choose<deselby::IsStreamable<EVENT>>(event, "event: "s + typeid(EVENT).name()) << std::endl;
         }
     };
+
+
 }
 
 

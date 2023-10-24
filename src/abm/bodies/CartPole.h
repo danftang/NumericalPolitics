@@ -83,7 +83,7 @@ namespace abm::bodies {
          * @param action The current action.
          * @return reward, it's 1.0
          */
-        events::Reward handleAct(int action) {
+        events::MonadicMessageReward handleAct(int action) {
             // Update the number of steps performed.
             stepsPerformed++;
 
@@ -102,8 +102,9 @@ namespace abm::bodies {
             velocity += tau * xAcc,
             angle += tau * angularVelocity,
             angularVelocity += tau * thetaAcc;
-            bool isEndOfEpisode = isTerminal();
-            return isEndOfEpisode ? events::Reward(std::nullopt) : events::Reward(1.0);
+            bool failed = isInFailState();
+            double reward = !failed;
+            return events::MonadicMessageReward(hasReachedMaxSteps() || failed, reward);
         }
 
 //        template<class MIND>
@@ -137,13 +138,22 @@ namespace abm::bodies {
          *
          * @return true if state is a terminal state, otherwise false.
          */
-        bool isTerminal() const {
-            if (maxSteps != 0 && stepsPerformed >= maxSteps) return true;
-            if (std::abs(position) > xThreshold ||
-                std::abs(angle) > thetaThresholdRadians)
-                return true;
-            return false;
+//        bool isTerminal() const {
+//            if (maxSteps != 0 && stepsPerformed >= maxSteps) return true;
+//            if (std::abs(position) > xThreshold ||
+//                std::abs(angle) > thetaThresholdRadians)
+//                return true;
+//            return false;
+//        }
+
+        bool hasReachedMaxSteps() const {
+            return maxSteps != 0 && stepsPerformed >= maxSteps;
         }
+
+        bool isInFailState() const {
+            return std::abs(position) > xThreshold || std::abs(angle) > thetaThresholdRadians;
+        }
+
 
         //! Get the number of steps performed.
         size_t StepsPerformed() const { return stepsPerformed; }

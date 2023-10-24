@@ -50,7 +50,11 @@ namespace tests {
         const size_t bufferSize = 100000;
         const size_t batchSize = 64;
         const double discount = 1.0;
-        const size_t endSatateFnnUpdateInterval = 5;
+        const size_t endSatateFnnUpdateInterval = 6; //5;
+        const double initialExploration = 0.1;
+        const double finalExploration = 0.01;
+        const size_t nExplorationSteps = 20000;
+        const double updateStepSize = 0.001;
 
         approximators::FNN fnn(abm::bodies::CartPole::dimension,
                 mlpack::Linear(100),
@@ -60,14 +64,14 @@ namespace tests {
                 mlpack::Linear(abm::bodies::CartPole::action_type::size)
                 );
 
-        auto burnInThenTrainEveryStep = [burnin = batchSize]<class BODY>(const events::PreActBodyState<BODY> & /* event */) mutable {
+        auto burnInThenTrainEveryStep = [burnin = 16]<class BODY>(const events::PreActBodyState<BODY> & /* event */) mutable {
             if(burnin > 0) --burnin;
             return burnin == 0;
         };
 
         approximators::DifferentialTrainingPolicy trainingPolicy(
                 ens::AdamUpdate(),
-                0.001,
+                updateStepSize,
                 fnn.parameters().n_rows,
                 fnn.parameters().n_cols,
                 burnInThenTrainEveryStep);
@@ -86,13 +90,21 @@ namespace tests {
                         std::move(trainingPolicy),
                         std::move(loss)
                         ),
-                abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(0.5,50000,0.01))
+                abm::minds::GreedyPolicy(abm::explorationStrategies::LinearDecay(initialExploration, nExplorationSteps, finalExploration))
                 );
 
 //        abm::Agent agent(abm::bodies::CartPole(), std::move(mind));
         abm::Agent agent(abm::bodies::CartPole(), mind);
 
-        agent.runEpisode(abm::callbacks::Verbose());
+        abm::callbacks::RewardPerEpisode rewardCallback;
+
+        double smoothedReward = 0.0;
+        for(int episode = 0; episode < 500; ++episode) {
+            agent.runEpisode(rewardCallback);
+            smoothedReward = 0.95*smoothedReward + 0.05*rewardCallback.rewardThisEpisode;
+            std::cout << episode << " " << smoothedReward << " " << rewardCallback.rewardThisEpisode << std::endl;
+        }
+
     }
 }
 

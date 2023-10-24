@@ -63,7 +63,7 @@ namespace abm::explorationStrategies {
         double exploreDecay;
         double pExploreMin;
 
-        LinearDecay(double initialExploration, int stepsToDecayToMinimum, double minimumExploration) :
+        LinearDecay(double initialExploration, size_t stepsToDecayToMinimum, double minimumExploration) :
                 pExplore(initialExploration),
                 exploreDecay((initialExploration - minimumExploration)/stepsToDecayToMinimum),
                 pExploreMin(minimumExploration) {}
