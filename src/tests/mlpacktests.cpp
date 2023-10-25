@@ -48,27 +48,23 @@ void cartPoleDQNTest() {
 
     mlpack::SimpleDQN<> qNetwork(100,50,2);
 //    mlpack::GreedyPolicy<Environment> policy(1.0, 100, 0.01, 0.97);
-    mlpack::GreedyPolicy<Environment> policy(0.1, 10000, 0.01, 0.5);
+//    mlpack::GreedyPolicy<Environment> policy(0.1, 10000, 0.01, 0.5);
+    mlpack::GreedyPolicy<Environment> policy(0.1, 20000, 0.01);
     mlpack::RandomReplay<Environment> replay(64,100000);
 //    mlpack::PrioritizedReplay<Environment> replay(10, 10000, 0.6);
     ens::AdamUpdate updater;
     Environment environment;
-
-//    mlpack::QLearning<
-//            mlpack::CartPole,
-//            mlpack::SimpleDQN<>,
-//            ens::AdamUpdate,
-//            mlpack::GreedyPolicy<Environment>,
-//            mlpack::RandomReplay<Environment>> model(config, qNetwork, policy, replay, updater, environment);
 
     mlpack::QLearning model(config, qNetwork, policy, replay, updater, environment);
 
     double smoothedReturn = 20.0;
     int iterations = 0;
     while(smoothedReturn < 199.999) {
+        auto startTimer = std::chrono::system_clock::now();
         double episodeReturn = model.Episode();
+        auto endTimer = std::chrono::system_clock::now();
         smoothedReturn = 0.95*smoothedReturn + 0.05*episodeReturn;
-        std::cout << iterations << " " << smoothedReturn << " " << episodeReturn << std::endl;
+        std::cout << iterations << " " << smoothedReturn << " " << episodeReturn << " " << endTimer-startTimer << std::endl;
         ++iterations;
     }
     std::cout << "Learned to balance a pole in " << iterations << " episodes." << std::endl;

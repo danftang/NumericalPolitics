@@ -74,6 +74,30 @@ namespace abm::explorationStrategies {
         }
     };
 
+    /** remain at maximum exploration for a number of steps, then decay linearly */
+    class BurninThenLinearDecay {
+    public:
+        size_t burnin;
+        double pExplore;
+        double exploreDecay;
+        double pExploreMin;
+
+        BurninThenLinearDecay(size_t burnin, double initialExploration, size_t stepsToDecayToMinimum, double minimumExploration) :
+                burnin(burnin),
+                pExplore(initialExploration),
+                exploreDecay((initialExploration - minimumExploration)/stepsToDecayToMinimum),
+                pExploreMin(minimumExploration) {}
+
+        bool operator()() {
+            if(burnin > 0) {
+                --burnin;
+            } else if (pExplore > pExploreMin) {
+                pExplore -= std::min(exploreDecay, pExplore - pExploreMin);
+            }
+            return deselby::Random::nextBool(pExplore);
+        }
+    };
+
 
     class ExponentialDecay {
     public:

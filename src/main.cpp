@@ -43,8 +43,10 @@ int main() {
 
 //    tests::testFNN();
 
+    deselby::Random::gen.seed(1235);
     tests::DQNCartPole();
 
+//    mlpack::RandomSeed(52386);
 //    cartPoleDQNTest();
 
     return 0;

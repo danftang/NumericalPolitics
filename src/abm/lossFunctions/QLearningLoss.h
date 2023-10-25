@@ -26,7 +26,7 @@ namespace abm::lossFunctions {
         uint nParameterUpdates;
         double discount;
 
-        arma::ucolvec batchCols;     // columns of the buffer in the current batch
+        arma::uvec batchCols;     // columns of the buffer in the current batch
 
 
         QLearningLoss(size_t bufferSize, size_t stateSize, size_t batchSize, double discount, const ENDSTATEPREDICTOR &endStatePredictor, size_t endStateParameterUpdateInterval) :
@@ -83,12 +83,12 @@ namespace abm::lossFunctions {
         void trainingSet(INPUTS &trainingPoints) {
             assert(bufferIsFull || insertCol > 0);
             if(bufferIsFull) {
-                batchCols = arma::randi<arma::ucolvec>(batchCols.n_rows, arma::distr_param(1, bufferSize() - 1)).transform(
-                        [insertCol = insertCol, buffSize = bufferSize()](auto i) {
+                batchCols = arma::randi<arma::uvec>(batchCols.n_rows, arma::distr_param(1, bufferSize() - 1));
+                batchCols.transform([insertCol = insertCol, buffSize = bufferSize()](auto i) {
                             return (i + insertCol) % buffSize;
                         });
             } else {
-                batchCols = arma::randi<arma::ucolvec>(batchCols.n_rows, arma::distr_param(0, insertCol-1));
+                batchCols = arma::randi<arma::uvec>(batchCols.n_rows, arma::distr_param(0, insertCol-1));
             }
             trainingPoints = stateHistory.cols(batchCols);
         }
@@ -96,28 +96,22 @@ namespace abm::lossFunctions {
 
         template<class OUTPUTS, class RESULT>
         void gradientByPrediction(const OUTPUTS &predictions, RESULT &gradient) {
-            size_t nActions = predictions.n_rows;
             size_t batchSize = predictions.n_cols;
-            arma::urowvec batchElements = arma::regspace<arma::urowvec>(0, nActions, batchSize*nActions - 1) + actionIndices.cols(batchCols);
-            arma::mat batchEndStates = stateHistory.cols(batchCols.transform([buffSize = bufferSize()](auto i) { return (i + 1) % buffSize; }));
+            arma::uvec endStateBatchCols(batchSize, arma::fill::none);
+            for(int i=0; i<batchSize; ++i) endStateBatchCols(i) = (batchCols(i) + 1) % bufferSize();
+            arma::mat batchEndStates  = stateHistory.cols(endStateBatchCols);
             arma::mat batchEndStateQVectors = endStatePredictor(batchEndStates);
-//            auto batchEndStateQVals = arma::max(batchEndStateQVectors);
-//            gradient.resize(nActions, batchSize);
+
             gradient.zeros();
-
-
-            gradient.elem(batchElements) =
-                    predictions.elem(batchElements)
-                    - rewards.cols(batchCols).t()
-                    - (arma::max(batchEndStateQVectors) % effectiveDiscount.cols(batchCols)).t();
-
-
-//            std::cout << "Predictions = \n" << predictions.elem(batchElements).t() << std::endl;
-//            std::cout << "Rewards = \n" << rewards.cols(batchCols) << std::endl;
-//            std::cout << "EndState QVals = \n" << arma::max(batchEndStateQVectors) << std::endl;
-//            std::cout << "EpisodeEnd = \n" << isEpisodeEnd.cols(batchCols) << std::endl;
-//            std::cout << "Gradient = " << gradient.n_rows << " x " << gradient.n_cols << std::endl;
-//            std::cout << gradient << std::endl;
+            double scale = 2.0/batchSize;
+            for (size_t i = 0; i < batchSize; ++i)
+            {
+                uint batchIndex = batchCols(i);
+                uint action = actionIndices(batchIndex);
+                gradient(action, i) = (predictions(action, i)
+                        - rewards(batchIndex)
+                        - batchEndStateQVectors.col(i).max() * effectiveDiscount(batchIndex)) * scale;
+            }
         }
 
 

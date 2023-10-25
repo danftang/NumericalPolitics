@@ -21,7 +21,7 @@ namespace abm::approximators {
 
 
         template<InitializationRule INITRULE, class... LAYERS>
-        FNN(size_t inputDimensions, INITRULE initializeRule, LAYERS &&... layers) {
+        FNN(INITRULE initializeRule, size_t inputDimensions, LAYERS &&... layers) {
             (network.Add(new std::remove_cvref_t<LAYERS>(std::forward<LAYERS>(layers))), ... );
             // set dimensionality
             network.InputDimensions() = {inputDimensions};
@@ -37,7 +37,7 @@ namespace abm::approximators {
         }
 
         template<class... LAYERS>
-        FNN(size_t inputDimensions, LAYERS... layers) : FNN(inputDimensions, mlpack::HeInitialization(), layers...) {}
+        FNN(size_t inputDimensions, LAYERS... layers) : FNN(mlpack::HeInitialization(), inputDimensions, layers...) {}
 
         FNN(const FNN<MatType> &other) : network(other.network), params(other.params) {
             // Set alias matrices to point to new parameter matrix

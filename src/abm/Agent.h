@@ -116,7 +116,7 @@ namespace abm::events {
         IncomingMessage(MESSAGE &&message, double &&reward): MessageReward<MESSAGE>(std::move(message),std::move(reward)) {};
     };
 
-    /** Mind acts and body responds */
+    /** Body's response to an act, packaged together with the act */
     template<class ACTION, class RESPONSE>
     struct Act : RESPONSE {
         ACTION act;
