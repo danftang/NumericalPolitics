@@ -84,41 +84,173 @@
 #include "ZeroIntelligence.h"
 #include "../../DeselbyStd/stlstream.h"
 #include "../episodes/SimpleEpisode.h"
-#include "../../approximators/FeedForwardNeuralNet.h"
-#include "../../approximators/Concepts.h"
-//#include "../../observations/InputOutput.h"
-//#include "../../observations/ActionResponseReward.h"
-#include "../../approximators/InputOutput.h"
+#include "QMind.h"
+
+namespace abm::events {
+    template<class BODY>
+    struct IncomingMessageObservation {
+        std::vector<BODY> bodySamples;
+        BODY::message_type message;
+    };
+
+    template<class BODY>
+    struct TreeQVectorObservation {
+        BODY body;
+        std::vector<double> qVector;
+    };
+}
 
 namespace abm::minds {
 
+    namespace IIMCTS {
+
+        /** Intercepts (BODY,Q-vector) pairs and (BODY state PMF, message) pairs to make a loss function
+         * for a parameterised approximator.
+         *
+         * Given a (BODY state PMF, message) pair and a Q-policy, we define the loss of a function F(x) as the
+         * posterior probability of making the observation:
+         * P(message | P(B), Policy(F)) = \sum_B P(B) P(B.handleAct(Policy(F(B))) == message)
+         * If P(B) is expressed as a set of body-state samples, S, then
+         * P(message | S, Policy(F)) \approx 1/|S| \sum_{B \in S} \sum_a P(B.handleAct(a) == message)P(Policy(F(B)) == a)
+         * so
+         * dP(message | S, Policy(F))/dF(B) \approx 1/|S| \sum_a P(B.handleAct(a) == message)dP(Policy(F(B))==a)/dF(B)
+         * So, we need to use a differentiable policy. Also, we don't have the probability of getting a message given an
+         * act, but we have a sampler of messages given an act, so for each a we sample the message and add the dP/dF
+         * term if sample == message.
+         */
+        template<class BODY, class QPOLICY>
+        class OffTreeLossFunction {
+        public:
+            typedef size_t action_type;
+            QPOLICY qPolicy;
+            std::vector<events::TreeQVectorObservation<BODY>>     qVectorObservationBuffer;
+            std::vector<events::IncomingMessageObservation<BODY>> messageObservationBuffer;
+
+
+        };
+
+        /** A single node in the tree. Represents Q-values of all hidden states with a given observable history.
+         *  For each hidden state, there is an associated "QEntry" (a map<BODY,QVector>::iterator) which
+         *  identifies the body state and the Q-values for all acts from this state.
+         **/
+        template<class BODY, class MESSAGE>
+        class TreeNode {
+        public:
+            typedef MESSAGE message_type;
+            typedef BODY body_type;
+
+            std::map<BODY, QVector<body_type::action_type::size>> qEntries; // qVectors for current player.
+            std::map<BODY, uint> otherPlayerDistribution; // posterior of other player body states given move history
+        private:
+            std::map<message_type, TreeNode *> children;
+//            std::array<TreeNode *, static_cast<size_t>(message_type::size)> children;   // ...indexed by actId. nullptr if child not present.
+        public:
+
+            TreeNode() { children.fill(nullptr); }
+
+            ~TreeNode() { for (TreeNode *child: children) delete (child); }
+
+            TreeNode *getChildOrCreate(message_type message);
+
+            TreeNode *getChildOrNull(message_type message);
+
+            TreeNode *unlinkChild(message_type message);
+
+            auto addQEntry(const BODY &agent);
+
+            const BODY *sampleActorBodyGivenMessage(message_type actorMessage);
+        };
+
+
+        /** A SelfPlayMind is a Mind used to build the tree using self-play.
+         * It can be thought of as a smart pointer into the tree that moves from the root
+         * to a leaf then back-propagates to update Q-values.
+         * During self-play, two SelfPlayMinds simultaneously navigate the same tree.
+         * Each mind can add at most a single qEntry on their turn to act, creating new
+         * TreeNodes in which to put the new qEntry if necessary.
+         * [So, there are three states, onTree/notAddedQEntry, onTree/AddedQentry. offTree]
+         *
+         * The parameters LEAVETRACE and DOBACKPROP allow normal leraning (<true.true> plays against <true,true>)
+         * or targeted improvement of Q-values without invalidating the posterior distributions or Q-values via
+         * leaking information about the state of other player (<false,true> plays against <true,false>)
+         *
+         * @tparam LEAVETRACE   If true, the mind will increment counts in otherPlayerDistribution
+         *                      as it passes through TreeNodes as the other player.
+         * @tparam DOBACKPROP   If true, after the end of an episode, the mind will backpropogate and
+         *                      update the Q-values of the TreeNodes it passed through as currentPlayer.
+         */
+        template<class TREENODE, class OFFTREEQFUNC, bool LEAVETRACE, bool DOBACKPROP>
+        class SelfPlayQFunction {
+        public:
+            typedef TREENODE::body_type body_type;
+            typedef TREENODE::message_type message_type;
+            typedef body_type::action_type action_type;
+            typedef OFFTREEQFUNC offtreeqfunc_type;
+
+            TREENODE *treeNode;// current treeNodes for player's experience, null if off the tree
+            std::vector<QValue *> QValues; // Q values at choice points of the player
+            std::vector<double> rewards; // reward between choice points of the player
+            bool hasAddedQEntry; // have we added a QEntry to the tree yet?
+            offtreeqfunc_type &offTreeQFunction;// current treeNodes for player's experience, null if off the tree
+
+            explicit SelfPlayQFunction(TREENODE &treeNode, offtreeqfunc_type &offtreeqfunction) :
+                    treeNode(treeNode), hasAddedQEntry(!DOBACKPROP), offTreeQFunction(offtreeqfunction) {}
+
+            // ==== Mind interface
+
+            action_type operator()(const body_type &);
+
+            void on(const events::OutgoingMessage<action_type, message_type> &outgoingMessage);
+
+            void on(const events::IncomingMessage<message_type> &incomingMessage);
+//            template<class AGENT1, class AGENT2>
+//            void on(const events::EndEpisode<AGENT1,AGENT2> &startEpisode);
+//            void on(const events::Reward &);
+
+            // =====
+
+            bool isOnTree() const { return treeNode != nullptr; }
+        };
+    }
 
 
     /** An IncompleteInformationMCTS is a Q-function from current
      * body state to Q-vector.
      * The function learns from the following events:
-     * MessageOut,
-     * MessageIn,
-     * BodyStateDrawnFrom   - Signifies that a given agent's body was publicly drawn from a given distribution
-     *                          (but the results of the draw are private).
+     *  - AgentStartEpisode,
+     *  - Act,
+     *  - IncomingMessage,
+     *  - BodyStateDrawnFrom   - Signifies that a given agent's body was publicly drawn from a given distribution
+     *                           (but the results of the draw are private).
      *
-     * An incomplete information Monte-Carlo tree-search is used to generate a Q-vector from a start state,
-     * my (public) belief about the other agent's state and other agent's (public) belief about my state.
+     * At the start of an episode, it is assumed that the start states of the agents are drawn from a distribution
+     * known to both agents.
      *
-     * It is assumed that the opponent has the same type of body, there is a known, shared reward function.
+     * On each function evaluation, a playout tree is constructed by Monte-Carlo sampling (making use of any
+     * valid tree that may already be known) using a pair of SelfPlayMinds and the assumed-to-be-known bodies.
+     * In each state, my belief about the other agent's state and other agent's belief about my state are explicitly
+     * represented as samples. Higher order beliefs aren't necessary as the start state distribution is known and
+     * the bodies are assumed to be known.
      *
-     * Off-tree search is achieved with another (configurable) approximation function from body state
-     * to actions (i.e. an off-tree mind) which must learn from (body state, Q-vector) pairs and
-     * (body state set, observed move) pairs.
+     * The SelfPlayMinds navigate a single tree, which they modify by adding at most one Q-entry per episode.
+     * During back-propogation, they also modify all Q-values they have passed through. SelfPlayMinds intercept
+     *  - IncomingMessage
+     *  - Act
      *
-     * Also configurable is the "Self play policy" which chooses a branch of the tree to investigate
-     * during self play given the current value of the Q-vector.
+     * If the SelfPlayMind goes off off-tree, then a single, shared OFFTREEMIND is used to generate actions from
+     * body states. The OFFTREEMIND can learn from:
+     *  - The Q-vectors generated by the tree.
+     *  - The observed messages from the opponent, given our belief about his state.
+     * These events are generated by the tree, on evaluation and on receipt of incoming messages.
+     *
      *
      * @tparam BODY The body with which we should play out in order to build this tree
      */
-    template<Body BODY,
-            class OffTreeMind, // Function from Body to action trainable on InputOutput<Body,Action> observations
-            class SelfPlayPolicy = abm::UpperConfidencePolicy<typename BODY::action_type>>
+    template<
+            class OffTreeApproximator, // Parameterised approximator from Body to Q-vector
+            class BODY,
+            class OPPONENTBODY = BODY,
+            class SelfPlayPolicy = UpperConfidencePolicy<typename BODY::action_type>>
     class IncompleteInformationMCTS {
     public:
 
@@ -216,17 +348,26 @@ namespace abm::minds {
                                             // N.B. entries may differ from info in qEntries due to sample boosting
                                             // but should be equal to other player distribution of parent.
 
-        inline static const auto defaultOffTreeMind =
-                GreedyPolicy(explorationStrategies::NoExploration(),
-                                        approximators::FeedForwardNeuralNet(
-                                                {new mlpack::Linear(100),
-                                                 new mlpack::ReLU(),
-                                                 new mlpack::Linear(50),
-                                                 new mlpack::ReLU(),
-                                                 new mlpack::Linear(BODY::action_type::size)
-                                                }));
+//        inline static const auto defaultOffTreeMind =
+//                GreedyPolicy(explorationStrategies::NoExploration(),
+//                                        approximators::FeedForwardNeuralNet(
+//                                                {new mlpack::Linear(100),
+//                                                 new mlpack::ReLU(),
+//                                                 new mlpack::Linear(50),
+//                                                 new mlpack::ReLU(),
+//                                                 new mlpack::Linear(BODY::action_type::size)
+//                                                }));
 
         IncompleteInformationMCTS(size_t nSamplesPerTree, double discount, OffTreeMind offTreeMind = defaultOffTreeMind);
+
+        IncompleteInformationMCTS(
+                OffTreeApproximator offTreeApproximator,
+                std::function<BODY(const BODY &)> selfStateSampler,
+                std::function<OPPONENTBODY(const BODY &)> opponentStateSampler,
+                double discount,
+                size_t nSamplesInATree,
+                SelfPlayPolicy selfplaypolicy = UpperConfidencePolicy<typename BODY::action_type>()
+        );
 
         ~IncompleteInformationMCTS() { delete (rootNode); }
 
@@ -307,15 +448,29 @@ namespace abm::minds {
         void shiftRoot(message_type message);
     };
 
+    template<class OffTreeApproximator, class BODY, class OPPONENTBODY, class SelfPlayPolicy>
+    IncompleteInformationMCTS<OffTreeApproximator, BODY, OPPONENTBODY, SelfPlayPolicy>::IncompleteInformationMCTS(
+            OffTreeApproximator offTreeApproximator,
+            std::function<BODY(const BODY &)> selfStateSampler,
+            std::function<OPPONENTBODY(const BODY &)> opponentStateSampler,
+            double discount,
+            size_t nSamplesInATree,
+            SelfPlayPolicy selfplaypolicy) :
+    rootNode(nullptr),
+    nSamplesPerTree(nSamplesPerTree),
+    discount(discount),
+    selfPlayPolicy(selfplaypolicy) {
+    }
 
 
-    template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy>
+    template<class BODY, class OffTreeQFunction, class SelfPlayPolicy>
     IncompleteInformationMCTS<BODY, OffTreeQFunction, SelfPlayPolicy>::
     IncompleteInformationMCTS(size_t nSamplesPerTree, double discount, OffTreeQFunction offTreeMind) :
             rootNode(nullptr),
             nSamplesPerTree(nSamplesPerTree),
             discount(discount),
             offTreeQMind(std::move(offTreeMind)) { }
+
 
 
 //    template<Body BODY, class OffTreeQFunction, class SelfPlayPolicy>
@@ -374,7 +529,7 @@ namespace abm::minds {
 
 
     // ===========================================================================
-    // ============================= TREE NODE ===================================
+    // ======================= TREE NODE IMPLEMENTATION ==========================
     // ===========================================================================
 
     /** Given that the current actor in this node produced a given message, sample from the posterior

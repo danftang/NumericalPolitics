@@ -122,13 +122,19 @@ namespace abm::bodies {
 //        }
 
 
-        operator arma::mat::fixed<4, 1>() const {
-            return asMat();
-        }
+//        operator arma::mat::fixed<4, 1>() const {
+//            return {position, velocity, angle, angularVelocity};
+//        }
 
-        arma::mat::fixed<4, 1> asMat() const {
+        operator arma::mat() const {
             return {position, velocity, angle, angularVelocity};
         }
+
+
+
+//        arma::mat::fixed<4, 1> asMat() const {
+//            return {position, velocity, angle, angularVelocity};
+//        }
 
 
         static action_mask legalActs() { return 3; }

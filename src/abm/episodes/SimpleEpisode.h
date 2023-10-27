@@ -94,9 +94,9 @@ namespace abm::episodes {
      * to both agents
      * The supplied callbacks will be called on the following events:
      *   - StartEpisode
-     *   - Message
+     *   - LeftMessage
+     *   - RightMessage
      *   - EndEpisode
-     * TODO: add synchronous episode running (for e.g. rock/paper/scissors)
      */
     template<class AGENT0, class AGENT1, class... CALLBACKS>
     class Runner {
@@ -112,40 +112,35 @@ namespace abm::episodes {
                 agent1(std::forward<AGENT1>(secondMover)),
                 callbacks(std::forward<CALLBACKS>(callbacks)...) { }
 
-         /** Runs a number of episodes asynchronously (i.e. agents take turns to send messages)
-          *
-          * @param nEpisodes number of epsiodes to run
-          */
+
+         /** Runs a number of episodes asynchronously (i.e. agents take turns to send messages) */
         void runAsync() {
-            callback(events::StartEpisode{agent0, agent1}, callbacks);
-            passMessageRightAndRecurse(agent0.startEpisode());
+            callback(events::StartEpisode{agent0, agent1}, agent0, agent1, callbacks);
+            passMessagesAsync(agent0.startEpisode());
             callback(events::EndEpisode{agent0, agent1}, agent0, agent1, callbacks);
         }
 
-        /** Runs a number of episodes asynchronously (i.e. agents take turns to send messages)
-         *
-         * @param nEpisodes number of epsiodes to run
-         */
+
+        /** Runs a number of episodes asynchronously (i.e. agents take turns to send messages) */
         void runSync() {
-            callback(events::StartEpisode{agent0, agent1}, callbacks);
+            callback(events::StartEpisode{agent0, agent1}, agent0, agent1, callbacks);
             passMessagesSynchronously(agent1.startEpisode(), agent0.startEpisode());
             callback(events::EndEpisode{agent0, agent1}, agent0, agent1, callbacks);
         }
 
     protected:
-        template<class MESSAGE>
-        void passMessageRightAndRecurse(MESSAGE message) {
-            if(isEmptyOptional(message)) return;
-            callback(events::RightMessage{agent0,agent1,valueIfOptional(message)},callbacks);
-            passMessageLeftAndRecurse(agent1.handleMessage(std::move(valueIfOptional(message)))); // tail-recursion will be optimised out (if optimisation is on)
-        }
 
         template<class MESSAGE>
-        void passMessageLeftAndRecurse(MESSAGE message) {
-            if(isEmptyOptional(message)) return;
-            callback(events::LeftMessage{agent1,agent0,valueIfOptional(message)},callbacks);
-            passMessageRightAndRecurse(agent0.handleMessage(std::move(valueIfOptional(message))));
+        void passMessagesAsync(MESSAGE messageFor1) {
+            if(isEmptyOptional(messageFor1)) return;
+            callback(events::RightMessage{agent0,agent1,valueIfOptional(messageFor1)},callbacks);
+            auto messageFor0 = agent1.handleMessage(std::move(valueIfOptional(messageFor1)));
+            if(isEmptyOptional(messageFor0)) return;
+            callback(events::LeftMessage{agent1,agent0,valueIfOptional(messageFor0)},callbacks);
+            // not exactly recursion as MESSAGE type may be different, but tail-call optimisation should prevent stack overflow
+            passMessagesAsync(agent0.handleMessage(std::move(valueIfOptional(messageFor0))));
         }
+
 
         template<class MESSAGE0, class MESSAGE1>
         void passMessagesSynchronously(MESSAGE0 messageFor0, MESSAGE1 messageFor1) {
@@ -154,11 +149,14 @@ namespace abm::episodes {
             callback(events::LeftMessage{agent1,agent0,valueIfOptional(messageFor0)},callbacks);
             passMessagesSynchronously(
                     agent1.handleMessage(std::move(valueIfOptional(messageFor1))),
-                    agent0.handleMessage(std::move(valueIfOptional(messageFor0))));
+                    agent0.handleMessage(std::move(valueIfOptional(messageFor0)))); // tail-call will be optimised out (if optimisation is on)
         }
 
         template<class T>
         inline static bool isEmptyOptional(const std::optional<T> &x) { return !x.has_value(); }
+
+        template<class T>
+        inline static bool isEmptyOptional(const std::nullopt_t &x) { return true; }
 
         template<class T>
         inline static bool isEmptyOptional(const T &x) { return false; }

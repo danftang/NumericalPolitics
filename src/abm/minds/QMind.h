@@ -23,8 +23,8 @@ namespace abm::minds {
         QMind(QFUNCTION qfunction, POLICY policy): QFUNCTION(std::move(qfunction)), policy(std::move(policy)) { }
 
         template<class BODY>
-        auto act(const BODY &body) {
-            return policy.sample(QFUNCTION::operator()(body), body.legalActs());
+        auto act(BODY &&body) {
+            return policy.sample(QFUNCTION::operator()(std::forward<BODY>(body)), body.legalActs());
         }
     };
 }

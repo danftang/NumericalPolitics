@@ -50,7 +50,7 @@ namespace tests {
         const size_t bufferSize = 100000;
         const size_t batchSize = 64;
         const double discount = 1.0;
-        const size_t endSatateFnnUpdateInterval = 5;
+        const size_t endStateFnnUpdateInterval = 5;
         const size_t explorationBurnin = 100;
         const double initialExploration = 0.1;
         const double finalExploration = 0.01;
@@ -84,7 +84,7 @@ namespace tests {
                 batchSize,
                 discount,
                 fnn,
-                endSatateFnnUpdateInterval);
+                endStateFnnUpdateInterval);
 
         auto mind = abm::minds::QMind(
                 approximators::AdaptiveFunction(

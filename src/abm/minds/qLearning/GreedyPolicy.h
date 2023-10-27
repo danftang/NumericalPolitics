@@ -22,17 +22,17 @@ namespace abm::minds {
 
     class GreedyPolicy {
     public:
-        std::function<bool()> explore;
+        std::function<bool()> explorationStrategy;
 
         /** exploration strategies can be found in abm::explorationStrategies */
-        explicit GreedyPolicy(std::function<bool()> explorationStrategy) : explore(std::move(explorationStrategy)) {}
+        explicit GreedyPolicy(std::function<bool()> explorationStrategy) : explorationStrategy(std::move(explorationStrategy)) {}
 
         /** QVector must have operator[] and elements must have an ordering  */
         template<GenericQVector QVECTOR, DiscreteActionMask ACTIONMASK>
         size_t sample(const QVECTOR &qValues, const ACTIONMASK &legalActs) {
             size_t chosenMove;
             assert(legalActs.count() >= 1);
-            return explore() ? minds::ZeroIntelligence::sampleUniformly(legalActs) : max(qValues, legalActs);
+            return explorationStrategy() ? minds::ZeroIntelligence::sampleUniformly(legalActs) : max(qValues, legalActs);
         }
 
         template<GenericQVector QVECTOR, DiscreteActionMask ACTIONMASK>

@@ -10,6 +10,9 @@
 #include "../../DeselbyStd/random.h"
 #include "mlpack.hpp"
 
+#include "../Agent.h"
+#include "../episodes/SimpleEpisode.h"
+
 namespace abm::bodies {
 
     template<bool HASLANGUAGE>
@@ -58,9 +61,10 @@ namespace abm::bodies {
                 8 * nOneHotBitsForMessageEncode * (encodeOutgoingMessage ? nOneHotBitsForMessageEncode : 1);
 
         // Agent state
-        arma::mat::fixed<dimension, 1> netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
+//        arma::mat::fixed<dimension, 1> netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
+        arma::mat netInput = arma::mat(dimension,1); // state in the form of one-hot vectors of action history, plus sugar, spice and preference
         bool isTerminal = false;
-        double reward = 0.0;
+//        double reward = 0.0;
         message_type lastOutgoingMessage;
         action_mask legalMoves;
 
@@ -73,11 +77,10 @@ namespace abm::bodies {
 
         // ----- Body interface -----
 
-        message_type actToMessage(int action);
-        double messageToReward(message_type incomingMessage);
+        events::MessageReward<message_type> handleAct(int action);
+        double handleMessage(message_type incomingMessage);
         std::bitset<action_type::size> legalActs();
-//        bool isEndOfEpisode();
-        double endEpisode();
+        template<class A1, class A2> void on(const events::EndEpisode<A1,A2> &);
         double actToMessageProb(action_type action, message_type message);
 
         // ---- End of Body interface
@@ -98,14 +101,18 @@ namespace abm::bodies {
 
         [[nodiscard]] const double &spice() const { return netInput[1]; }
 
-        [[nodiscard]] const double &prefersSugar() const { return netInput[2]; }
+        [[nodiscard]] bool hasSugar() const { return netInput[0] > 0.0; }
 
-        operator const arma::mat::fixed<dimension,1> &() const {
+        [[nodiscard]] bool hasSpice() const { return netInput[1] > 0.0; }
+
+        [[nodiscard]] bool prefersSugar() const { return netInput[2] != 0.0; }
+
+        operator const arma::mat &() const {
             return netInput;
         }
 
         // convert to integer giving the ordinal of this state
-        operator int() const {
+        operator size_t() const {
             return netInput[0] + 2 * netInput[1] + 4 * netInput[2] + 8 * (static_cast<int>(getLastIncomingMessage()) +
                                                                           (encodeOutgoingMessage ?
                                                                            nOneHotBitsForMessageEncode *
@@ -150,7 +157,7 @@ namespace abm::bodies {
 
         void reset(bool hasSugar, bool hasSpice, bool prefersSugar);
 
-        void onInit(const SugarSpiceTradingBody<HASLANGUAGE> &state) { reset(state.sugar(), state.spice(), state.prefersSugar()); }
+//        void onInit(const SugarSpiceTradingBody<HASLANGUAGE> &state) { reset(state.sugar(), state.spice(), state.prefersSugar()); }
 
         // [[nodiscard]] double utility() const;
 
@@ -211,11 +218,9 @@ namespace abm::bodies {
     }
 
     template<bool HASLANGUAGE>
-    double SugarSpiceTradingBody<HASLANGUAGE>::endEpisode() {
-        double residualReward = reward;
-        reward = 0.0;
+    template<class A1, class A2>
+    double SugarSpiceTradingBody<HASLANGUAGE>::on(const events::EndEpisode<A1,A2> & /* event */) {
         resetLegalMoves();
-        return residualReward;
     }
 
 //    template<bool HASLANGUAGE>
@@ -230,8 +235,8 @@ namespace abm::bodies {
         if(isTerminal) return 0;
         action_mask legalActs;
         for (int i = 0; i < legalActs.size(); ++i) legalActs[i] = true;
-        if (sugar() == 0) legalActs[iGiveSugar] = false;
-        if (spice() == 0) legalActs[iGiveSpice] = false;
+        if (!hasSugar()) legalActs[iGiveSugar] = false;
+        if (!hasSpice()) legalActs[iGiveSpice] = false;
         legalActs[iSay0] = HASLANGUAGE;
 //        legalActs[iSay1] = HASLANGUAGE;
         return legalActs;
@@ -257,64 +262,65 @@ namespace abm::bodies {
         resetLegalMoves();
         recordIncomingMessage(message_type::IndeterminateTerminalMessage); // use first terminal state to mean Empty as we don't use this
         recordOutgoingMessage(message_type::IndeterminateTerminalMessage);
-        sugar() = hasSugar;
-        spice() = hasSpice;
-        this->prefersSugar() = prefersSugar;
-        reward = 0.0;
+        setSugar(hasSugar);
+        setSpice(hasSpice);
+        setPrefersSugar(prefersSugar);
     }
 
 
     template<bool HASLANGUAGE>
-    SugarSpiceTradingBody<HASLANGUAGE>::message_type SugarSpiceTradingBody<HASLANGUAGE>::actToMessage(int action) {
+    abm::events::MessageReward<typename SugarSpiceTradingBody<HASLANGUAGE>::message_type>
+    SugarSpiceTradingBody<HASLANGUAGE>::handleAct(int action) {
+        events::MessageReward<message_type> response(message_type(), 0.0);
         if (deselby::Random::nextBool(pBanditAttack)) {
-            reward -= costOfBanditAttack;
-            if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-            if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-            sugar() = 0;
-            spice() = 0;
+            response.reward -= costOfBanditAttack;
+            if(hasSugar()) response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+            if(hasSpice()) response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+            setSugar(0);
+            setSpice(0);
             isTerminal = true;
-            return message_type::Bandits;
+            response.message = message_type::Bandits;
+            return response;
         }
-        message_type outgoingMessage;
         switch (action) {
             case iGiveSugar:
-                assert(sugar() >= 1);
-                sugar() -= 1;
-                outgoingMessage = message_type::GiveSugar;
-                reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if (sugar() == 0) legalMoves[iGiveSugar] = false;
+                assert(hasSugar());
+                setSugar(sugar() - 1);
+                response.message = message_type::GiveSugar;
+                response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if (!hasSugar()) legalMoves[iGiveSugar] = false;
                 break;
             case iGiveSpice:
-                assert(spice() >= 1);
-                spice() -= 1;
-                outgoingMessage = message_type::GiveSpice;
-                reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-                if (spice() == 0) legalMoves[iGiveSpice] = false;
+                assert(hasSpice());
+                setSpice(spice() - 1);
+                response.message = message_type::GiveSpice;
+                response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                if (!hasSpice()) legalMoves[iGiveSpice] = false;
                 break;
             case iWalkAway:
-                outgoingMessage = message_type::WalkAway;
+                response.message = message_type::WalkAway;
                 break;
             case iFight:
                 // I started fight
-                reward -= costOfFighting;
+                response.reward -= costOfFighting;
                 if(deselby::Random::nextBool()) {
-                    outgoingMessage = message_type::YouWonFight;
-                    if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                    if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-                    sugar() = 0;
-                    spice() = 0;
+                    response.message = message_type::YouWonFight;
+                    if(hasSugar()) response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                    if(hasSpice()) response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                    setSugar(0);
+                    setSpice(0);
                     legalMoves[iGiveSugar] = true;
                     legalMoves[iGiveSpice] = true;
                 } else {
-                    outgoingMessage = message_type::YouLostFight;
-                    if(sugar() == 0.0) reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                    if(spice() == 0.0)  reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-                    sugar() = 1;
-                    spice() = 1;
+                    response.message = message_type::YouLostFight;
+                    if(!hasSugar()) response.reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                    if(!hasSpice()) response.reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                    setSugar(1);
+                    setSpice(1);
                 }
                 break;
             case iSay0:
-                outgoingMessage = message_type::Say0;
+                response.message = message_type::Say0;
                 break;
 //            case iSay1:
 //                outgoingMessage = message_type::Say1;
@@ -326,58 +332,56 @@ namespace abm::bodies {
 //                (outgoingMessage == message_type::YouWonFight ||
 //                outgoingMessage == message_type::YouLostFight ||
 //                (outgoingMessage == message_type::WalkAway && getLastIncomingMessage() == message_type::WalkAway));
-        recordOutgoingMessage(outgoingMessage);
-        return outgoingMessage;
+        recordOutgoingMessage(response.message);
+        return response;
     }
 
 
     template<bool HASLANGUAGE>
-    double SugarSpiceTradingBody<HASLANGUAGE>::messageToReward(SugarSpiceTradingBody::message_type incomingMessage) {
+    double SugarSpiceTradingBody<HASLANGUAGE>::handleMessage(message_type incomingMessage) {
+        double reward = 0.0;
         switch (incomingMessage) {
             case message_type::GiveSugar:
-                sugar() += 1;
+                setSugar(sugar() + 1);
                 reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                 break;
             case message_type::GiveSpice:
-                spice() += 1;
+                setSpice(spice() + 1);
                 reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 break;
             case message_type::YouWonFight:
                 // You started fight and I won
                 reward -= costOfFighting;
-                if(sugar() == 0.0) reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if(spice() == 0.0)  reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-                sugar() = 1;
-                spice() = 1;
+                if(!hasSugar()) reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(!hasSpice())  reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                setSugar(1);
+                setSpice(1);
                 break;
             case message_type::YouLostFight:
                 // You started fight and I lost
                 reward -= costOfFighting;
-                if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-                sugar() = 0;
-                spice() = 0;
+                if(hasSugar()) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(hasSpice())  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                setSugar(0);
+                setSpice(0);
                 break;
             case message_type::Bandits:
                 reward -= costOfBanditAttack;
-                if(sugar() == 1.0) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if(spice() == 1.0)  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-                sugar() = 0;
-                spice() = 0;
+                if(hasSugar()) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(hasSpice())  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                setSugar(0);
+                setSpice(0);
                 break;
             default:
                 break;
         }
         recordIncomingMessage(incomingMessage);
-        double returnedReward = reward;
-        reward = 0.0;
-//        std::cout << "sending reward " << reward << std::endl;
         isTerminal =
                 (incomingMessage == message_type::Bandits ||
                 incomingMessage == message_type::YouWonFight ||
                 incomingMessage == message_type::YouLostFight ||
                 (incomingMessage == message_type::WalkAway && getLastOutgoingMessage() == message_type::WalkAway));
-        return returnedReward;
+        return reward;
     }
 }
 

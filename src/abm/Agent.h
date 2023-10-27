@@ -27,6 +27,7 @@
 
 namespace abm::events {
 
+    /** StartEpisode event for an agent that doesn't communicate with any other agent */
     template<class BODY>
     struct AgentStartEpisode {
         BODY &body;
@@ -113,7 +114,7 @@ namespace abm::events {
 
     template<class MESSAGE>
     struct IncomingMessage : MessageReward<MESSAGE> {
-        IncomingMessage(MESSAGE &&message, double &&reward): MessageReward<MESSAGE>(std::move(message),std::move(reward)) {};
+        IncomingMessage(MESSAGE &&message, const double &reward): MessageReward<MESSAGE>(std::move(message),reward) {};
     };
 
     /** Body's response to an act, packaged together with the act */
@@ -132,6 +133,9 @@ namespace abm::events {
             return out;
         }
     };
+
+    template<class ACTION, class MESSAGE>
+    using OutgoingMessage = Act<ACTION, MessageReward<MESSAGE>>;
 
 
 
@@ -216,7 +220,8 @@ namespace abm {
     template<class BODY, class MIND>
     concept BodyMindPair = requires(BODY body, MIND mind) {
         { body.handleAct(mind.act(body)) } -> deselby::IsSpecializationOf<events::MessageReward>;
-        // and handleMessage(.) on some type of incoming message, depending on which agent it is paired with
+        // and body.handleMessage(.) on some set of incoming message types, if not a Monad (see below).
+        // and body.legalActs(); // returns an ActionMask of acts that the mind can legally perform
     };
 
 
@@ -290,8 +295,17 @@ namespace abm {
         }
 
         template<class AGENT1,class AGENT2>
-        void on(const events::EndEpisode<AGENT1,AGENT2> & /* event */) {
-            callback(events::AgentEndEpisode(body), mind);
+        void on(const events::StartEpisode<AGENT1,AGENT2> & event) {
+            callback(event, body);
+            callback(event, mind);
+            callback(events::AgentStartEpisode(body), mind, body);
+        }
+
+        template<class AGENT1,class AGENT2>
+        void on(const events::EndEpisode<AGENT1,AGENT2> & event) {
+            callback(event, body);
+            callback(event, mind);
+            callback(events::AgentEndEpisode(body), mind, body);
         }
 
         /** This method is called after initiation.
@@ -300,7 +314,6 @@ namespace abm {
          * @return message that begins the episode
          */
         auto startEpisode() requires BodyMindPair<BODY,MIND> {
-            callback(events::AgentStartEpisode(body), mind);
             return getNextActEvent().message;
         }
 

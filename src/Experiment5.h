@@ -83,9 +83,13 @@
 #include "abm/minds/IncompleteInformationMCTS.h"
 #include "abm/episodes/SimpleEpisode.h"
 #include "abm/bodies/SugarSpiceTradingBody.h"
-#include "abm/DQN.h"
-#include "abm/RandomQStepReplay.h"
+// #include "abm/DQN.h"
+// #include "abm/RandomQStepReplay.h"
 #include "abm/minds/qLearning/GreedyPolicy.h"
+#include "abm/approximators/FNN.h"
+#include "abm/approximators/AdaptiveFunction.h"
+#include "abm/lossFunctions/QLearningLoss.h"
+
 
 namespace experiment5 {
     const bool HASLANGUAGE = true;
@@ -100,12 +104,8 @@ namespace experiment5 {
     template<class MIND1, class MIND2>
     void
     setStartState(abm::Agent<body_type,MIND1> &firstAgent, abm::Agent<body_type,MIND2> &secondAgent, std::bitset<4> startState) {
-        firstAgent.body.sugar() = startState[0];
-        secondAgent.body.sugar() = 1.0 - firstAgent.body.sugar();
-        firstAgent.body.spice() = startState[1];
-        secondAgent.body.spice() = 1.0 - firstAgent.body.spice();
-        firstAgent.body.prefersSugar() = startState[2];
-        secondAgent.body.prefersSugar() = startState[3];
+        firstAgent.body.reset(startState[0], startState[1], startState[2]);
+        secondAgent.body.reset(!firstAgent.body.hasSugar(), !firstAgent.body.hasSpice(), startState[3]);
     }
 
 
@@ -126,93 +126,145 @@ namespace experiment5 {
     /** Iterates through all 64 games between two agents (32 joint start states times two possible first movers) */
     template<class AGENT1, class AGENT2>
     void showBehaviour(AGENT1 &agent1, AGENT2 &agent2) {
+        abm::callbacks::MeanRewardPerEpisode agent1MeanReward;
+        abm::callbacks::MeanRewardPerEpisode agent2MeanReward;
+
         for(int startState = 0; startState < 32; ++startState) {
             setStartState(agent1, agent2, startState);
-            abm::episodes::runAsync(agent1, agent2, abm::episodes::callbacks::Verbose());
-            abm::episodes::runAsync(agent2, agent1, abm::episodes::callbacks::Verbose());
+            abm::episodes::runAsync(agent1, agent2, abm::callbacks::Verbose(), agent1MeanReward);
+            abm::episodes::runAsync(agent2, agent1, abm::callbacks::Verbose(), agent2MeanReward);
         }
+        std::cout << "Agent1 mean reward per episode = " << agent1MeanReward.mean() << std::endl;
+        std::cout << "Agent2 mean reward per episode = " << agent2MeanReward.mean() << std::endl;
+    }
+
+
+    template<class MIND1, class MIND2>
+    void trainAndShow(MIND1 &&mind1, MIND2 &&mind2, const int NTRAININGEPISODES) {
+        abm::Agent agent1(body_type(), std::move(mind1));
+        abm::Agent agent2(body_type(), std::move(mind2));
+        train(agent1, agent2, NTRAININGEPISODES);
+        body_type::pBanditAttack = 0.002;
+        agent1.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
+        agent2.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
+        showBehaviour(agent1, agent2);
+    }
+
+
+    template<class APPROXIMATOR>
+    void approximatorSugarSpice(APPROXIMATOR &&approximatorFunction) {
+        const int NTRAININGEPISODES = 200000; // 4000000;
+        const double updateStepSize = 0.001;
+        const size_t bufferSize = 128;
+        const size_t batchSize = 16;
+        const double discount = 1.0;
+        const size_t endStateFnnUpdateInterval = 2;
+
+        auto burnInThenTrainEveryStep = [burnin = 2]<class BODY>(const abm::events::PreActBodyState<BODY> & /* event */) mutable {
+            if(burnin > 0) --burnin;
+            return burnin == 0;
+        };
+
+        abm::approximators::DifferentialTrainingPolicy trainingPolicy(
+                ens::AdamUpdate(),
+                updateStepSize,
+                approximatorFunction.parameters().n_rows,
+                approximatorFunction.parameters().n_cols,
+                burnInThenTrainEveryStep);
+
+        abm::lossFunctions::QLearningLoss loss(
+                bufferSize,
+                body_type::dimension,
+                batchSize,
+                discount,
+                approximatorFunction,
+                endStateFnnUpdateInterval);
+
+        auto mind1 = abm::minds::QMind(
+                abm::approximators::AdaptiveFunction(
+                        std::move(approximatorFunction),
+                        std::move(trainingPolicy),
+                        std::move(loss)),
+                abm::minds::GreedyPolicy(
+                        abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                )
+        );
+        auto mind2 = mind1;
+        trainAndShow(std::move(mind1), std::move(mind2), NTRAININGEPISODES);
     }
 
 
     /** Test a QTable on binary, repeated SugarSpiceTrading */
-    void runA() {
+    void qTableSugarSpice() {
         const int NTRAININGEPISODES = 200000; // 4000000;
 
-        auto mind = abm::minds::MeanRewardMindWrapper(
-                0.99,
-                abm::minds::QMind(
-                        abm::QTable<body_type::nstates, body_type::action_type::size>(1.0, 0.9999),
-                        abm::GreedyPolicy<body_type::action_type>(
+        auto mind1 = abm::minds::QMind(
+                        abm::minds::QTable<body_type::nstates, body_type::action_type::size>(1.0),
+                        abm::minds::GreedyPolicy(
                                 abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
                         )
-                )
-        );
-
-        auto agent1 = abm::Agent(body_type{}, mind);
-        auto agent2 = abm::Agent(body_type{}, mind);
-        train(agent1,agent2,NTRAININGEPISODES);
-        body_type::pBanditAttack = 0.002;
-        agent1.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
-        agent2.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
-        showBehaviour(agent1,agent2);
+                    );
+        auto mind2 = mind1;
+        trainAndShow(std::move(mind1), std::move(mind2), NTRAININGEPISODES);
     }
+
+
 
     /** Test a Deep Q-network on binary, repeated SugarSpiceTrading
     * (spoiler: doesn't learn to cooperate)
     */
-    void runB() {
-        const int NTRAININGEPISODES = 200000; // 4000000;
+    void dqnSugarSpice() {
+        approximatorSugarSpice(abm::approximators::FNN(
+                mlpack::GaussianInitialization(),
+                body_type::dimension,
+                mlpack::Linear(50),
+                mlpack::ReLU(),
+                mlpack::Linear(25),
+                mlpack::ReLU(),
+                mlpack::Linear(body_type::action_type::size)
+        ));
 
-        auto mind = abm::minds::MeanRewardMindWrapper(
-                0.99,
-                abm::minds::QMind(
-                        abm::DQN<body_type::dimension, body_type::action_type::size>(
-                                mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>(
-                                        50, 25, body_type::action_type::size),
-                                abm::RandomQStepReplay(16, 128, body_type::dimension),
-                                2,
-                                1.0),
-                        abm::GreedyPolicy<body_type::action_type>(
-                                abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
-                        )
-                )
-        );
-
-        std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
-        train(agents,NTRAININGEPISODES);
-        body_type::pBanditAttack = 0.002;
-        agents[0].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
-        agents[1].mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
-        showBehaviour(agents);
     }
 
 
     /** Test a Incomplete Information Monte-Carlo tree search on binary, repeated SugarSpiceTrading
     */
-    void runC() {
-        std::cout << "starting experiment" << std::endl;
-        typedef approximators::FeedForwardNeuralNet<body_type::dimension, body_type::action_type::size, mlpack::SimpleDQN<mlpack::MeanSquaredError, mlpack::HeInitialization>> qFunction;
+    void iimctsSugarSpics() {
+        const double discount = 1.0;
+        const size_t nSamplesInATree = 1000;
+        const size_t nTrainingEpisodes = 1000;
 
-        auto network = mlpack::FFN(mlpack::MeanSquaredError(), mlpack::HeInitialization());
-        network.Add(new mlpack::Linear(100));
-        network.Add(new mlpack::ReLU());
-        network.Add(new mlpack::Linear(50));
-        network.Add(new mlpack::ReLU());
-        network.Add(new mlpack::Linear(body_type::action_type::size));
+        auto offTreeApproximator = abm::approximators::FNN(
+                mlpack::GaussianInitialization(),
+                body_type::dimension,
+                mlpack::Linear(50),
+                mlpack::ReLU(),
+                mlpack::Linear(25),
+                mlpack::ReLU(),
+                mlpack::Linear(body_type::action_type::size)
+        );
 
-        ens::Adam adam;
-        adam.MaxIterations()
+        auto selfStateSampler = [](const body_type &myTrueState) {
+            return body_type(myTrueState.hasSugar(), myTrueState.hasSpice(), deselby::Random::nextBool());
+        };
 
-        auto mind =  abm::minds::IncompleteInformationMCTS<body_type,decltype(network)>(200000, 1.0, network);
+        auto opponentStateSampler = [](const body_type &myTrueState) {
+            return body_type(!myTrueState.hasSugar(), !myTrueState.hasSpice(), deselby::Random::nextBool());
+        };
 
-        std::vector agents = {abm::Agent(body_type(), mind), abm::Agent(body_type(), mind)};
+        auto mind1 = abm::minds::QMind(
+                abm::minds::IncompleteInformationMCTS(
+                        offTreeApproximator,
+                        selfStateSampler,
+                        opponentStateSampler,
+                        discount,
+                        nSamplesInATree
+                        ),
+                abm::minds::GreedyPolicy(abm::explorationStrategies::NoExploration()));
 
-        showBehaviour(agents);
+        auto mind2 = mind1;
 
-//        static_assert(abm::HasOneParamInitCallback<abm::minds::IncompleteInformationMCTS<body_type>>);
-//        static_assert(abm::HasOneParamInitCallback<body_type &>);
-
-
+        trainAndShow(std::move(mind1), std::move(mind2), nTrainingEpisodes);
     }
 
 }

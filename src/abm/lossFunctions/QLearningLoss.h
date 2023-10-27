@@ -53,7 +53,7 @@ namespace abm::lossFunctions {
                 insertCol = 0;
             }
             effectiveDiscount(insertCol) = discount; // reset pending AgentStartEpisode event
-            stateHistory.col(insertCol) = event.body.asMat();
+            stateHistory.col(insertCol) = static_cast<const arma::mat &>(event.body);
         }
 
 
