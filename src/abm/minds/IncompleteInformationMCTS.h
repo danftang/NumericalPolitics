@@ -75,6 +75,8 @@
 #include <random>
 #include <bitset>
 #include <ranges>
+#include <boost/circular_buffer.hpp>
+#include <armadillo>
 
 #include "../Agent.h"
 #include "../societies/RandomEncounterSociety.h"
@@ -89,14 +91,8 @@
 namespace abm::events {
     template<class BODY>
     struct IncomingMessageObservation {
-        std::vector<BODY> bodySamples;
+        std::map<BODY,uint> &bodySamples;
         BODY::message_type message;
-    };
-
-    template<class BODY>
-    struct TreeQVectorObservation {
-        BODY body;
-        std::vector<double> qVector;
     };
 }
 
@@ -104,28 +100,95 @@ namespace abm::minds {
 
     namespace IIMCTS {
 
+        /** Loss for a Q-function given a PMF over body states and an observed message
+         * Given a (BODY state PMF, message) pair and a Q-policy, we define the loss of a Q-function Q(b) as the
+         * posterior probability of making the observation:
+         * P(message | P(b), Policy(Q(.))) = \sum_b P(b) P(b.handleAct(Policy(Q(b))) == message)
+         * If P(b) is expressed as a set of weighted body-state samples, b \in S, with weights w(b) then
+         * P(message | S, Policy(Q(.))) \approx 1/\sum_{b' \in S}w(b)  \sum_{b \in S} w(b)\sum_a P(b.handleAct(a) == message)P(Policy(Q(b)) == a)
+         * so
+         *
+         * dP(message | S, Policy(Q(.)))/dQ_a(b) \approx w(b)/\sum_{b' \in S}w(b) \sum_a' P(b.handleAct(a') == message)dP(Policy(Q(b))==a')/dQ_a(b)
+         *
+         * So, we need to use a differentiable policy. Also, we don't have the probability of getting a message given an
+         * act, but we have a sampler of messages given an act, so for each 'a' we sample the message and add the dP/dF
+         * term if sample == message. So for each b \in S
+         *
+         * dP(message | S, Policy(Q(.)))/dQ_a(b) \approx w(b)/\sum_{b' \in S}w(b) \sum_a' [b.handleAct(a') == message]dP(Policy(Q(b))==a')/dQ_a(b)
+         *
+         * so, we can calculate a loss at a single training point, b, given Q(b), w(b), the set of actions, A, which
+         * gave rise to the observed message on sampling and the differential policy,
+         *
+         * N.B. if we assume a deterministic act->message map, then for a given observed message, the set of acts that give
+         * rise to that message is fixed and the associated probabiities are 1, so the sampling over a is exact.
+         */
+         template<class BODY, class POLICY>
+        class MessageLoss {
+        public:
+
+            arma::mat trainingPoints;
+            std::vector<double> weights;    // normalised weight of the training point
+            std::vector<std::vector<uint>>  actions; // actions over which to sum for each training point
+            POLICY policy;
+
+            size_t insertCol = 0;
+            bool isFull = false;
+
+            void on(const events::IncomingMessageObservation<BODY> &observation) {
+                double sumOfWeights = std::views::keys(observation.bodySamples).sum();
+                for(const auto &[body, uweight] : observation.bodySamples) {
+                    trainingPoints.col(insertCol) = static_cast<const arma::mat &>(observation.body);
+                    weights[insertCol] = uweight/sumOfWeights;
+                    actions[insertCol] = body.inverseHandleAct(observation.message);
+                }
+                insertCol = (insertCol + 1)%trainingPoints.n_cols;
+                if(insertCol == 0) isFull = true;
+            }
+
+            size_t capacity() const { trainingPoints.n_cols; }
+            size_t size() const { isFull?capacity():insertCol; }
+
+            template<class INPUTS>
+            void trainingSet(INPUTS &trainingMat) {
+                assert(size() > 0);
+                trainingMat = isFull?trainingPoints:trainingPoints.cols(0, insertCol-1);
+            }
+
+            template<class OUTPUTS, class RESULT>
+            void gradientByPrediction(const OUTPUTS &qVectors, RESULT &gradient) {
+                size_t s = size();
+                gradient.zeroes();
+                for(size_t col = 0; col < s; ++col) {
+                    for(uint action : actions[col]) {
+                        gradient.col(col) += policy.gradient(qVectors.col(col)).col(action);
+                    }
+                    gradient.col(col) *= weights[col];
+                }
+            }
+        };
+
         /** Intercepts (BODY,Q-vector) pairs and (BODY state PMF, message) pairs to make a loss function
          * for a parameterised approximator.
          *
-         * Given a (BODY state PMF, message) pair and a Q-policy, we define the loss of a function F(x) as the
-         * posterior probability of making the observation:
-         * P(message | P(B), Policy(F)) = \sum_B P(B) P(B.handleAct(Policy(F(B))) == message)
-         * If P(B) is expressed as a set of body-state samples, S, then
-         * P(message | S, Policy(F)) \approx 1/|S| \sum_{B \in S} \sum_a P(B.handleAct(a) == message)P(Policy(F(B)) == a)
-         * so
-         * dP(message | S, Policy(F))/dF(B) \approx 1/|S| \sum_a P(B.handleAct(a) == message)dP(Policy(F(B))==a)/dF(B)
-         * So, we need to use a differentiable policy. Also, we don't have the probability of getting a message given an
-         * act, but we have a sampler of messages given an act, so for each a we sample the message and add the dP/dF
-         * term if sample == message.
+         * The loss is given by:
+         *
+         * L = IOLoss + w*MessageLoss
+         * where w is a weight
          */
         template<class BODY, class QPOLICY>
         class OffTreeLossFunction {
         public:
-            typedef size_t action_type;
+            typedef BODY::action_type action_type;
             QPOLICY qPolicy;
-            std::vector<events::TreeQVectorObservation<BODY>>     qVectorObservationBuffer;
-            std::vector<events::IncomingMessageObservation<BODY>> messageObservationBuffer;
+            size_t qVectorBatchSize;
+            size_t messageBatchSize;
+            const double selfOtherLearningRatio = 2.0;
 
+            OffTreeLossFunction(size_t qVectorBufferSize, size_t messageBufferSize, size_t qVectorBatchSize, size_t messageBatchSize):
+            qVectorBatchSize(qVectorBatchSize),
+            messageBatchSize(messageBatchSize) {
+
+            }
 
         };
 

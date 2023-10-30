@@ -344,8 +344,8 @@ namespace abm {
 
 
         friend std::ostream &operator <<(std::ostream &out, const Agent<BODY,MIND> &agent) {
-            deselby::constexpr_if<deselby::IsStreamable<MIND>>([&out](auto &mind) { out << mind << std::endl; }, agent.mind);
-            deselby::constexpr_if<deselby::IsStreamable<BODY>>([&out](auto &body) { out << body << std::endl; }, agent.body);
+            deselby::constexpr_if<deselby::HasInsertStreamOperator<MIND>>([&out](auto &mind) { out << mind << std::endl; }, agent.mind);
+            deselby::constexpr_if<deselby::HasInsertStreamOperator<BODY>>([&out](auto &body) { out << body << std::endl; }, agent.body);
             return out;
         }
     protected:

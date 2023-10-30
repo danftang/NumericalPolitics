@@ -81,13 +81,13 @@ namespace abm::lossFunctions {
 
         template<class INPUTS>
         void trainingSet(INPUTS &trainingPoints) {
-            assert(bufferIsFull || insertCol > 0);
             if(bufferIsFull) {
                 batchCols = arma::randi<arma::uvec>(batchCols.n_rows, arma::distr_param(1, bufferSize() - 1));
                 batchCols.transform([insertCol = insertCol, buffSize = bufferSize()](auto i) {
                             return (i + insertCol) % buffSize;
                         });
             } else {
+                assert(insertCol > 0);
                 batchCols = arma::randi<arma::uvec>(batchCols.n_rows, arma::distr_param(0, insertCol-1));
             }
             trainingPoints = stateHistory.cols(batchCols);

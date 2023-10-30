@@ -7,7 +7,6 @@
 #define MULTIAGENTGOVERNMENT_FEEDFORWARDNEURALNET_H
 
 #include "mlpack.hpp"
-#include "InputOutput.h"
 
 namespace approximators {
     /** use FNN instead  */

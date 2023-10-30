@@ -115,7 +115,7 @@ namespace abm::callbacks {
     public:
         template<class EVENT>
         void on(const EVENT &event) {
-            std::cout << deselby::choose<deselby::IsStreamable<EVENT>>(event, "event: "s + typeid(EVENT).name()) << std::endl;
+            std::cout << deselby::choose<deselby::HasInsertStreamOperator<EVENT>>(event, "event: "s + typeid(EVENT).name()) << std::endl;
         }
     };
 

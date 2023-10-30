@@ -295,12 +295,12 @@ namespace deselby {
     /** True if T can be streamed to a std::ostream using the << operator */
 //    template<class T>
 //    concept IsStreamable = requires(std::ostream out, T obj) { out << obj; };
-    template<class T, class S = std::ostream>
-    concept IsStreamable = requires(S out, T obj) { out << obj; };
+    template<class T, class STREAM = std::ostream>
+    concept HasInsertStreamOperator = requires(STREAM out, T obj) { out << obj; };
 
     /** useful lambda for referring to the overloaded stream operator
      *  is not invocable if not streamable */
-    constexpr auto streamoperator = []<class S, IsStreamable<S> T>(S &out, T &&obj) -> S & { return out << std::forward<T>(obj); };
+    constexpr auto streamoperator = []<class S, HasInsertStreamOperator<S> T>(S &out, T &&obj) -> S & { return out << std::forward<T>(obj); };
 
 
     /** A simple box that allows native types (such as double) to be used as template parameters
