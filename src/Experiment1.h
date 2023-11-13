@@ -88,7 +88,6 @@
 
 #include <set>
 
-#include "abm/abm.h"
 #include "abm/V0.1/agents/agents.h"
 #include "DeselbyStd/stlstream.h"
 

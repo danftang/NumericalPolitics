@@ -31,7 +31,7 @@ namespace abm::lossFunctions {
         size_t insertCol = 0;
         bool isFull = false;
 
-        IOLoss(size_t bufferSize, size_t inputSize, size_t outputSize, size_t batchSize) :
+        IOLoss(size_t bufferSize, size_t inputSize, size_t outputSize) :
                 inputs(inputSize, bufferSize),
                 outputs(outputSize, bufferSize) {
         }
@@ -48,19 +48,19 @@ namespace abm::lossFunctions {
 
         size_t capacity() const { return inputs.n_cols; }
 
-        size_t size() const { return isFull?capacity():insertCol; }
+        size_t batchSize() const { return isFull?capacity():insertCol; }
 
 
         template<class INPUTS>
         void trainingSet(INPUTS &trainingPoints) {
-            assert(size() > 0);
-            trainingPoints = inputs.cols(0, size()-1);
+            assert(batchSize() > 0);
+            trainingPoints = inputs.cols(0, batchSize()-1);
         }
 
 
         template<class OUTPUTS, class RESULT>
         void gradientByPrediction(const OUTPUTS &predictions, RESULT &gradient) {
-            gradient = predictions - outputs.cols(0,size()-1);
+            gradient = predictions - outputs.cols(0,batchSize()-1);
         }
     };
 }

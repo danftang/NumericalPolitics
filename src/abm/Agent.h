@@ -20,19 +20,26 @@
 #include <algorithm>
 #include <cassert>
 #include <utility>
-#include "Body.h"
-#include "Mind.h"
+//#include "Body.h"
+//#include "Mind.h"
 #include "CallbackUtils.h"
 #include "../DeselbyStd/OptionalDouble.h"
+#include "Concepts.h"
 
 namespace abm::events {
+
+    struct IsEndEpisodeMessage {
+        IsEndEpisodeMessage(bool isEndEpisode) : isEndEpisode(isEndEpisode) {}
+        bool isEndEpisode;
+    };
 
     /** StartEpisode event for an agent that doesn't communicate with any other agent */
     template<class BODY>
     struct AgentStartEpisode {
         BODY &body;
+        bool isFirstMover;
 
-        explicit AgentStartEpisode(BODY &body): body(body) {}
+        explicit AgentStartEpisode(BODY &body, bool isFirstMover): body(body), isFirstMover(isFirstMover) {}
 
         friend std::ostream &operator <<(std::ostream &out, const AgentStartEpisode<BODY> &event) {
             out << "Starting episode...";
@@ -66,15 +73,6 @@ namespace abm::events {
     };
 
 
-//    template<class T>
-//    struct Action {
-//        T act;
-//
-//        explicit Action(const T &act): act(act) {}
-//        explicit Action(T &&act): act(std::move(act)) {}
-//    };
-
-
     /** return type for a body's handleAct(.) method */
     template<class MESSAGE>
     struct MessageReward : Reward {
@@ -89,16 +87,6 @@ namespace abm::events {
         }
     };
 
-    /** return type for a body's handleAct(.) method
-     * when the body never communicates with any other agent.
-     * In this case, the message is a bool, indicating whether the episode has ended
-     */
-    struct MonadicMessageReward : MessageReward<bool> {
-        MonadicMessageReward(bool isEndEpisode, const double &reward): MessageReward<bool>(isEndEpisode, reward) {}
-
-        bool isEndEpisode() { return message; }
-    };
-
 
     template<class BODY>
     struct PreActBodyState {
@@ -109,34 +97,62 @@ namespace abm::events {
             out << "Preparing to act...";
             return out;
         }
-
     };
 
-    template<class MESSAGE>
-    struct IncomingMessage : MessageReward<MESSAGE> {
-        IncomingMessage(MESSAGE &&message, const double &reward): MessageReward<MESSAGE>(std::move(message),reward) {};
-    };
 
-    /** Body's response to an act, packaged together with the act */
-    template<class ACTION, class RESPONSE>
-    struct Act : RESPONSE {
-        ACTION act;
+    template<class BODY>
+    struct PostActBodyState {
+        BODY &body;
+        PostActBodyState(BODY &body): body(body) {}
 
-        Act(ACTION &&act, RESPONSE &&messageReward):
-                RESPONSE(std::move(messageReward)),
-                act(std::move(act)) { }
-
-        const RESPONSE &response() const { return *this; }
-
-        friend std::ostream &operator <<(std::ostream &out, const Act<ACTION,RESPONSE> &event) {
-            out << "Agent performed act " << event.act << " and body returned " << event.response();
+        friend std::ostream &operator <<(std::ostream &out, const PostActBodyState<BODY> &event) {
+            out << "Acted...";
             return out;
         }
     };
 
-    template<class ACTION, class MESSAGE>
-    using OutgoingMessage = Act<ACTION, MessageReward<MESSAGE>>;
+    struct IncomingMessageResponse : Reward {
+        bool isEndEpisode;
+    };
 
+    template<class MESSAGE>
+    struct IncomingMessage : IncomingMessageResponse {
+        MESSAGE message;
+    };
+
+
+    template<class MESSAGE>
+    struct OutgoingMessage : MessageReward<MESSAGE> {
+        OutgoingMessage(MESSAGE &&message, const double &reward): MessageReward<MESSAGE>(std::move(message),reward) {};
+    };
+
+
+    /** return type for a body's handleAct(.) method
+     * when the body never communicates with any other agent.
+     * In this case, the message is a bool, indicating whether the episode has ended
+     */
+     // Use OutgoingMessage<EmptyMessage>
+//    struct MonadicMessageReward : OutgoingMessage<bool> {
+//        MonadicMessageReward(bool isEndEpisode, const double &reward): OutgoingMessage<bool>(std::move(isEndEpisode), reward) {}
+//
+//        bool isEndEpisode() { return message; }
+//    };
+
+
+    /** Mind's act and Body's reward and message in response to the act */
+    template<class ACTION, class MESSAGE>
+    struct AgentStep : OutgoingMessage<MESSAGE> {
+        ACTION act;
+
+        AgentStep(ACTION &&act, OutgoingMessage<MESSAGE> &&messageReward):
+                OutgoingMessage<MESSAGE>(std::move(messageReward)),
+                act(std::move(act)) { }
+
+        friend std::ostream &operator <<(std::ostream &out, const AgentStep<ACTION,MESSAGE> &event) {
+            out << "Agent performed act " << event.act << " and body returned " << static_cast<OutgoingMessage<MESSAGE> &>(event);
+            return out;
+        }
+    };
 
 
 }
@@ -217,20 +233,6 @@ namespace abm::callbacks {
 }
 
 namespace abm {
-    template<class BODY, class MIND>
-    concept BodyMindPair = requires(BODY body, MIND mind) {
-        { body.handleAct(mind.act(body)) } -> deselby::IsSpecializationOf<events::MessageReward>;
-        // and body.handleMessage(.) on some set of incoming message types, if not a Monad (see below).
-        // and body.legalActs(); // returns an ActionMask of acts that the mind can legally perform
-    };
-
-
-    /** A body/mind monad is one where the body doesn't send any messages out or handle any
-     * incoming messages. So the communication is entirely act/reward between mind and body. */
-    template<class BODY, class MIND>
-    concept BodyMindMonad = requires(BODY body, MIND mind) {
-        { body.handleAct(mind.act(body)) } -> std::same_as<events::MonadicMessageReward>;
-    };
 
 
     /**
@@ -243,7 +245,8 @@ namespace abm {
      * @tparam BODY
      * @tparam MIND
      */
-    template<class BODY, class MIND> class Agent {
+    template<class BODY, class MIND> requires BodyMindPair<BODY,MIND>
+    class Agent {
     public:
         BODY body;
         MIND mind;
@@ -251,10 +254,10 @@ namespace abm {
         typedef BODY body_type;
         typedef MIND mind_type;
 
-        // This design implies single action and message types
+        // Given BODY and MIND, action and (outgoing) message types are defined.
+        // These typedefs can be used to refer to them, given BODY and MIND
         typedef decltype(mind.act(body)) action_type;
-//        typedef decltype(body.handleAct(std::declval<action_type>()).message) message_type;
-//        typedef events::OutgoingMessage<BODY,action_type, message_type> outgoing_message_type;
+        typedef decltype(body.handleAct(mind.act(body)).message) message_type;
 
         /**
          *
@@ -298,7 +301,7 @@ namespace abm {
         void on(const events::StartEpisode<AGENT1,AGENT2> & event) {
             callback(event, body);
             callback(event, mind);
-            callback(events::AgentStartEpisode(body), mind, body);
+            callback(events::AgentStartEpisode(body, static_cast<void *>(this) == static_cast<void *>(&event.agent1)), mind, body);
         }
 
         template<class AGENT1,class AGENT2>
@@ -313,7 +316,7 @@ namespace abm {
          * If the episode is synchronous (e.g. rock-paper-scisors) it is called on both agents.
          * @return message that begins the episode
          */
-        auto startEpisode() requires BodyMindPair<BODY,MIND> {
+        message_type startEpisode() requires BodyMindPair<BODY,MIND> {
             return getNextActEvent().message;
         }
 
@@ -321,9 +324,9 @@ namespace abm {
          * consists of act/reward between mind and body until body returns a not-a-number as reward */
          template<class... CALLBACKS>
         void runEpisode(CALLBACKS &&... callbacks) requires BodyMindMonad<BODY,MIND> {
-            callback(events::AgentStartEpisode(body), mind, body, std::forward<CALLBACKS>(callbacks)...);
-            auto response = getNextActEvent(std::forward<CALLBACKS>(callbacks)...);
-            while(!response.isEndEpisode()) {
+            callback(events::AgentStartEpisode(body,true), mind, body, std::forward<CALLBACKS>(callbacks)...);
+            events::AgentStep<action_type,message_type> response = getNextActEvent(std::forward<CALLBACKS>(callbacks)...);
+            while(!response.message.isEndEpisode) {
                 response = getNextActEvent(std::forward<CALLBACKS>(callbacks)...);
             }
             callback(events::AgentEndEpisode(body), mind, body, std::forward<CALLBACKS>(callbacks)...);
@@ -336,9 +339,11 @@ namespace abm {
          *   ended the episode.
          */
         template<class INMESSAGE> requires BodyMindPair<BODY,MIND>
-        auto handleMessage(INMESSAGE incomingMessage) {
-            events::IncomingMessage inMessageEvent(std::move(incomingMessage), body.handleMessage(incomingMessage));
+        deselby::ensure_optional_t<message_type> handleMessage(INMESSAGE incomingMessage) {
+            events::IncomingMessageResponse inMessageResponse = body.handleMessage(incomingMessage);
+            events::IncomingMessage<message_type> inMessageEvent{std::move(inMessageResponse), std::move(incomingMessage)};
             callback(inMessageEvent,mind);
+            if(inMessageEvent.isEndEpisode) return std::nullopt;
             return getNextActEvent().message;
         }
 
@@ -350,11 +355,13 @@ namespace abm {
         }
     protected:
         template<class... EXTRACALLBACKS>
-        auto getNextActEvent(EXTRACALLBACKS &&... extraCallbacks) {
+        events::AgentStep<action_type,message_type> getNextActEvent(EXTRACALLBACKS &&... extraCallbacks) {
             callback(events::PreActBodyState(body), mind, std::forward<EXTRACALLBACKS>(extraCallbacks)...);
             action_type act = mind.act(body);
-            events::Act actEvent(std::move(act), body.handleAct(act));
+            events::OutgoingMessage<message_type> outMessageEvent = body.handleAct(act);
+            events::AgentStep<action_type, message_type> actEvent{std::move(act), std::move(outMessageEvent)};
             callback(actEvent, mind, std::forward<EXTRACALLBACKS>(extraCallbacks)...);
+            callback(events::PostActBodyState(body), mind, std::forward<EXTRACALLBACKS>(extraCallbacks)...);
             return actEvent;
         }
     };

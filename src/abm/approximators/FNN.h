@@ -65,7 +65,7 @@ namespace abm::approximators {
         template<LossFunction LOSS>
         MatType gradientByParams(LOSS &&loss) {
             // get the training set on which the loss function is defined
-            MatType inputs(network.InputDimensions()[0], loss.nPoints());
+            MatType inputs(network.InputDimensions()[0], loss.batchSize());
             loss.trainingSet(inputs);
 
             // Ensure the inputs are of the right dimension

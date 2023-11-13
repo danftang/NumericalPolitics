@@ -1,8 +1,8 @@
-//#include "mlpack.hpp"
+#include "mlpack.hpp"
 //#include "abm/agents/agents.h"
 //#include "Experiment1.h"
 //#include "Experiment2.h"
-//#include "Experiment5.h"
+#include "Experiment5.h"
 
 
 #include <vector>
@@ -21,14 +21,17 @@
 
 //#include "abm/societies/RandomEncounterSociety.h"
 
+
 int main() {
+
 //  --- EXPERIMENTS
 ////    experiment1();
 //    experiment2a();
 ////    experiment2b();
 //    experiment5a();
 //    experiment5b();
-//    experiment5::runC();
+
+    experiment5::iimctsSugarSpice();
 
     // ---- TESTS
 //    cartPoleDQNTest();
@@ -43,11 +46,11 @@ int main() {
 
 //    tests::testFNN();
 
-    deselby::Random::gen.seed(1235);
-    tests::DQNCartPole();
+//    tests::DQNCartPole();
 
 //    mlpack::RandomSeed(52386);
 //    cartPoleDQNTest();
+
 
     return 0;
 }

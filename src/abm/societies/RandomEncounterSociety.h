@@ -53,8 +53,8 @@ namespace abm::societies {
             auto callbackTuple = std::tie(callbacks...);
             while(nEpisodes != 0) {
                 --nEpisodes;
-                deselby::ElementID agent1ID = deselby::randomElementIndex(agents, deselby::Random::gen);
-                deselby::ElementID agent2ID = deselby::randomElementIndex(agents, deselby::Random::gen);
+                deselby::ElementID agent1ID = deselby::randomElementIndex(agents);
+                deselby::ElementID agent2ID = deselby::randomElementIndex(agents);
                 deselby::visit_tuple(agents,
                                             [nEpisodes, &callbackTuple](auto &agent1, auto &agent2) {
                                                 episodes::runAsync(agent1, agent2, callbackTuple);
@@ -64,7 +64,7 @@ namespace abm::societies {
         }
     };
     template<deselby::IsUniquelyConvertibleToTemplate<std::vector>... VECTORS> requires(sizeof...(VECTORS)>1 && deselby::AllDifferentAndNotEmpty<VECTORS...>)
-    RandomEncounterSociety(VECTORS &&...vectors) -> RandomEncounterSociety<typename deselby::ConvertsToTemplateType<std::remove_reference_t<VECTORS>,std::vector>::value_type...>;
+    RandomEncounterSociety(VECTORS &&...vectors) -> RandomEncounterSociety<typename deselby::converts_to_template_t<std::remove_reference_t<VECTORS>,std::vector>::value_type...>;
 
     // ----- Specialization for just one type of agent
     template<class AGENT>
@@ -97,8 +97,8 @@ namespace abm::societies {
         // Randomly choose a pair of agent's without replacement
         std::pair<AGENT &, AGENT &> chooseAgentPair() {
             assert(agents.size() >= 2);
-            int firstAgentIndex = deselby::Random::nextInt(0, agents.size());
-            int secondAgentIndex = deselby::Random::nextInt(0, agents.size()-1);
+            int firstAgentIndex = deselby::random::uniform(0, agents.size());
+            int secondAgentIndex = deselby::random::uniform(0, agents.size()-1);
             if(secondAgentIndex >= firstAgentIndex) ++secondAgentIndex;
             return { agents[firstAgentIndex], agents[secondAgentIndex] };
         }

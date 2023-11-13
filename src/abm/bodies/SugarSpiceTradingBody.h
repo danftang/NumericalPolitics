@@ -63,7 +63,7 @@ namespace abm::bodies {
         // Agent state
 //        arma::mat::fixed<dimension, 1> netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
         arma::mat netInput = arma::mat(dimension,1); // state in the form of one-hot vectors of action history, plus sugar, spice and preference
-        bool isTerminal = false;
+//        bool isTerminal = false;
 //        double reward = 0.0;
         message_type lastOutgoingMessage;
         action_mask legalMoves;
@@ -71,31 +71,36 @@ namespace abm::bodies {
         SugarSpiceTradingBody(): SugarSpiceTradingBody(false, false, false) { }
 
         SugarSpiceTradingBody(bool hasSugar, bool hasSpice, bool prefersSugar) {
+            resetLegalMoves();
             reset(hasSugar, hasSpice, prefersSugar);
         }
 
 
         // ----- Body interface -----
 
-        events::MessageReward<message_type> handleAct(int action);
-        double handleMessage(message_type incomingMessage);
+        events::OutgoingMessage<message_type> handleAct(int action);
+
+        events::IncomingMessageResponse handleMessage(message_type incomingMessage);
+
         std::bitset<action_type::size> legalActs();
-        template<class A1, class A2> void on(const events::EndEpisode<A1,A2> &);
+
+//        template<class A1, class A2> void on(const events::EndEpisode<A1,A2> &);
+
         double actToMessageProb(action_type action, message_type message);
 
         // ---- End of Body interface
 
-        double &setSugar(int nSugar) {
+        void setSugar(int nSugar) {
             netInput[0] = nSugar;
             legalMoves[iGiveSugar] = nSugar>0;
         }
 
-        double &setSpice(int nSpice) {
+        void setSpice(int nSpice) {
             netInput[1] = nSpice;
             legalMoves[iGiveSpice] = nSpice>0;
         }
 
-        double &setPrefersSugar(bool prefersSugar) { netInput[2] = prefersSugar; }
+        void setPrefersSugar(bool prefersSugar) { netInput[2] = prefersSugar; }
 
         [[nodiscard]] const double &sugar() const { return netInput[0]; }
 
@@ -217,11 +222,11 @@ namespace abm::bodies {
         return p;
     }
 
-    template<bool HASLANGUAGE>
-    template<class A1, class A2>
-    double SugarSpiceTradingBody<HASLANGUAGE>::on(const events::EndEpisode<A1,A2> & /* event */) {
-        resetLegalMoves();
-    }
+//    template<bool HASLANGUAGE>
+//    template<class A1, class A2>
+//    void SugarSpiceTradingBody<HASLANGUAGE>::on(const events::EndEpisode<A1,A2> & /* event */) {
+//        resetLegalMoves();
+//    }
 
 //    template<bool HASLANGUAGE>
 //    bool SugarSpiceTradingBody<HASLANGUAGE>::isEndOfEpisode() {
@@ -232,14 +237,7 @@ namespace abm::bodies {
     template<bool HASLANGUAGE>
     SugarSpiceTradingBody<HASLANGUAGE>::action_mask
     SugarSpiceTradingBody<HASLANGUAGE>::legalActs() {
-        if(isTerminal) return 0;
-        action_mask legalActs;
-        for (int i = 0; i < legalActs.size(); ++i) legalActs[i] = true;
-        if (!hasSugar()) legalActs[iGiveSugar] = false;
-        if (!hasSpice()) legalActs[iGiveSpice] = false;
-        legalActs[iSay0] = HASLANGUAGE;
-//        legalActs[iSay1] = HASLANGUAGE;
-        return legalActs;
+        return legalMoves;
     }
 
     template<bool HASLANGUAGE>
@@ -259,7 +257,6 @@ namespace abm::bodies {
 
     template<bool HASLANGUAGE>
     void SugarSpiceTradingBody<HASLANGUAGE>::reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
-        resetLegalMoves();
         recordIncomingMessage(message_type::IndeterminateTerminalMessage); // use first terminal state to mean Empty as we don't use this
         recordOutgoingMessage(message_type::IndeterminateTerminalMessage);
         setSugar(hasSugar);
@@ -269,16 +266,15 @@ namespace abm::bodies {
 
 
     template<bool HASLANGUAGE>
-    abm::events::MessageReward<typename SugarSpiceTradingBody<HASLANGUAGE>::message_type>
+    abm::events::OutgoingMessage<typename SugarSpiceTradingBody<HASLANGUAGE>::message_type>
     SugarSpiceTradingBody<HASLANGUAGE>::handleAct(int action) {
-        events::MessageReward<message_type> response(message_type(), 0.0);
-        if (deselby::Random::nextBool(pBanditAttack)) {
+        events::OutgoingMessage<message_type> response(message_type(), 0.0);
+        if (deselby::random::Bernoulli(pBanditAttack)) {
             response.reward -= costOfBanditAttack;
             if(hasSugar()) response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
             if(hasSpice()) response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
             setSugar(0);
             setSpice(0);
-            isTerminal = true;
             response.message = message_type::Bandits;
             return response;
         }
@@ -303,7 +299,7 @@ namespace abm::bodies {
             case iFight:
                 // I started fight
                 response.reward -= costOfFighting;
-                if(deselby::Random::nextBool()) {
+                if(deselby::random::uniform<bool>()) {
                     response.message = message_type::YouWonFight;
                     if(hasSugar()) response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                     if(hasSpice()) response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
@@ -338,7 +334,7 @@ namespace abm::bodies {
 
 
     template<bool HASLANGUAGE>
-    double SugarSpiceTradingBody<HASLANGUAGE>::handleMessage(message_type incomingMessage) {
+    events::IncomingMessageResponse SugarSpiceTradingBody<HASLANGUAGE>::handleMessage(message_type incomingMessage) {
         double reward = 0.0;
         switch (incomingMessage) {
             case message_type::GiveSugar:
@@ -376,12 +372,12 @@ namespace abm::bodies {
                 break;
         }
         recordIncomingMessage(incomingMessage);
-        isTerminal =
+        bool isTerminal =
                 (incomingMessage == message_type::Bandits ||
                 incomingMessage == message_type::YouWonFight ||
                 incomingMessage == message_type::YouLostFight ||
                 (incomingMessage == message_type::WalkAway && getLastOutgoingMessage() == message_type::WalkAway));
-        return reward;
+        return events::IncomingMessageResponse {reward, isTerminal };
     }
 }
 

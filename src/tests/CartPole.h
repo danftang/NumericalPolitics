@@ -8,7 +8,6 @@
 #include <random>
 #include <bitset>
 #include "mlpack.hpp"
-#include "../abm/Mind.h"
 
 // TODO: make this just take a Mind and provides a step?
 namespace tests {

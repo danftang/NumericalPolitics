@@ -48,7 +48,7 @@ namespace abm::minds {
 
         /** Remember last act, body state and reward */
         template<class ACTION, class MESSAGE>
-        void on(const events::Act<ACTION, MESSAGE> &actEvent) {
+        void on(const events::AgentStep<ACTION, MESSAGE> &actEvent) {
             learningStepEvent.reward = actEvent.reward;
             learningStepEvent.action = actEvent.act;
         }

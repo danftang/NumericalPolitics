@@ -61,13 +61,15 @@ namespace abm::minds {
       * and
       * E_n[Q] = (1-a_n)E_{n-1}[Q] + a_n.Q_n
       *
+      * x^n = 0.5, x = e^(-ln(2)/n)
       */
-    template<deselby::ConstExpr<double> sampleDecay>
+    template<uint sampleHalfLife>
     class ExponentiallyWeightedQValue {
     public:
         double  qValue      = 0.0;  // weighted average of samples
         uint    sampleCount = 0;    // number of samples
 
+        static constexpr double sampleDecay = exp(-log(2)/sampleHalfLife);
 
         void addSample(double cumulativeReward) {
             const double a_n = (1.0-sampleDecay)/(1.0-std::pow(sampleDecay, ++sampleCount));
@@ -76,11 +78,11 @@ namespace abm::minds {
 
         operator double() const { return qValue; } // implicit conversion for use with policies that expect a single value
 
-        bool operator <(const ExponentiallyWeightedQValue &other) const {
+        bool operator <(const ExponentiallyWeightedQValue<sampleHalfLife> &other) const {
             return qValue < other.qValue;
         }
 
-        friend std::ostream &operator <<(std::ostream &out, const ExponentiallyWeightedQValue<sampleDecay> &qVal) {
+        friend std::ostream &operator <<(std::ostream &out, const ExponentiallyWeightedQValue<sampleHalfLife> &qVal) {
             out << qVal.sampleCount << ": " << qVal.qValue;
             return out;
         }
@@ -131,22 +133,25 @@ namespace abm::minds {
     template<size_t SIZE, class QVALUE = QValue>
     class QVector: public std::array<QVALUE, SIZE> {
     public:
-        int totalSamples() const {
-            int sum = 0;
+        uint totalSamples() const {
+            uint sum = 0;
             for(const QValue &val : *this) sum += val.sampleCount;
             return sum;
         }
 
         std::array<QVALUE,SIZE> &asArray() { return *this; }
+
 //        arma::mat::fixed<SIZE,1> toVector() {
 //            arma::mat::fixed<SIZE,1> Qvec;
 //            for(int i=0; i<SIZE; ++i) Qvec(i) = (*this)[i].mean();
 //            return Qvec;
 //        }
-//
-//        operator arma::mat::fixed<SIZE,1>() {
-//            return toVector();
-//        }
+
+        arma::mat toVector() {
+            arma::mat Qvec(SIZE,1);
+            for(int i=0; i<SIZE; ++i) Qvec(i) = (*this)[i].mean();
+            return Qvec;
+        }
     };
 }
 

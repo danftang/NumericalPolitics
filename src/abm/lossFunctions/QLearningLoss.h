@@ -7,10 +7,10 @@
 
 #include <armadillo>
 #include "../minds/qLearning/QLearningStepMixin.h"
-
+#include "../Concepts.h"
 
 namespace abm::lossFunctions {
-    template<approximators::ParameterisedFunction ENDSTATEPREDICTOR>
+    template<ParameterisedFunction ENDSTATEPREDICTOR>
     class QLearningLoss {
     public:
         // the buffer...
@@ -48,7 +48,7 @@ namespace abm::lossFunctions {
         /** Remember body state directly before act */
         template<class BODY>
         void on(const events::PreActBodyState<BODY> &event) {
-            if(++insertCol >= bufferSize()) {
+            if(++insertCol >= capacity()) {
                 bufferIsFull = true;
                 insertCol = 0;
             }
@@ -59,7 +59,7 @@ namespace abm::lossFunctions {
 
         /** Remember last act and reward and increment buffer pointer */
         template<class ACTION, class MESSAGE>
-        void on(const events::Act<ACTION, MESSAGE> &actEvent) {
+        void on(const events::AgentStep<ACTION, MESSAGE> &actEvent) {
             rewards(insertCol) = actEvent.reward;
             actionIndices(insertCol) = actEvent.act;
         }
@@ -77,13 +77,16 @@ namespace abm::lossFunctions {
             }
         }
 
-        size_t nPoints() { return batchCols.n_rows; }
+        size_t batchSize() { return batchCols.n_rows; }
+        size_t capacity() const { return stateHistory.n_cols; }
+        size_t bufferSize() const { return bufferIsFull?capacity():insertCol; } // number of items in the buffer
+
 
         template<class INPUTS>
         void trainingSet(INPUTS &trainingPoints) {
             if(bufferIsFull) {
-                batchCols = arma::randi<arma::uvec>(batchCols.n_rows, arma::distr_param(1, bufferSize() - 1));
-                batchCols.transform([insertCol = insertCol, buffSize = bufferSize()](auto i) {
+                batchCols = arma::randi<arma::uvec>(batchCols.n_rows, arma::distr_param(1, capacity() - 1));
+                batchCols.transform([insertCol = insertCol, buffSize = capacity()](auto i) {
                             return (i + insertCol) % buffSize;
                         });
             } else {
@@ -98,7 +101,7 @@ namespace abm::lossFunctions {
         void gradientByPrediction(const OUTPUTS &predictions, RESULT &gradient) {
             size_t batchSize = predictions.n_cols;
             arma::uvec endStateBatchCols(batchSize, arma::fill::none);
-            for(int i=0; i<batchSize; ++i) endStateBatchCols(i) = (batchCols(i) + 1) % bufferSize();
+            for(int i=0; i<batchSize; ++i) endStateBatchCols(i) = (batchCols(i) + 1) % capacity();
             arma::mat batchEndStates  = stateHistory.cols(endStateBatchCols);
             arma::mat batchEndStateQVectors = endStatePredictor(batchEndStates);
 
@@ -115,7 +118,6 @@ namespace abm::lossFunctions {
         }
 
 
-        size_t bufferSize() const { return stateHistory.n_cols; }
 
     protected:
     };

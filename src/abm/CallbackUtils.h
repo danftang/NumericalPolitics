@@ -63,6 +63,9 @@ namespace abm {
         handler.on(std::forward<EVENT>(event), handler);
     }
 
+    template<class EVENT, class CALLBACK> requires(!HasCallback<CALLBACK,EVENT> && !deselby::IsSpecializationOf<std::remove_cvref_t<CALLBACK>,std::tuple>)
+    inline void callback(const EVENT & /* event */, CALLBACK && /* callback */) { }
+
     template<class EVENT,class... CALLBACKS>
     inline void callback(const EVENT &event, std::tuple<CALLBACKS...> &callbackTuple) {
         deselby::for_each(callbackTuple,
@@ -75,8 +78,6 @@ namespace abm {
                           [&event](auto &element) { callback(event, element); });
     }
 
-    template<class EVENT, class CALLBACK> requires(!HasCallback<CALLBACK,EVENT>)
-    inline void callback(EVENT &&, CALLBACK &&) { }
 
     template<class EVENT, class...CALLBACKS> requires(sizeof...(CALLBACKS)>1)
     inline void callback(const EVENT &event, CALLBACKS &&...callbacks) {

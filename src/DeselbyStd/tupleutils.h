@@ -196,7 +196,7 @@ namespace deselby {
 
     /** returns the (tuple index, vector index) pair of a uniformly chosen element in a tuple of sized ranges */
     template<class RANDOMGENERATOR, std::ranges::sized_range...TYPES>
-    ElementID randomElementIndex(const std::tuple<TYPES...> &tuple, RANDOMGENERATOR &&gen) {
+    ElementID randomElementIndex(const std::tuple<TYPES...> &tuple, RANDOMGENERATOR &&gen = deselby::random::gen) {
         auto allSizes = sizes(tuple);
         size_t sumOfSizes = allSizes.sum();
         ElementID element{ 0, std::uniform_int_distribution<size_t>(0,sumOfSizes-1)(gen) };

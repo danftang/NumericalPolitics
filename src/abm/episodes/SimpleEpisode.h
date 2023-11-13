@@ -132,43 +132,43 @@ namespace abm::episodes {
 
         template<class MESSAGE>
         void passMessagesAsync(MESSAGE messageFor1) {
-            if(isEmptyOptional(messageFor1)) return;
-            callback(events::RightMessage{agent0,agent1,valueIfOptional(messageFor1)},callbacks);
-            auto messageFor0 = agent1.handleMessage(std::move(valueIfOptional(messageFor1)));
-            if(isEmptyOptional(messageFor0)) return;
-            callback(events::LeftMessage{agent1,agent0,valueIfOptional(messageFor0)},callbacks);
+            if(deselby::isEmptyOptional(messageFor1)) return;
+            callback(events::RightMessage{agent0,agent1,deselby::valueIfOptional(messageFor1)},callbacks);
+            auto messageFor0 = agent1.handleMessage(std::move(deselby::valueIfOptional(messageFor1)));
+            if(deselby::isEmptyOptional(messageFor0)) return;
+            callback(events::LeftMessage{agent1,agent0,deselby::valueIfOptional(messageFor0)},callbacks);
             // not exactly recursion as MESSAGE type may be different, but tail-call optimisation should prevent stack overflow
-            passMessagesAsync(agent0.handleMessage(std::move(valueIfOptional(messageFor0))));
+            passMessagesAsync(agent0.handleMessage(std::move(deselby::valueIfOptional(messageFor0))));
         }
 
 
         template<class MESSAGE0, class MESSAGE1>
         void passMessagesSynchronously(MESSAGE0 messageFor0, MESSAGE1 messageFor1) {
-            if(isEmptyOptional(messageFor0) || isEmptyOptional(messageFor1)) return;
-            callback(events::RightMessage{agent0,agent1,valueIfOptional(messageFor1)},callbacks);
-            callback(events::LeftMessage{agent1,agent0,valueIfOptional(messageFor0)},callbacks);
+            if(deselby::isEmptyOptional(messageFor0) || deselby::isEmptyOptional(messageFor1)) return;
+            callback(events::RightMessage{agent0,agent1,deselby::valueIfOptional(messageFor1)},callbacks);
+            callback(events::LeftMessage{agent1,agent0,deselby::valueIfOptional(messageFor0)},callbacks);
             passMessagesSynchronously(
-                    agent1.handleMessage(std::move(valueIfOptional(messageFor1))),
-                    agent0.handleMessage(std::move(valueIfOptional(messageFor0)))); // tail-call will be optimised out (if optimisation is on)
+                    agent1.handleMessage(std::move(deselby::valueIfOptional(messageFor1))),
+                    agent0.handleMessage(std::move(deselby::valueIfOptional(messageFor0)))); // tail-call will be optimised out (if optimisation is on)
         }
 
-        template<class T>
-        inline static bool isEmptyOptional(const std::optional<T> &x) { return !x.has_value(); }
-
-        template<class T>
-        inline static bool isEmptyOptional(const std::nullopt_t &x) { return true; }
-
-        template<class T>
-        inline static bool isEmptyOptional(const T &x) { return false; }
-
-        template<class T>
-        inline static T &valueIfOptional(std::optional<T> &opt) { return opt.value(); }
-
-        template<class T>
-        inline static const T &valueIfOptional(const std::optional<T> &opt) { return opt.value(); }
-
-        template<class T>
-        inline static T valueIfOptional(T &&obj) { return std::forward<T>(obj); }
+//        template<class T>
+//        inline static bool isEmptyOptional(const std::optional<T> &x) { return !x.has_value(); }
+//
+//        template<class T>
+//        inline static bool isEmptyOptional(const std::nullopt_t &x) { return true; }
+//
+//        template<class T>
+//        inline static bool isEmptyOptional(const T &x) { return false; }
+//
+//        template<class T>
+//        inline static T &valueIfOptional(std::optional<T> &opt) { return opt.value(); }
+//
+//        template<class T>
+//        inline static const T &valueIfOptional(const std::optional<T> &opt) { return opt.value(); }
+//
+//        template<class T>
+//        inline static T valueIfOptional(T &&obj) { return std::forward<T>(obj); }
 
     };
     // Allow universal reference passing (runner will move rvalue refs and reference lvalue refs)

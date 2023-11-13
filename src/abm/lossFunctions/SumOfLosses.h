@@ -18,7 +18,7 @@ namespace abm::lossFunctions {
     public:
         std::tuple<LOSSES...> losses;
 
-        SumOfLosses(LOSSES...losses) : losses(losses...) {}
+        SumOfLosses(LOSSES...losses) : losses(std::move(losses)...) {}
 
         template<class EVENT> requires (HasCallback<LOSSES,EVENT> || ...)
         void on(const EVENT &event) {

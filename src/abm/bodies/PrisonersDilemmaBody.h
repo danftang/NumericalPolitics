@@ -28,20 +28,22 @@ namespace abm::bodies {
 
         PrisonersDilemmaBody(double pEndEpisode): pEndEpisode(pEndEpisode) { }
 
-        events::MessageReward<std::optional<message_type>> handleAct(size_t actFromMind) {
+        events::OutgoingMessage<message_type> handleAct(size_t actFromMind) {
             myLastMove = actFromMind;
-            return {(deselby::Random::nextBool(pEndEpisode) ? std::nullopt : std::optional(static_cast<message_type>(myLastMove))), 0.0};
+            return { message_type(myLastMove), 0.0 };
         };
 
-        double handleMessage(uint incomingMessage) {
+        events::IncomingMessageResponse handleMessage(uint incomingMessage) {
+            events::IncomingMessageResponse response {0.0, deselby::random::Bernoulli(pEndEpisode)};
             yourLastMove = incomingMessage;
             switch(moveId(myLastMove, yourLastMove)) {
-                case moveId(Cooperate, Cooperate):  return 3.0;
-                case moveId(Cooperate, Defect):     return 0.0;
-                case moveId(Defect,    Cooperate):  return 4.0;
-                case moveId(Defect,    Defect):     return 1.0;
+                case moveId(Cooperate, Cooperate):  response.reward = 3.0; break;
+                case moveId(Cooperate, Defect):     response.reward = 0.0; break;
+                case moveId(Defect,    Cooperate):  response.reward = 4.0; break;
+                case moveId(Defect,    Defect):     response.reward = 1.0; break;
+                default: throw(std::out_of_range("unknown incomming message"));
             }
-            throw(std::out_of_range("unknown incomming message"));
+            return response;
         }
 
         operator size_t() const { return 2*myLastMove + yourLastMove; }

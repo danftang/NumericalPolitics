@@ -6,7 +6,7 @@
 #define MULTIAGENTGOVERNMENT_ZEROINTELLIGENCE_H
 
 #include <cassert>
-#include "../ActionMask.h"
+#include "../Concepts.h"
 #include "../../DeselbyStd/random.h"
 
 namespace abm::minds {
@@ -22,17 +22,25 @@ namespace abm::minds {
          * @param legalMoves the mask from which we wish to sample
          * @return a legal index into legalMoves chosen with uniform probability.
          */
-        template<DiscreteActionMask MASK>
-        static size_t sampleUniformly(const MASK &legalMoves) {
-            size_t chosenMove = 0;
-            auto nLegalMoves = legalMoves.count();
-            assert(nLegalMoves > 0);
-            size_t legalMovesToGo = deselby::Random::nextSizeT(0, nLegalMoves);
-            while(legalMovesToGo > 0 || legalMoves[chosenMove] == false) {
-                if(legalMoves[chosenMove] == true) --legalMovesToGo;
-                ++chosenMove;
-                assert(chosenMove < legalMoves.size());
-            }
+        template<IntegralActionMask MASK>
+        static auto sampleUniformly(const MASK &legalMoves) {
+            typedef decltype(legalMoves.size()) action_type;
+//            action_type chosenMove = 0;
+//            action_type nLegalMoves = legalMoves.count();
+//            assert(nLegalMoves > 0);
+//            action_type legalMovesToGo = deselby::random::uniform(nLegalMoves);
+//            while(legalMovesToGo > 0 || legalMoves[chosenMove] == false) {
+//                if(legalMoves[chosenMove] == true) --legalMovesToGo;
+//                ++chosenMove;
+//                assert(chosenMove < legalMoves.size());
+//            }
+            action_type chosenMove;
+            size_t maxMoves = size_t(64)*legalMoves.size();
+            std::uniform_int_distribution<action_type> randomElement(legalMoves.size());
+            do { // rejection sampling has expected runtime of legalMoves.size()/legalMoves.count()
+                chosenMove = randomElement(deselby::random::gen);
+                assert(--maxMoves > 0);
+            } while(legalMoves[chosenMove] == false);
             return chosenMove;
         }
     };

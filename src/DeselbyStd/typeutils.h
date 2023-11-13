@@ -48,18 +48,19 @@ namespace deselby {
 //    template<class T> inline constexpr bool is_optional_v = is_specialization_of_v<T,std::optional>;
 //    template<class T> inline constexpr bool is_tuple_v = is_specialization_of_v<T,std::tuple>;
 
-    /** ConvertsToTemplateType is true if a type can be used to call to a function that takes that template type,
-     * templated on any templates */
+    /** IsUniquelyConvertibleToTemplate<T,TEMPLATE> is true if there exists a parameter pack ARGS... such that
+     * an object of type T can be used to call to a function that takes (const TEMPLATE<ARGS...> & ) */
     template<template<class...> class TEMPLATE, class... TS>
-    TEMPLATE<TS...> is_uniquely_convertible_to_template_helper(TEMPLATE<TS...> objToTest) { return objToTest; };
+    TEMPLATE<TS...> is_uniquely_convertible_to_template_helper(const TEMPLATE<TS...> &objToTest) { return objToTest; };
 
 
     template<class T, template<class...> class TEMPLATE>
     concept IsUniquelyConvertibleToTemplate = requires(T obj) {
         is_uniquely_convertible_to_template_helper<TEMPLATE>(obj); };
 
+    /** converts_to_template_t<T,TEMPLATE> is an alias for the type of template TEMPLATE<ARGS...> that T converts to */
     template<class T, template<class...> class TEMPLATE>
-    using ConvertsToTemplateType = decltype(is_uniquely_convertible_to_template_helper(std::declval<T>()));
+    using converts_to_template_t = decltype(is_uniquely_convertible_to_template_helper(std::declval<T>()));
 
     /** Expresses a number as a sequence of digits in a given base
      *
@@ -302,17 +303,17 @@ namespace deselby {
      *  is not invocable if not streamable */
     constexpr auto streamoperator = []<class S, HasInsertStreamOperator<S> T>(S &out, T &&obj) -> S & { return out << std::forward<T>(obj); };
 
-
-    /** A simple box that allows native types (such as double) to be used as template parameters
-     * which seems not to be supported (as of 2023, clang gives
-     * error: sorry, non-type template argument of type 'double' is not yet supported)
-     * But ConstExpr<double> is fine!
+    /** type for passing constexpr values as arguments. This is useful for sending to constructors
+     * to allow class parameter type deduction.
      */
-    template<class T> struct ConstExpr {
-        const T value;
-        consteval ConstExpr(T val) : value(std::move(val)) {}
-        consteval operator const T &() const { return value; }
+    template<auto... VALS>
+    struct ConstExpr {
     };
+
+    /** type for passing parameter packs as arguments. This is useful for sending to constructors
+     * to allow class parameter type deduction. */
+    template<class... TYPES>
+    struct ParameterPack {};
 
 
     /** use call_signature<T> to extract information from call signatures and function pointers */
@@ -355,6 +356,58 @@ namespace deselby {
     }
 
     template<class T> using call_signature = impl::call_signature_helper<std::remove_cv_t<T>>;
+
+
+
+    /** If obj is a reference_wrapper, returns a reference to the target,
+     * otherwise does nothing */
+    template<class T>
+    T &&remove_reference_wrapper(T &&obj) { return std::forward<T>(obj); }
+
+    template<class T>
+    T &remove_reference_wrapper(const std::reference_wrapper<T> &obj) { return obj.get(); }
+
+    template<class T>
+    T &remove_reference_wrapper(std::reference_wrapper<T> &obj) { return obj.get(); }
+
+    template<class T>
+    T &remove_reference_wrapper(std::reference_wrapper<T> &&obj) { return obj.get(); }
+
+
+    template<class T>
+    struct ensure_optional {
+        typedef std::optional<T> type;
+    };
+
+    template<class T> requires IsUniquelyConvertibleToTemplate<T,std::optional>
+    struct ensure_optional<T> {
+        typedef T type;
+    };
+
+    template<class T>
+    using ensure_optional_t = ensure_optional<T>::type;
+
+    /** true if the argument is an empty optional, otherwise false */
+    template<class T>
+    inline static bool isEmptyOptional(const std::optional<T> &x) { return !x.has_value(); }
+
+    template<class T>
+    inline static bool isEmptyOptional(const std::nullopt_t & /* nullopt */) { return true; }
+
+    template<class T>
+    inline static bool isEmptyOptional(const T & /* non-optional */) { return false; }
+
+    /** if argument is an optional, returns the value of the optional (or error if it's empty)
+     * otherwise returns the argument */
+    template<class T>
+    inline static T &valueIfOptional(std::optional<T> &opt) { return opt.value(); }
+
+    template<class T>
+    inline static const T &valueIfOptional(const std::optional<T> &opt) { return opt.value(); }
+
+    template<class T>
+    inline static T &&valueIfOptional(T &&obj) { return std::forward<T>(obj); }
+
 }
 
 #endif //POLYMORPHICCOLLECTION_TYPEUTILS_H

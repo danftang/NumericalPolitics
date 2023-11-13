@@ -5,14 +5,16 @@
 #ifndef MULTIAGENTGOVERNMENT_UPPERCONFIDENCEPOLICY_H
 #define MULTIAGENTGOVERNMENT_UPPERCONFIDENCEPOLICY_H
 
-#include "ActionMask.h"
-#include "QVector.h"
-#include "../DeselbyStd/random.h"
 #include <bitset>
 #include <cassert>
 #include <ranges>
+#include <cmath>
 
-namespace abm {
+#include "../../Concepts.h"
+#include "QVector.h"
+#include "../../../DeselbyStd/random.h"
+
+namespace abm::minds {
 
     /** Implements a version of UCT that makes use of the standard deviation of QValue samples
      * to provide better performance.
@@ -34,7 +36,7 @@ namespace abm {
          *
          * @return the chosen act
          */
-        template<size_t SIZE, DiscreteActionMask MASK>
+        template<size_t SIZE, IntegralActionMask MASK>
         ACTION sample(const QVector<SIZE> &qValues, const MASK &legalActs) {
             assert(legalActs.size() == SIZE);
             assert(legalActs.count() > 0);
@@ -43,7 +45,7 @@ namespace abm {
             constexpr int minSamples = 1;
             auto undersampledActs = legalActIndices
                                  | std::ranges::views::filter([&qValues](size_t i) { return qValues[i].sampleCount < minSamples; });
-            auto randomUnsampledActIt = deselby::Random::chooseElement(undersampledActs);
+            auto randomUnsampledActIt = deselby::random::uniformIterator(undersampledActs);
             if(randomUnsampledActIt != undersampledActs.end()) return static_cast<ACTION>(*randomUnsampledActIt);
 
             const double N = qValues.totalSamples();
@@ -55,7 +57,7 @@ namespace abm {
                 const QValue &qVal = qValues[actId];
 //                double upperConfidenceQ = qVal.mean() + nStandardErrors * 3.0 * qVal.standardErrorOfMean();
                 double upperConfidenceQ = qVal.mean() + nStandardErrors * 16.0/sqrt(qVal.sampleCount);
-                assert(!isnan(upperConfidenceQ));
+                assert(!std::isnan(upperConfidenceQ));
                 if (upperConfidenceQ >= bestQ) {
                     bestQ = upperConfidenceQ;
                     bestActId = actId;

@@ -12,7 +12,7 @@
 #include "QLearningStepMixin.h"
 
 namespace abm::minds {
-    template<int NSTATES, int NACTIONS, class QVALUE = ExponentiallyWeightedQValue<0.999>>
+    template<int NSTATES, int NACTIONS, class QVALUE = ExponentiallyWeightedQValue<700>>
     class QTable : public QLearningStepMixin<size_t> {
     public:
         std::array<QVector<NACTIONS, QVALUE>, NSTATES>  table;

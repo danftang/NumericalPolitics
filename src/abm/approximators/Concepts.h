@@ -208,7 +208,7 @@ namespace abm::approximators {
 
     ////////  A loss function is a set of inputs and an Output layer,
     /// a stochastic loss function is a generator of loss functions (or a loss function with a sample() member)
-
+F
 //    template<class T>
 //    concept StochasticLossFunction = requires(T obj) {
 //        { obj.getNextLossFunction() } -> LossFunction;

@@ -83,7 +83,7 @@ namespace abm::bodies {
          * @param action The current action.
          * @return reward, it's 1.0
          */
-        events::MonadicMessageReward handleAct(int action) {
+        events::OutgoingMessage<events::IsEndEpisodeMessage> handleAct(int action) {
             // Update the number of steps performed.
             stepsPerformed++;
 
@@ -104,7 +104,7 @@ namespace abm::bodies {
             angularVelocity += tau * thetaAcc;
             bool failed = isInFailState();
             double reward = !failed;
-            return events::MonadicMessageReward(hasReachedMaxSteps() || failed, reward);
+            return events::OutgoingMessage(events::IsEndEpisodeMessage(hasReachedMaxSteps() || failed), reward);
         }
 
 //        template<class MIND>

@@ -112,9 +112,10 @@ namespace experiment5 {
     /** trains agents by running nTrainingEpisodes with random start state and random first-mover */
     template<class AGENT1, class AGENT2>
     void train(AGENT1 &agent1, AGENT2 &agent2, size_t nTrainingEpisodes) {
+        std::cout << "Starting " << nTrainingEpisodes << "Training episodes" << std::endl;
         while(nTrainingEpisodes-- > 0) {
-            setStartState(agent1, agent2, deselby::Random::nextInt(32));
-            if(deselby::Random::nextBool()) {
+            setStartState(agent1, agent2, deselby::random::uniform(32));
+            if(deselby::random::uniform<bool>()) {
                 abm::episodes::runAsync(agent1, agent2);
             } else {
                 abm::episodes::runAsync(agent2, agent1);
@@ -132,6 +133,7 @@ namespace experiment5 {
         for(int startState = 0; startState < 32; ++startState) {
             setStartState(agent1, agent2, startState);
             abm::episodes::runAsync(agent1, agent2, abm::callbacks::Verbose(), agent1MeanReward);
+            setStartState(agent1, agent2, startState);
             abm::episodes::runAsync(agent2, agent1, abm::callbacks::Verbose(), agent2MeanReward);
         }
         std::cout << "Agent1 mean reward per episode = " << agent1MeanReward.mean() << std::endl;
@@ -229,10 +231,10 @@ namespace experiment5 {
 
     /** Test a Incomplete Information Monte-Carlo tree search on binary, repeated SugarSpiceTrading
     */
-    void iimctsSugarSpics() {
+    void iimctsSugarSpice() {
         const double discount = 1.0;
         const size_t nSamplesInATree = 1000;
-        const size_t nTrainingEpisodes = 1000;
+        const size_t nTrainingEpisodes = 2;
 
         auto offTreeApproximator = abm::approximators::FNN(
                 mlpack::GaussianInitialization(),
@@ -244,19 +246,19 @@ namespace experiment5 {
                 mlpack::Linear(body_type::action_type::size)
         );
 
-        auto selfStateSampler = [](const body_type &myTrueState) {
-            return body_type(myTrueState.hasSugar(), myTrueState.hasSpice(), deselby::Random::nextBool());
-        };
+//        auto selfStateSampler = [](const body_type &myTrueState) {
+//            return body_type(myTrueState.hasSugar(), myTrueState.hasSpice(), deselby::random::uniform<bool>());
+//        };
 
-        auto opponentStateSampler = [](const body_type &myTrueState) {
-            return body_type(!myTrueState.hasSugar(), !myTrueState.hasSpice(), deselby::Random::nextBool());
+        std::function<body_type(const body_type &)> bodyStateSampler = [](const body_type &myTrueState) {
+            return body_type(!myTrueState.hasSugar(), !myTrueState.hasSpice(), deselby::random::uniform<bool>());
         };
 
         auto mind1 = abm::minds::QMind(
                 abm::minds::IncompleteInformationMCTS(
                         offTreeApproximator,
-                        selfStateSampler,
-                        opponentStateSampler,
+                        bodyStateSampler,
+                        bodyStateSampler,
                         discount,
                         nSamplesInATree
                         ),
