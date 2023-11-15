@@ -284,14 +284,12 @@ namespace abm::bodies {
                 setSugar(sugar() - 1);
                 response.message = message_type::GiveSugar;
                 response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if (!hasSugar()) legalMoves[iGiveSugar] = false;
                 break;
             case iGiveSpice:
                 assert(hasSpice());
                 setSpice(spice() - 1);
                 response.message = message_type::GiveSpice;
                 response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
-                if (!hasSpice()) legalMoves[iGiveSpice] = false;
                 break;
             case iWalkAway:
                 response.message = message_type::WalkAway;
@@ -300,15 +298,13 @@ namespace abm::bodies {
                 // I started fight
                 response.reward -= costOfFighting;
                 if(deselby::random::uniform<bool>()) {
-                    response.message = message_type::YouWonFight;
+                    response.message = message_type::YouWonFight; // I lost fight
                     if(hasSugar()) response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                     if(hasSpice()) response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                     setSugar(0);
                     setSpice(0);
-                    legalMoves[iGiveSugar] = true;
-                    legalMoves[iGiveSpice] = true;
                 } else {
-                    response.message = message_type::YouLostFight;
+                    response.message = message_type::YouLostFight; // I won fight
                     if(!hasSugar()) response.reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                     if(!hasSpice()) response.reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                     setSugar(1);
@@ -329,42 +325,49 @@ namespace abm::bodies {
 //                outgoingMessage == message_type::YouLostFight ||
 //                (outgoingMessage == message_type::WalkAway && getLastIncomingMessage() == message_type::WalkAway));
         recordOutgoingMessage(response.message);
+//        std::cout << "Sending message " << response << std::endl;
         return response;
     }
 
 
     template<bool HASLANGUAGE>
     events::IncomingMessageResponse SugarSpiceTradingBody<HASLANGUAGE>::handleMessage(message_type incomingMessage) {
-        double reward = 0.0;
+        events::IncomingMessageResponse response{
+            0.0,
+            incomingMessage == message_type::Bandits ||
+            incomingMessage == message_type::YouWonFight ||
+            incomingMessage == message_type::YouLostFight ||
+            (incomingMessage == message_type::WalkAway && getLastOutgoingMessage() == message_type::WalkAway)
+        };
         switch (incomingMessage) {
             case message_type::GiveSugar:
                 setSugar(sugar() + 1);
-                reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                response.reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                 break;
             case message_type::GiveSpice:
                 setSpice(spice() + 1);
-                reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                response.reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 break;
             case message_type::YouWonFight:
                 // You started fight and I won
-                reward -= costOfFighting;
-                if(!hasSugar()) reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if(!hasSpice())  reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                response.reward -= costOfFighting;
+                if(!hasSugar()) response.reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(!hasSpice())  response.reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 setSugar(1);
                 setSpice(1);
                 break;
             case message_type::YouLostFight:
                 // You started fight and I lost
-                reward -= costOfFighting;
-                if(hasSugar()) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if(hasSpice())  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                response.reward -= costOfFighting;
+                if(hasSugar()) response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(hasSpice()) response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 setSugar(0);
                 setSpice(0);
                 break;
             case message_type::Bandits:
-                reward -= costOfBanditAttack;
-                if(hasSugar()) reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
-                if(hasSpice())  reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
+                response.reward -= costOfBanditAttack;
+                if(hasSugar()) response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
+                if(hasSpice()) response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 setSugar(0);
                 setSpice(0);
                 break;
@@ -372,12 +375,8 @@ namespace abm::bodies {
                 break;
         }
         recordIncomingMessage(incomingMessage);
-        bool isTerminal =
-                (incomingMessage == message_type::Bandits ||
-                incomingMessage == message_type::YouWonFight ||
-                incomingMessage == message_type::YouLostFight ||
-                (incomingMessage == message_type::WalkAway && getLastOutgoingMessage() == message_type::WalkAway));
-        return events::IncomingMessageResponse {reward, isTerminal };
+//        std::cout << "Incoming message response " << response << std::endl;
+        return response;
     }
 }
 

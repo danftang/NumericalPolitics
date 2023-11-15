@@ -113,6 +113,11 @@ namespace abm::events {
 
     struct IncomingMessageResponse : Reward {
         bool isEndEpisode;
+
+        friend std::ostream &operator <<(std::ostream &out, const IncomingMessageResponse &event) {
+            out << "Reward: " << event.reward << " isEndEpisode: " << event.isEndEpisode;
+            return out;
+        }
     };
 
     template<class MESSAGE>
@@ -232,9 +237,8 @@ namespace abm::callbacks {
 
 }
 
+
 namespace abm {
-
-
     /**
      *  An agent consists of a body and a mind.
      *  The body stores any local state, handles incoming
@@ -292,7 +296,7 @@ namespace abm {
 
         /** Pass on events to body and mind */
         template<class EVENT> requires HasCallback<BODY, EVENT> || HasCallback<MIND, EVENT>
-        inline void on(const EVENT &event) {
+        inline void on(const EVENT & event) {
             callback(event, body);
             callback(event, mind);
         }

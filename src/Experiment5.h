@@ -112,7 +112,7 @@ namespace experiment5 {
     /** trains agents by running nTrainingEpisodes with random start state and random first-mover */
     template<class AGENT1, class AGENT2>
     void train(AGENT1 &agent1, AGENT2 &agent2, size_t nTrainingEpisodes) {
-        std::cout << "Starting " << nTrainingEpisodes << "Training episodes" << std::endl;
+        std::cout << "Starting " << nTrainingEpisodes << " training episodes" << std::endl;
         while(nTrainingEpisodes-- > 0) {
             setStartState(agent1, agent2, deselby::random::uniform(32));
             if(deselby::random::uniform<bool>()) {
@@ -233,18 +233,26 @@ namespace experiment5 {
     */
     void iimctsSugarSpice() {
         const double discount = 1.0;
-        const size_t nSamplesInATree = 1000;
-        const size_t nTrainingEpisodes = 2;
+        const size_t nSamplesInATree = 1000000;
+        const size_t nTrainingEpisodes = 1;
 
-        auto offTreeApproximator = abm::approximators::FNN(
-                mlpack::GaussianInitialization(),
-                body_type::dimension,
-                mlpack::Linear(50),
-                mlpack::ReLU(),
-                mlpack::Linear(25),
-                mlpack::ReLU(),
-                mlpack::Linear(body_type::action_type::size)
-        );
+//        auto offTreeApproximator = abm::approximators::FNN(
+//                mlpack::HeInitialization(),
+//                body_type::dimension,
+//                mlpack::Linear(50),
+//                mlpack::ReLU(),
+//                mlpack::Linear(25),
+//                mlpack::ReLU(),
+//                mlpack::Linear(body_type::action_type::size)
+//        );
+
+        auto offTreeApproximator = [](const body_type &body) {
+            arma::mat qVec(body_type::action_type::size,1);
+            qVec.randu();
+//            std::cout << "Offtree " << qVec.t() << std::endl;
+            return qVec;
+        };
+
 
 //        auto selfStateSampler = [](const body_type &myTrueState) {
 //            return body_type(myTrueState.hasSugar(), myTrueState.hasSpice(), deselby::random::uniform<bool>());
@@ -266,7 +274,19 @@ namespace experiment5 {
 
         auto mind2 = mind1;
 
-        trainAndShow(std::move(mind1), std::move(mind2), nTrainingEpisodes);
+        abm::Agent agent1(body_type(), std::move(mind1));
+        abm::Agent agent2(body_type(), std::move(mind2));
+
+//        agent1.body.reset(false, true, true);
+//        agent1.mind.on(abm::events::AgentStartEpisode(agent1.body, true));
+//        std::cout << "QVec = " << agent1.mind(agent1.body) << std::endl;
+//        std::cout << "act = " << agent1.mind.act(agent1.body) << std::endl;
+//        std::cout << "QVec = " << agent1.mind(agent1.body) << std::endl;
+        //        train(agent1, agent2, 1);
+
+        showBehaviour(agent1,agent2);
+
+        //        trainAndShow(std::move(mind1), std::move(mind2), nTrainingEpisodes);
     }
 
 }

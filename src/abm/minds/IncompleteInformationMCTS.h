@@ -259,12 +259,14 @@ namespace abm::minds {
             template<bool LEAVETRACE> std::pair<QVector<action_type::size> *,bool> getQVecPtr(const BODY &body, bool canAddEntry);
 
             auto activePlayerBodySampler() {
+                assert(!qEntries.empty());
                 return DiscreteObjectDistribution<std::reference_wrapper<const BODY>>(
                         qEntries | std::views::keys,
                         qEntries | std::views::values | std::views::transform([](auto &item){ return item.traceCount; }));
             }
 
             auto passivePlayerBodySampler() {
+                assert(!qEntries.empty());
                 return DiscreteObjectDistribution<std::reference_wrapper<const BODY>>(
                         otherPlayerDistribution | std::views::keys,
                         otherPlayerDistribution | std::views::values);
@@ -578,12 +580,9 @@ namespace abm::minds {
         void SelfPlayQFunction<TREENODE, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
         on(const events::AgentStep<action_type,message_type> &event) {
             if(isOnTree()) {
+                assert(lastQVector != nullptr);
+                if constexpr (DOBACKPROP) qValues.push_back(&((*lastQVector)[event.act]));
                 treeNode = treeNode->getChild(event.message, canAddToTree);
-                if constexpr (DOBACKPROP) {
-                    if(isOnTree()) { //...still on tree...
-                        qValues.push_back(&(*lastQVector)[event.act]);
-                    }
-                }
             }
             rewards.push_back(event.reward); // new reward entry
         }
@@ -602,17 +601,21 @@ namespace abm::minds {
         void SelfPlayQFunction<TREENODE, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
         on(const events::AgentEndEpisode<body_type> &event) { // back propagate rewards
             if constexpr (DOBACKPROP) {
+//                std::cout << "Starting backprop..." << std::endl;
                 double cumulativeReward = 0.0;
                 while (rewards.size() > qValues.size()) {
                     cumulativeReward = cumulativeReward * discount + rewards.back();
+//                    std::cout << "Got offtree reawrd " << rewards.back() << std::endl;
                     rewards.pop_back();
                 }
                 while (!rewards.empty()) {
-                    qValues.back()->addSample(cumulativeReward);
                     cumulativeReward = cumulativeReward * discount + rewards.back();
+                    qValues.back()->addSample(cumulativeReward);
+//                    std::cout << "Got ontree reawrd " << rewards.back() << " Cumulative reward = " << cumulativeReward << " qValue = " << *qValues.back() << std::endl;
                     rewards.pop_back();
                     qValues.pop_back();
                 }
+//                std::cout << "Ending backprop..." << std::endl;
             }
             // reset for next episode
 //            treeNode = tree.rootNode;
@@ -662,14 +665,20 @@ namespace abm::minds {
             if(isOnTree()) {
                 bool addedNewEntry;
                 std::tie(lastQVector, addedNewEntry) = treeNode->template getQVecPtr<LEAVETRACE>(body, canAddToTree);
+//                if(addedNewEntry) { // set initial value to offTree value
+//                    auto offTreeQVector = offTreeQFunction(body);
+//                    for(int i=0; i<lastQVector->size(); ++i) (*lastQVector)[i].addSample(offTreeQVector[i]);
+//                }
                 canAddToTree = !addedNewEntry;
-                if(lastQVector == nullptr) {
+                if(lastQVector == nullptr) { // no qVector and can't add to tree
                     treeNode = nullptr;
                     return offTreeQVector(body);
                 }
             } else {
+                lastQVector == nullptr;
                 return offTreeQVector(body);
             }
+//            std::cout << "Ontree QVec = " << *lastQVector << std::endl;
             return *lastQVector;
 //            QVector<action_type::size> *qEntry = nullptr;
 //            if(isOnTree()) {
@@ -836,8 +845,9 @@ namespace abm::minds {
                                                                     // the same for all states in the support of the PMF
                                                                     // given my body state. Also by assumption we have the
         const uint minSelfPlaySamples;             // number of samples taken to build the tree before a decision is made
-        static constexpr uint SelfPlayQVecSampleRatio = 10;
         const uint minQVecSamples ;
+
+        static constexpr uint SelfPlayQVecSampleRatio = 10;
 //        inline static const auto defaultOffTreeMind =
 //                GreedyPolicy(explorationStrategies::NoExploration(),
 //                                        approximators::FeedForwardNeuralNet(
@@ -859,13 +869,29 @@ namespace abm::minds {
                 SelfPlayPolicy selfplaypolicy = UpperConfidencePolicy<typename BODY::action_type>()
         );
 
+        IncompleteInformationMCTS(const IncompleteInformationMCTS<OffTreeApproximator, BODY, SelfPlayPolicy> &other) :
+        rootNode(nullptr),
+        discount(other.discount),
+        selfPlayPolicy(other.selfPlayPolicy),
+        offTreeQFunc(other.offTreeQFunc),
+        selfStatePriorSampler(other.selfStatePriorSampler),
+        otherStatePriorSampler(other.otherStatePriorSampler),
+        minSelfPlaySamples(other.minSelfPlaySamples),
+        minQVecSamples(other.minQVecSamples)
+        {
+            assert(other.rootNode == nullptr);
+        }
+
         ~IncompleteInformationMCTS() { delete (rootNode); }
 
         // ----- Q-value function interface -----
 
 //        action_type act(const observation_type &body, action_mask legalActs, [[maybe_unused]] reward_type rewardFromLastAct);
 
-        /** rebuilds the tree using a new draw of distributions of player states. */
+        /** rebuilds the tree using a new draw of distributions of player states.
+         * Note that we assume that other's belief about our body state is independent of
+         * the draw we take from otherSampler(), i.e. is the same for all states in the
+         * support of the distribution. */
         void on(const events::AgentStartEpisode<BODY> & event) {
             delete(rootNode);
             rootNode = new IIMCTS::TreeNode<BODY>();
@@ -945,6 +971,14 @@ namespace abm::minds {
         void shiftRoot(message_type message) {
             IIMCTS::TreeNode<BODY> *newRoot = rootNode->unlinkChild(message);
             assert(newRoot != nullptr);
+            if(newRoot == nullptr) {
+//                std::cerr << "Warning: Reality has gone off=tree (probably a sign of not enough samples in the tree)." << std::endl;
+//                newRoot = new IIMCTS::TreeNode<BODY>();
+                // TODO: Deal with particle depletion. Probably with MCMC over trajectories since the start
+                //  of the episode, given the observations. This can be done without modelling the other
+                //  agent, as the observations make the internal states of each agent independent.
+                //
+            }
             delete(rootNode);
             rootNode = newRoot;
         }
@@ -976,6 +1010,7 @@ namespace abm::minds {
                             selfPlayPolicy)
                     );
             for (int nSamples = 0; nSamples < nEpisodes; ++nSamples) {
+//                episodes::runAsync(player1, player2, callbacks::Verbose());
                 episodes::runAsync(player1, player2);
                 player1.body = player1BodySampler();
                 player2.body = player2BodySampler();

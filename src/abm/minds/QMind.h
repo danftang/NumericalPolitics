@@ -24,7 +24,10 @@ namespace abm::minds {
 
         template<class BODY>
         auto act(BODY &&body) {
-            return policy.sample(QFUNCTION::operator()(std::forward<BODY>(body)), body.legalActs());
+            auto qVector = QFUNCTION::operator()(std::forward<BODY>(body));
+            auto act = policy.sample(qVector, body.legalActs());
+//            std::cout << "QVector is " << qVector << "\tlegal acts " << body.legalActs() << "\tact " << act << std::endl;
+            return act;
         }
     };
 }

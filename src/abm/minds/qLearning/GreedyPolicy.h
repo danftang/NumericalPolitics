@@ -24,7 +24,6 @@ namespace abm::minds {
         /** QVector must have operator[] and elements must have an ordering  */
         template<GenericQVector QVECTOR, IntegralActionMask ACTIONMASK>
         size_t sample(const QVECTOR &qValues, const ACTIONMASK &legalActs) {
-            size_t chosenMove;
             assert(legalActs.count() >= 1);
             return explorationStrategy() ? minds::ZeroIntelligence::sampleUniformly(legalActs) : max(qValues, legalActs);
         }
