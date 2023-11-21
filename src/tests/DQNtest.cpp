@@ -71,13 +71,6 @@ namespace tests {
             return burnin == 0;
         };
 
-        approximators::DifferentialTrainingPolicy trainingPolicy(
-                ens::AdamUpdate(),
-                updateStepSize,
-                fnn.parameters().n_rows,
-                fnn.parameters().n_cols,
-                burnInThenTrainEveryStep);
-
         lossFunctions::QLearningLoss loss(
                 bufferSize,
                 abm::bodies::CartPole::dimension,
@@ -87,17 +80,20 @@ namespace tests {
                 endStateFnnUpdateInterval);
 
         auto mind = abm::minds::QMind(
-                approximators::AdaptiveFunction(
+                approximators::DifferentiableAdaptiveFunction(
                         std::move(fnn),
-                        std::move(trainingPolicy),
-                        std::move(loss)),
+                        std::move(loss),
+                        ens::AdamUpdate(),
+                        updateStepSize,
+                        burnInThenTrainEveryStep),
                 abm::minds::GreedyPolicy(
                         abm::explorationStrategies::BurninThenLinearDecay(
                                 explorationBurnin,
                                 initialExploration,
                                 nExplorationSteps,
                                 finalExploration))
-                );
+        );
+
 
 //        abm::Agent agent(abm::bodies::CartPole(), std::move(mind));
         abm::Agent agent(abm::bodies::CartPole(), mind);
