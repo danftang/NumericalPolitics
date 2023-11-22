@@ -408,6 +408,10 @@ namespace deselby {
     template<class T>
     inline static T &&valueIfOptional(T &&obj) { return std::forward<T>(obj); }
 
+    /** True if T has operator [] */
+    template<class T, class ARG>
+    concept HasIndexOperator = requires(T obj, ARG index) { obj[index]; };
+
 }
 
 #endif //POLYMORPHICCOLLECTION_TYPEUTILS_H

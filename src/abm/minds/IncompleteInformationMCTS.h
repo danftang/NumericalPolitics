@@ -94,16 +94,25 @@
 #include "../../DeselbyStd/DiscreteObjectDistribution.h"
 #include "../approximators/AdaptiveFunction.h"
 
+namespace abm::minds::IIMCTS {
+    template<size_t Qsize> class QEntry;
+//    template<class BODY> class TreeNode;
+};
+
 namespace abm::events {
     template<class BODY>
     struct IncomingMessageObservation {
         std::map<BODY,uint> &bodySamples;
         BODY::message_type message;
     };
+
+    template<class BODY>
+    struct QEntryObservation {
+        std::map<BODY, minds::IIMCTS::QEntry<BODY::action_type::size>>::iterator qEntryIt;
+    };
 }
 
 namespace abm::minds {
-
     namespace IIMCTS {
 
         /** Loss function for incoming messages given a Q-function, a policy, a PMF over body states and an observed
@@ -186,6 +195,75 @@ namespace abm::minds {
             }
         };
 
+
+        /** loss between a real vector of doubles and a QVector of QValues (i.e. (sample sum, sample count) pairs)
+         * For eqch (q,Q)-value pair, we define as the loss as minus the log-prob that the sum of samples in Q came from a
+         * Gaussian distribution with mean q
+         * So,
+         * P(q-\bar{Q}) = (sqrt(n/2pi.v)) e^{-(n/2v)(q-\bar{Q})^2}
+         * where v is the variance of the samples, so
+         * logP(q-\bar{Q}) = 0.5ln(n/v) - (n/2v)(q-\bar{Q})^2  - 0.5ln(2pi)
+         * so
+         * d(-logP)/dq = (n/v)(q-\bar{Q})
+         *
+         * since we have no information about the actual variance of the samples (we only know the sample count and
+         * sample sum), we assume that the samples in Q always have the same variance, and choose a variance to
+         * make the gradient around unity.
+         *
+         */
+        template<class BODY>
+        class QEntryLoss {
+        public:
+            static constexpr double sampleVariance = 100.0;
+
+            arma::mat   trainingPoints;  // by-column list of training points
+            std::vector<QVector<BODY::action_type::size> *> qVectorPtrs;
+            size_t      insertCol = 0;
+
+            QEntryLoss(size_t bufferSize) : trainingPoints(BODY::dimensions, bufferSize) {
+                qVectorPtrs.reserve(bufferSize);
+            }
+
+            void on(const events::QEntryObservation<BODY> &observation) {
+                trainingPoints.col(insertCol) = observation.qEntryIt->first;
+                const QVector<BODY::action_type__size> *qVecPtr = &(observation.qEntryIt->second.qVector);
+                if(insertCol == qVectorPtrs.size()) {
+                    qVectorPtrs.push_back(qVecPtr);
+                } else {
+                    qVectorPtrs[insertCol] = qVecPtr;
+                }
+                insertCol = (insertCol + 1)%trainingPoints.n_cols;
+            }
+
+            template<class INPUTS>
+            void trainingSet(INPUTS &trainingMat) {
+                if(bufferIsFull()) {
+                    trainingMat = trainingPoints;
+                } else {
+                    trainingMat = trainingPoints.cols(0, insertCol-1);
+                }
+            }
+
+            bool   bufferIsFull() const { return qVectorPtrs.size() == trainingPoints.n_cols; }
+            size_t capacity() const { return trainingPoints.n_cols; }
+            size_t bufferSize() const { return bufferIsFull()?capacity():insertCol; }
+            size_t batchSize() const { return capacity(); }
+
+            template<class OUTPUTS, class RESULT>
+            void gradientByPrediction(const OUTPUTS &qMeans, RESULT &gradient) {
+                size_t s = batchSize();
+                gradient.zeroes();
+                for(size_t col = 0; col < s; ++col) {
+                    const QVector<BODY::action_type__size> &qVec = *qVectorPtrs[col];
+                    for(size_t action = 0; action < qMeans.n_rows; ++action) {
+                        gradient(action,col) =
+                                qVec[action].sampleCount * (qMeans(action,col) - qVec[action].mean())
+                                / sampleVariance;
+                    }
+                }
+            }
+        };
+
         /** Loss function for training the off-tree qFunction. This is a weighted sum of the MessageLoss
          * from experience of other and the IOLoss compared to the Tree predictions.
          * Intercepts (BODY,Q-vector) pairs and (BODY state PMF, message) pairs to make a loss function
@@ -195,26 +273,29 @@ namespace abm::minds {
          *
          * L = IOLoss + w*MessageLoss
          * where w is a weight
+         *
+         * TODO: We could view the tree itself as a buffer of (Body,QVector) pairs, with perhaps sample count
+         *      as importance, from which we can sample a batch on which to train. The trajectory of self-training
+         *      minds provides a sample mechanism for free.
          */
         using lossFunctions::SumOfLosses;
-        using lossFunctions::IOLoss;
         using lossFunctions::WeightedLoss;
         template<class BODY, class QPOLICY = SoftMaxPolicy>
-        class OffTreeLoss : public SumOfLosses<IOLoss,WeightedLoss<MessageLoss<BODY,QPOLICY>>> {
+        class OffTreeLoss : public SumOfLosses<QEntryLoss<BODY>, WeightedLoss<MessageLoss<BODY,QPOLICY>>> {
         public:
-            typedef SumOfLosses<IOLoss,WeightedLoss<MessageLoss<BODY,QPOLICY>>> base_type;
+            typedef SumOfLosses<QEntryLoss<BODY>, WeightedLoss<MessageLoss<BODY,QPOLICY>>> base_type;
 
-            static constexpr size_t defaultQVectorBufferSize = 16;
+            static constexpr size_t defaultQEntryBufferSize = 16;
             static constexpr size_t defaultMessageBatchSize = 16;
             static constexpr size_t defaultMessageBufferSize = 512;
             static constexpr double selfOtherLearningRatio = 2.0;
 
-            OffTreeLoss(size_t qVectorBufferSize = defaultQVectorBufferSize,
+            OffTreeLoss(size_t qEntryBufferSize = defaultQEntryBufferSize,
                         size_t messageBufferSize = defaultMessageBufferSize,
                         size_t messageBatchSize = defaultMessageBatchSize,
                         QPOLICY qPolicy = SoftMaxPolicy()):
             base_type(
-                    IOLoss(qVectorBufferSize, BODY::dimensions, BODY::action_type::size),
+                    QEntryLoss<BODY>(qEntryBufferSize),
                     WeightedLoss(
                             selfOtherLearningRatio,
                             MessageLoss<BODY,QPOLICY>(messageBufferSize, messageBatchSize, qPolicy))) {
@@ -239,7 +320,11 @@ namespace abm::minds {
             return std::forward<QFUNC>(qFunc);
         }
 
-
+        template<size_t Qsize>
+        struct QEntry {
+            uint traceCount = 0;
+            QVector<Qsize> qVector;
+        };
 
 
         /** A single node in the tree. Represents Q-values of all hidden states with a given observable history.
@@ -251,16 +336,11 @@ namespace abm::minds {
         public:
             typedef BODY::message_type message_type;
             typedef BODY body_type;
-            typedef BODY::action_type action_type;
+            typedef QVector<BODY::action_type::size> qvector_type;
+            typedef std::map<BODY, QEntry<BODY::action_type::size>> qentries_type;
+            typedef qentries_type::iterator q_iterator_type;
 
-            struct QEntry {
-                uint traceCount;
-                QVector<action_type::size> qVector;
-
-                QEntry() : traceCount(0) {}
-            };
-
-            std::map<BODY, QEntry> qEntries; // qVectors for current player.
+            qentries_type qEntries; // qVectors for current player.
             std::map<BODY, uint> otherPlayerDistribution; // sample counts of other player body states during self play
         private:
             std::map<message_type, TreeNode *> children;
@@ -270,18 +350,18 @@ namespace abm::minds {
             ~TreeNode() { for (auto &child: children) delete (child.second); }
 
             /** Qvector for current body state, given complete episode history */
-            QVector<action_type::size> &operator()(const BODY &body) {
-                auto qEntryIt = qEntries.find(body);
-                assert(qEntryIt != qEntries.end());
+            qvector_type &operator()(const BODY &body) {
+                auto [qEntryIt, addedEntry ] = findQEntry<false>(body, true);
                 return qEntryIt->second.qVector;
             }
 
-//            TreeNode *getChildOrCreate(message_type message);
-//            TreeNode *getChildOrNull(message_type message);
             TreeNode *getChild(message_type message, bool createNodeIfAbsent);
             TreeNode *unlinkChild(message_type message);
             void leavePassiveTrace(const BODY &body);
-            template<bool LEAVETRACE> std::pair<QVector<action_type::size> *,bool> getQVecPtr(const BODY &body, bool canAddEntry);
+
+            template<bool LEAVETRACE>
+            std::pair<q_iterator_type, bool>
+                    findQEntry(const BODY &body, bool canAddEntry);
 
             auto activePlayerBodySampler() {
                 assert(!qEntries.empty());
@@ -303,7 +383,7 @@ namespace abm::minds {
                 return count;
             }
 
-            const BODY *sampleActorBodyGivenMessage(message_type actorMessage);
+//            const BODY *sampleActorBodyGivenMessage(message_type actorMessage);
         };
 
 
@@ -318,17 +398,10 @@ namespace abm::minds {
          * The return value is a pair, the second entry of which, if true, indicates that a new entry was added */
         template<class BODY>
         template<bool LEAVETRACE>
-        std::pair<QVector<BODY::action_type::size> *,bool> TreeNode<BODY>::getQVecPtr(const BODY &body, bool canAddEntry) {
-            std::pair<QVector<action_type::size> *,bool> result(nullptr,false);
-            decltype(qEntries.begin()) it;
-            if(canAddEntry) {
-                std::tie(it, result.second) = qEntries.try_emplace(body);
-            } else {
-                it = qEntries.find(body);
-                if(it == qEntries.end()) return result;
-            }
-            result.first = &it->second.qVector;
-            if constexpr(LEAVETRACE) ++(it->second.traceCount);
+        std::pair<typename TreeNode<BODY>::q_iterator_type, bool> TreeNode<BODY>::findQEntry(const BODY &body, bool canAddEntry) {
+            std::pair<q_iterator_type ,bool> result =
+                    canAddEntry ? qEntries.try_emplace(body) : std::pair(qEntries.find(body), false);
+            if constexpr(LEAVETRACE) if(result.first != qEntries.end()) ++(result.first->second.traceCount);
             return result;
         }
 
@@ -350,27 +423,27 @@ namespace abm::minds {
          * @param actorMessage
          * @return
          */
-        template<class BODY>
-        const BODY *TreeNode<BODY>::sampleActorBodyGivenMessage(message_type actorMessage) {
-            double totalWeight = 0.0;
-            std::vector<double>         cumulativeWeights;
-            std::vector<const BODY *>   states;
-            for(const auto &[body, qVec]: qEntries) {
-                auto maxQAct = sampleMaxQ(qEntries, body.legalActs());
-                double w = body.actToMessageProb(maxQAct, actorMessage);
-                totalWeight += w;
-                cumulativeWeights.push_back(totalWeight);
-                states.push_back(&body);
-            }
-            if(totalWeight == 0.0) { /* no state in this node could have produced this message */
-                return nullptr;
-            }
-            // sample an element from cumulativeWeights with weighted prob
-            double rand = deselby::random::uniform(0.0, totalWeight);
-            auto chosenIt = std::ranges::upper_bound(cumulativeWeights, rand);
-            assert(chosenIt != cumulativeWeights.end());
-            return states[chosenIt - cumulativeWeights.begin()];
-        }
+//        template<class BODY>
+//        const BODY *TreeNode<BODY>::sampleActorBodyGivenMessage(message_type actorMessage) {
+//            double totalWeight = 0.0;
+//            std::vector<double>         cumulativeWeights;
+//            std::vector<const BODY *>   states;
+//            for(const auto &[body, qVec]: qEntries) {
+//                auto maxQAct = sampleMaxQ(qEntries, body.legalActs());
+//                double w = body.actToMessageProb(maxQAct, actorMessage);
+//                totalWeight += w;
+//                cumulativeWeights.push_back(totalWeight);
+//                states.push_back(&body);
+//            }
+//            if(totalWeight == 0.0) { /* no state in this node could have produced this message */
+//                return nullptr;
+//            }
+//            // sample an element from cumulativeWeights with weighted prob
+//            double rand = deselby::random::uniform(0.0, totalWeight);
+//            auto chosenIt = std::ranges::upper_bound(cumulativeWeights, rand);
+//            assert(chosenIt != cumulativeWeights.end());
+//            return states[chosenIt - cumulativeWeights.begin()];
+//        }
 
 
         /**
@@ -433,7 +506,7 @@ namespace abm::minds {
             std::vector<double> rewards; // reward between choice points of the player
             bool canAddToTree; // have we added a QEntry to the tree yet?
             offtreeqfunc_type &offTreeQFunction;// current treeNodes for player's experience, null if off the tree
-            QVector<body_type::action_type::size> *lastQVector = nullptr;
+            TreeNode<BODY>::q_iterator_type lastQEntry;
             const double discount;
 
             static constexpr bool INITTREEFROMOFFTREE = true; // Initialise new Q-vectors from the offtree Q-function?
@@ -455,7 +528,7 @@ namespace abm::minds {
 
             // ==== Mind interface
 
-            auto operator()(const body_type &);
+            TreeNode<BODY>::qvector_type operator()(const body_type &);
 
             void on(const events::AgentStep<action_type, message_type> &);
             void on(const events::PostActBodyState<body_type> &);
@@ -465,6 +538,7 @@ namespace abm::minds {
             // =====
         protected:
             bool isOnTree() const { return treeNode != nullptr; }
+
             QVector<action_type::size> offTreeQVector(const BODY &body) {
                 QVector<action_type::size> offTreeQVec;
                 arma::mat offTreeQMat = offTreeQFunction(body);
@@ -482,7 +556,7 @@ namespace abm::minds {
 
         /** On Incoming message:
          *  - update the treeNode
-         *  - increment reward
+         *  - increment reward for this step (if not start of episode and we're second mover)
          *  - leave trace if necessary
          * */
         template<class TREENODE, class OFFTREEQFUNC, bool LEAVETRACE, bool DOBACKPROP>
@@ -500,8 +574,7 @@ namespace abm::minds {
         void SelfPlayQFunction<TREENODE, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
         on(const events::AgentStep<action_type,message_type> &event) {
             if(isOnTree()) {
-                assert(lastQVector != nullptr);
-                if constexpr (DOBACKPROP) qValues.push_back(&((*lastQVector)[event.act]));
+                if constexpr (DOBACKPROP) qValues.push_back(&((lastQEntry->second.qVector)[event.act]));
                 treeNode = treeNode->getChild(event.message, canAddToTree);
             }
             rewards.push_back(event.reward); // new reward entry
@@ -535,6 +608,7 @@ namespace abm::minds {
                     rewards.pop_back();
                     qValues.pop_back();
                 }
+
 //                std::cout << "Ending backprop..." << std::endl;
             }
             // reset for next episode
@@ -546,29 +620,28 @@ namespace abm::minds {
 
 
 
-        template<class TREENODE, class OFFTREEQFUNC, bool LEAVETRACE, bool DOBACKPROP>
-        auto SelfPlayQFunction<TREENODE, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
-        operator ()(const body_type &body) {
+        template<class BODY, class OFFTREEQFUNC, bool LEAVETRACE, bool DOBACKPROP>
+        TreeNode<BODY>::qvector_type SelfPlayQFunction<BODY, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
+        operator ()(const BODY &body) {
             if(isOnTree()) {
                 bool addedNewEntry;
-                std::tie(lastQVector, addedNewEntry) = treeNode->template getQVecPtr<LEAVETRACE>(body, canAddToTree);
-                if constexpr(INITTREEFROMOFFTREE) {
-                    if (addedNewEntry) { // set initial value to offTree value
-                        auto offTreeQVector = offTreeQFunction(body);
-                        for (int i = 0; i < lastQVector->size(); ++i) (*lastQVector)[i].addSample(offTreeQVector[i]);
-                    }
+                std::tie(lastQEntry, addedNewEntry) = treeNode->template findQEntry<LEAVETRACE>(body, canAddToTree);
+                if constexpr(INITTREEFROMOFFTREE) if(addedNewEntry) { // set initial value to offTree value
+                    lastQEntry->second.qVector = offTreeQFunction(body);
                 }
-                canAddToTree = !addedNewEntry;
-                if(lastQVector == nullptr) { // no qVector and can't add to tree
+                canAddToTree = canAddToTree && !addedNewEntry;
+                if(lastQEntry == treeNode->qEntries.end()) { // no qVector and can't add to tree
                     treeNode = nullptr;
-                    return offTreeQVector(body);
+                    return offTreeQFunction(body);
+                } else {
+                    callback(events::QEntryObservation<BODY>{lastQEntry}, offTreeQFunction); // teach offTreeQFunc on qEntry
                 }
             } else {
-                lastQVector == nullptr;
-                return offTreeQVector(body);
+                lastQEntry == treeNode->qEntries.end();
+                return offTreeQFunction(body);
             }
 //            std::cout << "Ontree QVec = " << *lastQVector << std::endl;
-            return *lastQVector;
+            return lastQEntry->second.qVector;
         }
 
     }
@@ -727,9 +800,6 @@ namespace abm::minds {
             uint qVecSamples = qVec.totalSamples();
             if(qVecSamples < minQVecSamples) augmentSamples(body, minQVecSamples - qVecSamples);
 
-            // train offTree QFunction on calculated QVector
-            callback(events::InputOutput(body, qVec), offTreeQFunc);
-
             return qVec;
         }
 
@@ -744,9 +814,8 @@ namespace abm::minds {
                 // TODO: Deal with particle depletion. Probably with MCMC over trajectories since the start
                 //  of the episode, given the observations. This can be done without modelling the other
                 //  agent, as the observations make the internal states of each agent independent.
-                //
-		// The Q-function itself defines a likkelihood function, so can be used to approximate the
-		// posterior!!
+                //  The Q-function itself defines a likkelihood function, so can be used to approximate the
+		        //  posterior!!
             }
             delete(rootNode);
             rootNode = newRoot;

@@ -19,6 +19,10 @@ namespace abm::minds {
         double  sumOfQ      = 0.0; // Sum of Q-values of all samples so far by action
         uint    sampleCount = 0;   // number of samples by action
 
+        QValue() = default;
+
+        QValue(double q) : sumOfQ(q), sampleCount(1) {}
+
         void addSample(double cumulativeReward) {
             sumOfQ += cumulativeReward;
             ++sampleCount;
@@ -28,6 +32,14 @@ namespace abm::minds {
             assert(sampleCount > 0);
             return  sumOfQ / sampleCount;
         }
+
+        /** interpret as setting to single sample */
+        inline QValue &operator =(const double &q) {
+            sumOfQ = q;
+            sampleCount = 1;
+            return *this;
+        }
+
 
         operator double() const { return mean(); } // implicit conversion for use with policies that expect a single value
 
@@ -133,6 +145,13 @@ namespace abm::minds {
     template<size_t SIZE, class QVALUE = QValue>
     class QVector: public std::array<QVALUE, SIZE> {
     public:
+        QVector() = default;
+
+        template<deselby::HasIndexOperator<size_t> QVECTOR>
+        QVector(const QVECTOR &qVector) {
+            for(size_t i=0; i<SIZE; ++i) (*this)[i] = qVector[i];
+        }
+
         uint totalSamples() const {
             uint sum = 0;
             for(const QValue &val : *this) sum += val.sampleCount;
@@ -147,7 +166,7 @@ namespace abm::minds {
 //            return Qvec;
 //        }
 
-        arma::mat toVector() {
+        arma::mat toMatrix() {
             arma::mat Qvec(SIZE,1);
             for(int i=0; i<SIZE; ++i) Qvec(i) = (*this)[i].mean();
             return Qvec;

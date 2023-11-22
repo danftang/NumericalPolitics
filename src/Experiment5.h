@@ -127,17 +127,12 @@ namespace experiment5 {
     /** Iterates through all 64 games between two agents (32 joint start states times two possible first movers) */
     template<class AGENT1, class AGENT2>
     void showBehaviour(AGENT1 &agent1, AGENT2 &agent2) {
-        abm::callbacks::MeanRewardPerEpisode agent1MeanReward;
-        abm::callbacks::MeanRewardPerEpisode agent2MeanReward;
-
         for(int startState = 0; startState < 32; ++startState) {
             setStartState(agent1, agent2, startState);
-            abm::episodes::runAsync(agent1, agent2, abm::callbacks::Verbose(), agent1MeanReward);
+            abm::episodes::runAsync(agent1, agent2, abm::callbacks::Verbose());
             setStartState(agent1, agent2, startState);
-            abm::episodes::runAsync(agent2, agent1, abm::callbacks::Verbose(), agent2MeanReward);
+            abm::episodes::runAsync(agent2, agent1, abm::callbacks::Verbose());
         }
-        std::cout << "Agent1 mean reward per episode = " << agent1MeanReward.mean() << std::endl;
-        std::cout << "Agent2 mean reward per episode = " << agent2MeanReward.mean() << std::endl;
     }
 
 
@@ -228,8 +223,8 @@ namespace experiment5 {
     */
     void iimctsSugarSpice() {
         const double discount = 1.0;
-        const size_t nSamplesInATree = 1000;
-        const size_t nTrainingEpisodes = 10000;
+        const size_t nSamplesInATree = 200000;
+        const size_t nTrainingEpisodes = 0;
 
         auto offTreeApproximator = abm::approximators::FNN(
                 mlpack::HeInitialization(),
@@ -272,13 +267,14 @@ namespace experiment5 {
 
 //        abm::Agent agent1(body_type(), std::move(mind1));
 //        abm::Agent agent2(body_type(), std::move(mind2));
+//        showBehaviour(agent1,agent2);
+
 //        agent1.body.reset(false, true, true);
 //        agent1.mind.on(abm::events::AgentStartEpisode(agent1.body, true));
 //        std::cout << "QVec = " << agent1.mind(agent1.body) << std::endl;
 //        std::cout << "act = " << agent1.mind.act(agent1.body) << std::endl;
 //        std::cout << "QVec = " << agent1.mind(agent1.body) << std::endl;
         //        train(agent1, agent2, 1);
-//        showBehaviour(agent1,agent2);
 
     }
 
