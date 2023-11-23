@@ -63,6 +63,7 @@ namespace abm::societies {
             }
         }
     };
+
     template<deselby::IsUniquelyConvertibleToTemplate<std::vector>... VECTORS> requires(sizeof...(VECTORS)>1 && deselby::AllDifferentAndNotEmpty<VECTORS...>)
     RandomEncounterSociety(VECTORS &&...vectors) -> RandomEncounterSociety<typename deselby::converts_to_template_t<std::remove_reference_t<VECTORS>,std::vector>::value_type...>;
 

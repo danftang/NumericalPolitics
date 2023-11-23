@@ -6,7 +6,7 @@
 #define MULTIAGENTGOVERNMENT_FNN_H
 
 #include "mlpack.hpp"
-#include "Concepts.h"
+#include "../Concepts.h"
 
 namespace abm::approximators {
 

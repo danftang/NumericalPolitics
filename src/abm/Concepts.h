@@ -2,8 +2,8 @@
 // Created by daniel on 31/10/23.
 //
 
-#ifndef MULTIAGENTGOVERNMENT_CONCEPTS_H
-#define MULTIAGENTGOVERNMENT_CONCEPTS_H
+#ifndef MULTIAGENTGOVERNMENT_ABM_CONCEPTS_H
+#define MULTIAGENTGOVERNMENT_ABM_CONCEPTS_H
 
 #include <armadillo>
 #include "../DeselbyStd/typeutils.h"
@@ -114,4 +114,4 @@ namespace abm {
 
 }
 
-#endif //MULTIAGENTGOVERNMENT_CONCEPTS_H
+#endif //MULTIAGENTGOVERNMENT_ABM_CONCEPTS_H

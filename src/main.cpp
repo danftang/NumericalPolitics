@@ -1,23 +1,26 @@
 #include "mlpack.hpp"
+
+//#include "abm/approximators/FNN.h"
+//#include "abm/Concepts.h"
+//#include "abm/lossFunctions/SumOfLosses.h"
+
 //#include "abm/agents/agents.h"
 //#include "Experiment1.h"
 //#include "Experiment2.h"
+
 #include "Experiment5.h"
 
+//#include "abm/societies/RandomEncounterSociety.h"
+// #include "abm/PingPongAgent.h"
 
-#include <vector>
-
-#include "abm/societies/RandomEncounterSociety.h"
-#include "abm/PingPongAgent.h"
-
-#include "tests/PrisonersDilemma.h"
+//#include "tests/PrisonersDilemma.h"
 //#include "tests/tests.h"
 //#include "tests/mlpacktests.cpp"
-#include "tests/DQNtest.cpp"
+//#include "tests/DQNtest.cpp"
 //#include "tests/IncompleteInformationMCTSTest.cpp"
 //#include "tests/FNN.h"
 
-#include "tests/mlpacktests.cpp"
+//#include "tests/mlpacktests.cpp"
 
 //#include "abm/societies/RandomEncounterSociety.h"
 
@@ -32,6 +35,7 @@ int main() {
 //    experiment5b();
 
     experiment5::iimctsSugarSpice();
+
 
     // ---- TESTS
 //    cartPoleDQNTest();

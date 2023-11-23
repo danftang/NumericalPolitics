@@ -102,7 +102,7 @@ namespace abm::minds::IIMCTS {
 namespace abm::events {
     template<class BODY>
     struct IncomingMessageObservation {
-        std::map<BODY,uint> &bodySamples;
+        const std::map<BODY,uint> &bodySamples;
         BODY::message_type message;
     };
 
@@ -115,35 +115,39 @@ namespace abm::events {
 namespace abm::minds {
     namespace IIMCTS {
 
-        /** Loss function for incoming messages given a Q-function, a policy, a PMF over body states and an observed
-         * message.
-         * Given a (BODY state PMF, message) pair and a Q-policy, we define the loss of a Q-function Q(b) as the
-         * posterior probability of making the observation:
-         * P(message | P(b), Policy(Q(.))) = \sum_b P(b) P(b.handleAct(Policy(Q(b))) == message)
-         * If P(b) is expressed as a set of weighted body-state samples, b \in S, with weights w(b) then
-         * P(message | S, Policy(Q(.))) \approx 1/\sum_{b' \in S}w(b)  \sum_{b \in S} w(b)\sum_a P(b.handleAct(a) == message)P(Policy(Q(b)) == a)
+        /** Loss function of a Q-function given a policy, a PMF over body states and an observed incoming
+         * message. This is the loss function for modelling/copying other.
+         *
+         * Given a Q-policy and a (S,w,m) triplet where S is a set of body-states, w(b) is a weight (unnormalised prob)
+         * associated with body state b, and m is an incoming message,
+         * we define the loss of a Q-function Q(b) as minus the log-posterior probability of making the observation, where:
+         *
+         * P(message | S, Policy) = A \sum_{b \in S} w(b) \sum_a P(b.handleAct(a) == message)P(Policy(Q(b)) == a)
+         * where
+         * A = 1/\sum_{b' \in S}w(b)
          * so
          *
-         * dP(message | S, Policy(Q(.)))/dQ_a(b) \approx w(b)/\sum_{b' \in S}w(b) \sum_a' P(b.handleAct(a') == message)dP(Policy(Q(b))==a')/dQ_a(b)
+         * d(-log(P(message | S, Policy(Q(.)))))/dQ_a(b) =  -1/(P(message | S,Policy)) dP(message | S, Policy(Q(.)))/dQ_a(b)
+         * where Q_a(b) is the a'th element of Q(b) and
+         *
+         * dP(message | S, Policy)/dQ_a(b) = A.w(b) \sum_a' P(b.handleAct(a') == message)dP(Policy(Q(b))==a')/dQ_a(b)
          *
          * So, we need to use a differentiable policy. Also, we don't have the probability of getting a message given an
-         * act, but we have a sampler of messages given an act, so for each 'a' we sample the message and add the dP/dF
-         * term if sample == message. So for each b \in S
+         * act, but we do have a sampler of messages given an act. Assuming the loss is being used by a stochastic
+         * optimisation algorithm, and that each training point is used multiple times, we can approximate the sum
+         * over a' by importance sampling: for each action, a', sample a message m', if m' = message then include the
+         * term. So
          *
-         * dP(message | S, Policy(Q(.)))/dQ_a(b) \approx w(b)/\sum_{b' \in S}w(b) \sum_a' [b.handleAct(a') == message]dP(Policy(Q(b))==a')/dQ_a(b)
+         * dP(message | S, Policy)/dQ_a(b) \approx A.w(b) \sum_a' [b.handleAct(a') == message]dP(Policy(Q(b))==a')/dQ_a(b)
          *
-         * so, we can calculate a loss at a single training point, b, given Q(b), w(b), the set of actions, A, which
-         * gave rise to the observed message on sampling and the differential policy,
-         *
-         * N.B. if we assume a deterministic act->message map, then for a given observed message, the set of acts that give
-         * rise to that message is fixed and the associated probabiities are 1, so the sampling over a is exact.
+         * N.B. if b.handleAct(.) is deterministic, then importance sampling over a' is exact.
          */
         template<class BODY, class POLICY = minds::SoftMaxPolicy>
         class MessageLoss {
         public:
 
             arma::mat  trainingPoints;  // by-column list of training points
-            arma::vec  weights;         // normalised weight of the training point
+            arma::rowvec  stateProbs;   // normalised weight of the training point
             arma::umat actions;         // actions over which to sum for each training point
             POLICY policy;              // policy from which to get gradient of P(act) w.r.t. qVector
 
@@ -152,8 +156,8 @@ namespace abm::minds {
             arma::uvec batchCols;
 
             MessageLoss(size_t bufferSize, size_t batchSize, POLICY policy = SoftMaxPolicy()) :
-            trainingPoints(BODY::dimensions, bufferSize),
-            weights(bufferSize),
+            trainingPoints(BODY::dimension, bufferSize),
+            stateProbs(bufferSize),
             actions(BODY::action_type::size, bufferSize),
             policy(std::move(policy)),
             batchCols(batchSize) {
@@ -161,10 +165,11 @@ namespace abm::minds {
 
 
             void on(const events::IncomingMessageObservation<BODY> &observation) {
+                std::cout << "Intercepting IncomingMessageObservation" << std::endl;
                 double sumOfWeights = std::views::keys(observation.bodySamples).sum();
                 for(const auto &[body, uweight] : observation.bodySamples) {
                     trainingPoints.col(insertCol) = static_cast<const arma::mat &>(observation.body);
-                    weights(insertCol) = uweight/sumOfWeights;
+                    stateProbs(insertCol) = uweight/sumOfWeights;
                     actions.col(insertCol) = body.messageToAct(observation.message);
                 }
                 insertCol = (insertCol + 1)%trainingPoints.n_cols;
@@ -182,16 +187,33 @@ namespace abm::minds {
                 trainingMat = trainingPoints.cols(batchCols);
             }
 
+            /**
+             * @tparam OUTPUTS
+             * @tparam RESULT
+             * @param qVectors
+             * @param result
+             */
             template<class OUTPUTS, class RESULT>
-            void gradientByPrediction(const OUTPUTS &qVectors, RESULT &gradient) {
+            void gradientByPrediction(const OUTPUTS &qVectors, RESULT &result) {
                 size_t s = batchSize();
-                gradient.zeroes();
+                result.zeroes();
                 for(size_t col = 0; col < s; ++col) {
                     for(uint action : actions.col(col)) {
-                        gradient.col(col) += policy.gradient(qVectors.col(col)).col(action);
+                        result.col(col) += policy.gradient(qVectors.col(col)).col(action);
                     }
-                    gradient.col(col) *= weights(col);
+                    result.col(col) *= stateProbs(col);
                 }
+            }
+
+            /** Probability of  is defined as
+            * P(message | S, Policy) = A \sum_{b \in S} w(b) \sum_a P(b.handleAct(a) == message)P(Policy(Q(b)) == a)
+            * where
+            * A = 1/\sum_{b' \in S}w(b)
+            * see above.
+            */
+            template<class OUTPUTS, class RESULT>
+            void prob(const OUTPUTS &qVectors, RESULT &result) {
+
             }
         };
 
@@ -220,11 +242,12 @@ namespace abm::minds {
             std::vector<QVector<BODY::action_type::size> *> qVectorPtrs;
             size_t      insertCol = 0;
 
-            QEntryLoss(size_t bufferSize) : trainingPoints(BODY::dimensions, bufferSize) {
+            QEntryLoss(size_t bufferSize) : trainingPoints(BODY::dimension, bufferSize) {
                 qVectorPtrs.reserve(bufferSize);
             }
 
             void on(const events::QEntryObservation<BODY> &observation) {
+                std::cout << "Intercepting QEntryObservation" << std::endl;
                 trainingPoints.col(insertCol) = observation.qEntryIt->first;
                 const QVector<BODY::action_type__size> *qVecPtr = &(observation.qEntryIt->second.qVector);
                 if(insertCol == qVectorPtrs.size()) {
@@ -308,14 +331,14 @@ namespace abm::minds {
          * then assume it's a raw approximator and wrap it in a DifferentiableAdaptiveFunction with OffTreeLoss
          * as a loss function.
          * Uses default optimizer and buffer sizes.  */
-        template<class BODY, DifferentiableParameterisedFunction<IIMCTS::OffTreeLoss<BODY>> QFUNC> requires(!HasCallback<QFUNC, events::IncomingMessageObservation<BODY>>)
+        template<class BODY, DifferentiableParameterisedFunction<IIMCTS::OffTreeLoss<BODY>> QFUNC> requires (!HasCallback<QFUNC, events::QEntryObservation<BODY>>)
         static auto convertToOffTreeQFunc(QFUNC &&qFunc) {
             return approximators::DifferentiableAdaptiveFunction(
                     std::forward<QFUNC>(qFunc),
                     IIMCTS::OffTreeLoss<BODY>());
         }
 
-        template<class BODY, class QFUNC>
+        template<class BODY, class QFUNC> requires HasCallback<QFUNC, events::QEntryObservation<BODY>>
         static std::remove_reference_t<QFUNC> convertToOffTreeQFunc(QFUNC &&qFunc) {
             return std::forward<QFUNC>(qFunc);
         }

@@ -208,7 +208,7 @@ namespace abm::approximators {
 
     ////////  A loss function is a set of inputs and an Output layer,
     /// a stochastic loss function is a generator of loss functions (or a loss function with a sample() member)
-F
+
 //    template<class T>
 //    concept StochasticLossFunction = requires(T obj) {
 //        { obj.getNextLossFunction() } -> LossFunction;
@@ -216,22 +216,22 @@ F
 //    };
 
     /** */
-    template<class T>
-    concept ParameterisedFunction = requires(T obj) {
-        { obj.parameters() } -> std::same_as<arma::mat &>;
-    };
-
-    /** */
-    template<class T, class LOSSFUNCTION>
-    concept DifferentiableParameterisedFunction = requires(T obj, LOSSFUNCTION loss) {
-        { obj.parameters() } -> std::same_as<arma::mat &>;
-        { obj.gradientByParams(loss) } -> std::same_as<arma::mat>;
-    };
-
-    template<class T, class LOSSFUNCTION>
-    concept OptimisableFunction = requires(T obj, LOSSFUNCTION loss) {
-        obj.updateParameters(loss);
-    };
+//    template<class T>
+//    concept ParameterisedFunction = requires(T obj) {
+//        { obj.parameters() } -> std::same_as<arma::mat &>;
+//    };
+//
+//    /** */
+//    template<class T, class LOSSFUNCTION>
+//    concept DifferentiableParameterisedFunction = requires(T obj, LOSSFUNCTION loss) {
+//        { obj.parameters() } -> std::same_as<arma::mat &>;
+//        { obj.gradientByParams(loss) } -> std::same_as<arma::mat>;
+//    };
+//
+//    template<class T, class LOSSFUNCTION>
+//    concept OptimisableFunction = requires(T obj, LOSSFUNCTION loss) {
+//        obj.updateParameters(loss);
+//    };
 
 
 //    /** */
