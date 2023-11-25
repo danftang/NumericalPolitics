@@ -12,7 +12,7 @@
  * wish to constrain only one element of the vector output
  * TODO: this should be an output layer (pure loss function)
  * */
- template<class INPUTS, class MatType>
+template<class INPUTS, class MatType>
 class ElementLoss {
 public:
     arma::sp_mat elements;      // the elements we have observations of, corresponding to inputs
@@ -20,7 +20,7 @@ public:
     ElementLoss() { }
 
     template<class OUT, class RESULTS>
-    void gradientByOutputs(const OUT &outputs, RESULTS &results) {
+    void gradientByOutputs(const OUT &outputs, RESULTS &&results) {
         results.zeros();
         auto elemIndices = arma::find(elements);
         results.elem(elemIndices) = outputs.elem(elemIndices) - arma::nonzeros(elements);
@@ -29,7 +29,7 @@ public:
     }
 
     template<class OUT, class ELEMENTS, class RESULTS>
-    static void gradient(const OUT &outputs, ELEMENTS elements, RESULTS &results) {
+    static void gradient(const OUT &outputs, ELEMENTS elements, RESULTS &&results) {
         results.zeros();
         auto elemIndices = arma::find(elements);
         results.elem(elemIndices) = outputs.elem(elemIndices) - arma::nonzeros(elements);

@@ -32,20 +32,25 @@ namespace abm::lossFunctions {
         }
 
         template<class INPUT>
-        void trainingSet(INPUT &input) { // possibly different every call, in the case of stochastic loss
+        void trainingSet(INPUT &&input) { // possibly different every call, in the case of stochastic loss
             size_t col = 0;
             deselby::for_each(losses, [&col, &input](auto &loss) {
-                loss.trainingSet(input.cols(col, col += loss.batchSize()));
+                size_t startCol = col;
+                col += loss.batchSize();
+                auto subMat = input.cols(startCol, col-1);
+                loss.trainingSet(subMat);
             });
         }
 
         template<class OUTPUT, class GRAD>
-        void gradientByPrediction(const OUTPUT &outputs, GRAD &grad) {
+        void gradientByPrediction(const OUTPUT &outputs, GRAD &&grad) {
             size_t col = 0;
             deselby::for_each(losses, [&col, &outputs, &grad](auto &loss) {
-                size_t endCol = col + loss.batchSize();
-                loss.gradientByPrediction(outputs.cols(col, endCol), grad.cols(col, endCol));
-                col = endCol;
+                size_t startCol = col;
+                col += loss.batchSize() - 1;
+                auto subMat = grad.cols(startCol, col);
+                loss.gradientByPrediction(outputs.cols(startCol, col), subMat);
+                ++col;
             });
         }
     };

@@ -52,14 +52,14 @@ namespace abm::lossFunctions {
 
 
         template<class INPUTS>
-        void trainingSet(INPUTS &trainingPoints) {
+        void trainingSet(INPUTS &&trainingPoints) {
             assert(batchSize() > 0);
             trainingPoints = inputs.cols(0, batchSize()-1);
         }
 
 
         template<class OUTPUTS, class RESULT>
-        void gradientByPrediction(const OUTPUTS &predictions, RESULT &gradient) {
+        void gradientByPrediction(const OUTPUTS &predictions, RESULT &&gradient) {
             gradient = predictions - outputs.cols(0,batchSize()-1);
         }
     };
