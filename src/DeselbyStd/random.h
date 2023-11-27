@@ -103,9 +103,16 @@ namespace deselby {
             return std::poisson_distribution(lambda)(gen);
         }
 
-        inline int binomial(int nTirals, double p) {
-            return std::binomial_distribution<int>(nTirals, p)(gen);
+        template<std::integral INTEGRAL>
+        inline INTEGRAL binomial(INTEGRAL nTirals, double p) {
+            return std::binomial_distribution<INTEGRAL>(nTirals, p)(gen);
         }
+
+        template<std::integral INTEGRAL = uint>
+        inline INTEGRAL geometric(double p) {
+            return std::geometric_distribution<INTEGRAL>(p)(gen);
+        }
+
 
         /** Choses a random element uniformly from a range with known size.
          * @return an iterator to an element of the container, chosen with a uniform probability,

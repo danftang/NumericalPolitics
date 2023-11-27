@@ -91,7 +91,7 @@
 #include "QMind.h"
 //#include "../lossFunctions/IOLoss.h"
 #include "../minds/qLearning/SoftMaxPolicy.h"
-//#include "../../DeselbyStd/DiscreteObjectDistribution.h"
+#include "../../DeselbyStd/DiscreteObjectDistribution.h"
 #include "../approximators/AdaptiveFunction.h"
 #include "../lossFunctions/IIMCTSLosses.h"
 

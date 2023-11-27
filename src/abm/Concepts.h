@@ -107,8 +107,7 @@ namespace abm {
      * */
     template<class T>
     concept GenericQVector = requires(T obj, size_t i) {
-        { obj[i] < obj[i] } -> std::convertible_to<bool>;
-        obj.size();
+        { obj[i] } -> std::convertible_to<double>;
     };
 
 

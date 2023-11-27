@@ -409,8 +409,15 @@ namespace deselby {
     inline static T &&valueIfOptional(T &&obj) { return std::forward<T>(obj); }
 
     /** True if T has operator [] */
-    template<class T, class ARG>
+    template<class T, class ARG = size_t>
     concept HasIndexOperator = requires(T obj, ARG index) { obj[index]; };
+
+    /** True if T has operator [] */
+    template<class T, class ARG = size_t>
+    concept HasIndexOperatorAndSize = requires(T obj, ARG index) {
+        obj[index];
+        { obj.size() } -> std::integral;
+    };
 
 }
 

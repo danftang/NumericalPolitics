@@ -71,48 +71,59 @@ namespace abm::lossFunctions {
     public:
         typedef decltype(std::declval<BODY>().legalActs()) mask_type;
 
-        arma::mat  trainingPoints;  // by-column list of training points. TODO: make this constructed on the fly
-        arma::rowvec weights;       // weight of each training point within its S set.
-        arma::uchar_rowvec isPMFStart; // boolean signalling which columns are the first of each set S
-        arma::umat actions;         // single sampled action for each training point
-        std::vector<mask_type> actionMasks;
+        struct Observation {
+            std::vector<std::pair<BODY,uint>> pmf;
+            BODY::message_type message;
+
+            Observation(const events::IncomingMessageObservation<BODY> &event) : message(event.message) {
+                pmf.reserve(event.bodySamples.size());
+                for(const auto &pmfEntry : event.bodySamples) pmf.push_back(pmfEntry);
+            }
+        };
+
+        std::vector<Observation>  observations;
+        std::vector<uint>   batchIndices;
         POLICY policy;              // differentiable policy from which to get gradient of dP(Q)/dQ
 
-        size_t insertCol = 0;
-        bool bufferIsFull = false;
-        arma::uvec batchCols;
+        uint insertCol = 0;
+        uint bufferCapacity;
+        uint nTrainingPoints = 0;
 
         /** N.B. bufferCapacity is measured in number of training points, not in number of incoming messages.
          * Each incoming message adds a set of training points, one for each possible state of other.*/
-        MessageLoss(size_t bufferCapacity, size_t batchSize, POLICY policy = minds::SoftMaxPolicy()) :
-                trainingPoints(BODY::dimension, bufferCapacity),
-                weights(bufferCapacity),
-                isPMFStart(bufferCapacity),
-                actions(BODY::action_type::size, bufferCapacity),
-                actionMasks(bufferCapacity),
-                policy(std::move(policy)),
-                batchCols(batchSize) {
+        MessageLoss(size_t bufferCapacity, size_t batchObservations, POLICY policy = minds::SoftMaxPolicy()) :
+                bufferCapacity(bufferCapacity),
+                batchIndices(batchObservations,0),
+                policy(std::move(policy)) {
+            observations.reserve(bufferCapacity);
         }
 
 
         void on(const events::IncomingMessageObservation<BODY> &observation) {
             std::cout << "Intercepting IncomingMessageObservation" << std::endl;
-            bool isFirstItem = true;
-            for(const auto &[body, uweight] : observation.bodySamples) {
-                trainingPoints.col(insertCol) = static_cast<const arma::mat &>(observation.body);
-                weights(insertCol) = uweight;
-                actions.col(insertCol) = body.messageToAct(observation.message);
-                actionMasks[insertCol] = body.legalActs();
-                isPMFStart(insertCol) = isFirstItem;
-                isFirstItem = false;
-                insertCol = (insertCol + 1)%capacity();
-                if(insertCol == 0) bufferIsFull = true;
+            if(insertCol < observations.size()) {
+                observations[insertCol] = observation;
+            } else {
+                observations.emplace_back(observation);
+                // maintain batchIndices as random sample so we can calculate batchSize at any time
+                if(observations.size() == 1) {
+                    nTrainingPoints = observation.bodySamples.size() * batchIndices.size();
+                } else {
+                    uint i = deselby::random::geometric(1.0 / observations.size());;
+                    while (i < batchIndices.size()) {
+                        nTrainingPoints += observation.bodySamples.size() - observations[batchIndices[i]].pmf.size();
+                        batchIndices[i] = observations.size() - 1;
+                        i += 1 + deselby::random::geometric(1.0 / observations.size());
+                    }
+                }
             }
+            insertCol = (insertCol + 1)%capacity();
         }
 
-        size_t capacity() const { return trainingPoints.n_cols; }
-        size_t bufferSize() const { return bufferIsFull?capacity():insertCol; }
-        size_t batchSize() const { return batchCols.n_rows; }
+        size_t capacity() const { return bufferCapacity; } // number of observations
+        size_t bufferSize() const { return observations.size(); } // number of observations
+        size_t batchObservations() const { return batchIndices.size(); } // number of observations
+        size_t batchSize() const { return nTrainingPoints; }
 
         /** TODO: Sort this out: need to return a batch of sets rather than individual states.
          *
@@ -122,8 +133,12 @@ namespace abm::lossFunctions {
         template<class INPUTS>
         void trainingSet(INPUTS &trainingMat) {
             assert(bufferSize() > 0);
-            batchCols = arma::randi<arma::uvec>(batchCols.n_rows, arma::distr_param(1, bufferSize() - 1));
-            trainingMat = trainingPoints.cols(batchCols);
+            int col = 0;
+            for(const uint &i : batchIndices) {
+                for(const auto &[body, weight] : observations[i].pmf) {
+                    trainingMat.col(col++) = static_cast<const arma::mat &>(body);
+                }
+            };
         }
 
         /** If we assume a given action a...
@@ -141,6 +156,9 @@ namespace abm::lossFunctions {
          * where
          * gamma(S) =  \sum_{b' \in S} w(b') P(Policy(Q(b')) == a)
          *
+         * d(-log(P(message | S,w,Policy)))/dQ(b) =  -w(b) dP(Policy(Q(b)) == b.messageToAct(message))/dQ(b)
+         *                                      /\sum_{b' \in S} w(b') P(Policy(Q(b')) == b.messageToAct(message))
+         *
          * @tparam OUTPUTS
          * @tparam RESULT
          * @param qVectors
@@ -149,23 +167,28 @@ namespace abm::lossFunctions {
         template<class OUTPUTS, class RESULT>
         void gradientByPrediction(const OUTPUTS &qVectors, RESULT &result) {
             result.zeros();
-            // iterate over complete PMFs
-            uint col = insertCol;
-            while(!isPMFStart(col)) {
-                col = (col+1)%capacity();
-                if(col == insertCol) throw(std::runtime_error("Trying to calculate loss of empty buffer"));
-            }
-            while(col != insertCol) {
-                double Pa = 0.0;
+
+            uint col = 0;
+            for(const uint &i : batchIndices) {
+                auto &message = observations[i].message;
+                double gamma = 0.0;
                 uint startCol = col;
-                do {
-                    result.col(col) =  weights(col) * policy.gradient(qVectors.col(col), actions(col), actionMasks(col));
-                    Pa += weights(col) * policy.probability(qVectors.col(col), actions(col), actionMasks(col));
-                    col = (col+1)%capacity();
-                } while(!isPMFStart(col) && col != insertCol);
-                for(uint i=startCol; i<col; ++i) {
-                    result.col(col) /= Pa;
+                for(const auto &[body, weight] : observations[i].pmf) {
+                    auto act = body.messageToAct(message);
+                    result.col(col) = -weight * policy.gradient(qVectors.col(col), body.legalActs(), act);
+                    gamma += weight * policy.probability(qVectors.col(col), body.legalActs(), act);
+                    ++col;
                 }
+                while(startCol != col) {
+                    result.col(startCol) /= gamma;
+                    ++startCol;
+                }
+            }
+            // resample batchIndices for next time
+            for(uint &i : batchIndices) {
+                nTrainingPoints -= observations[i].pmf.size();
+                i = deselby::random::uniform(observations.size()); // choose new batch for next time
+                nTrainingPoints += observations[i].pmf.size();
             }
         }
 
@@ -193,7 +216,7 @@ namespace abm::lossFunctions {
         static constexpr double sampleVariance = 100.0;
 
         arma::mat   trainingPoints;  // by-column list of training points
-        std::vector<minds::QVector<BODY::action_type::size> *> qVectorPtrs;
+        std::vector<const minds::QVector<BODY::action_type::size> *> qVectorPtrs;
         size_t      insertCol = 0;
 
         QEntryLoss(size_t bufferSize) : trainingPoints(BODY::dimension, bufferSize) {

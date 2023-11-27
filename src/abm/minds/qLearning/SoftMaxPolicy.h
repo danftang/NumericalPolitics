@@ -29,9 +29,13 @@ namespace abm::minds {
             assert(steepness > 0.0);
         }
 
-        template<std::ranges::sized_range QVECTOR, IntegralActionMask ACTIONMASK>
+        template<GenericQVector QVECTOR, IntegralActionMask ACTIONMASK>
         uint sample(const QVECTOR &qValues, const ACTIONMASK &legalActs) {
-            return pmf(qValues, legalActs)(deselby::random::gen);
+            return std::discrete_distribution<uint>(legalActs.size(), 0.0, legalActs.size(),
+                    [&legalActs, a=a, &qValues, maxQ = maxQVal(qValues,legalActs)](double x) {
+                       uint i = x;
+                        return legalActs[i]?exp(a*(qValues[i] - maxQ)):0.0;
+                    })(deselby::random::gen);
         }
 
 
@@ -45,11 +49,11 @@ namespace abm::minds {
          * @param action    the element of the qVec that we're varying
          * @return d(pmf(qVec))/dqVec(a)
          */
-        template<std::ranges::sized_range QVECTOR, IntegralActionMask ACTIONMASK>
+        template<GenericQVector QVECTOR, IntegralActionMask ACTIONMASK>
         arma::vec gradient(const QVECTOR &qVec, const ACTIONMASK &legalActs, uint action) {
-            arma::vec dP_dqa(qVec.size());
-            std::vector<double> P = pmf(qVec, legalActs).probabilities();
-            for(uint i=0; i<qVec.size(); ++i) {
+            arma::vec dP_dqa(legalActs.size());
+            std::vector<double> P = pmf(qVec, legalActs);
+            for(uint i=0; i<legalActs.size(); ++i) {
                 dP_dqa(i) = -P[action]*P[i];
             }
             dP_dqa(action) += P[action];
@@ -62,32 +66,48 @@ namespace abm::minds {
          * @param qVec the point at which to evaluate the PMF
          * @return A PMF over actions given a Q-Vector
          */
-        template<std::ranges::sized_range QVECTOR, IntegralActionMask ACTIONMASK>
-        std::discrete_distribution<uint> pmf(const QVECTOR &qValues, const ACTIONMASK &legalActs) {
-            auto maxIt = std::ranges::max_element(qValues); // scale everything by e^-max to avoid overflow (so 0 < e^q <= 1)
-            return std::views::iota(0,qValues.size())
-                   | std::views::transform([&qValues, &legalActs, a = a, qMax = *maxIt](auto &i) {
-                return legalActs[i]?exp(a*(qValues[i]-qMax)):0.0;
-            });
+        template<GenericQVector QVECTOR, IntegralActionMask ACTIONMASK>
+        std::vector<double> pmf(const QVECTOR &qVec, const ACTIONMASK &legalActs) {
+            uint size = legalActs.size();
+            std::vector<double> distribution(size);
+            double maxQ = maxQVal(qVec, legalActs); // scale everything by e^-max to avoid overflow (so 0 < e^q <= 1)
+            double sumOfWeights = 0.0;
+            for(uint i=0; i<size; ++i) {
+                double weight = legalActs[i]?exp(a*(qVec[i]-maxQ)):0.0;
+                distribution[i] = weight;
+                sumOfWeights += weight;
+            }
+            for(uint i=0; i<size; ++i) distribution[i] /= sumOfWeights;
+            return distribution;
         }
 
         /** The probability of a given action, given a Q-Vector and action mask
          */
-        template<std::ranges::sized_range QVECTOR, IntegralActionMask ACTIONMASK>
+        template<GenericQVector QVECTOR, IntegralActionMask ACTIONMASK>
         double probability(const QVECTOR &qVec, const ACTIONMASK &legalActs, uint action) {
-            auto maxIt = std::ranges::max_element(qVec); // scale everything by e^-max to avoid overflow (so 0 < e^q <= 1)
-            assert(maxIt != qVec.end());
-            double maxQ = *maxIt;
-            uint i=0;
+            if(!legalActs[action]) return 0.0;
+            double maxQ = maxQVal(qVec, legalActs);
             double sumOfExps = 0.0;
             double exp_a;
-            for(const auto &qVal : qVec) {
-                double e = exp(a*(qVal - maxQ));
-                sumOfExps += e;
-                if(i == action) exp_a = e;
-                ++i;
+            for(uint i=0; i<legalActs.size(); ++i) {
+                if(legalActs[i]) {
+                    double e = exp(a * (qVec[i] - maxQ));
+                    sumOfExps += e;
+                    if (i == action) exp_a = e;
+                }
             }
             return exp_a/sumOfExps;
+        }
+
+
+        template<GenericQVector QVECTOR, IntegralActionMask ACTIONMASK>
+        static auto maxQVal(const QVECTOR &qVec, const ACTIONMASK &legalActs) {
+            assert(legalActs.size() > 0);
+            auto maxQ = qVec[0u];
+            for(uint i = 1; i<legalActs.size(); ++i) {
+                if(legalActs[i] && maxQ < qVec[i]) maxQ = qVec[i];
+            }
+            return maxQ;
         }
 
     };
