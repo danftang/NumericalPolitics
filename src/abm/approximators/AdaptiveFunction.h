@@ -102,7 +102,7 @@ namespace abm::approximators {
 
         template<class EVENT>
         void on(const EVENT &event) {
-            std::cout << "Intercepting event in DifferentialAdaptiveFunction" << std::endl;
+//            std::cout << "Intercepting event in DifferentialAdaptiveFunction" << std::endl;
             callback(event, lossFunction);
             if (deselby::invoke_or(schedule, false, event)) { // Update parameters
                 updatePolicy.Update(parameters(), stepSize, gradientByParams(lossFunction));

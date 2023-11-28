@@ -23,7 +23,7 @@ namespace abm::lossFunctions {
 
         template<class EVENT> requires (HasCallback<LOSSES,EVENT> || ...)
         void on(const EVENT &event) {
-            std::cout << "Intercepting event via SumOfLosses" << std::endl;
+//            std::cout << "Intercepting event via SumOfLosses" << std::endl;
             callback(event, losses);
         }
 
@@ -36,9 +36,12 @@ namespace abm::lossFunctions {
             size_t col = 0;
             deselby::for_each(losses, [&col, &input](auto &loss) {
                 size_t startCol = col;
-                col += loss.batchSize();
-                auto subMat = input.cols(startCol, col-1);
-                loss.trainingSet(subMat);
+                auto batchSize = loss.batchSize();
+                if(batchSize > 0) {
+                    col += batchSize;
+                    auto subMat = input.cols(startCol, col-1);
+                    loss.trainingSet(subMat);
+                }
             });
         }
 
@@ -47,10 +50,13 @@ namespace abm::lossFunctions {
             size_t col = 0;
             deselby::for_each(losses, [&col, &outputs, &grad](auto &loss) {
                 size_t startCol = col;
-                col += loss.batchSize() - 1;
-                auto subMat = grad.cols(startCol, col);
-                loss.gradientByPrediction(outputs.cols(startCol, col), subMat);
-                ++col;
+                auto batchSize = loss.batchSize();
+                if(batchSize > 0) {
+                    col += batchSize - 1;
+                    auto subMat = grad.cols(startCol, col);
+                    loss.gradientByPrediction(outputs.cols(startCol, col), subMat);
+                    ++col;
+                }
             });
         }
     };

@@ -223,7 +223,7 @@ namespace experiment5 {
     */
     void iimctsSugarSpice() {
         const double discount = 1.0;
-        const size_t nSamplesInATree = 200000;
+        const size_t nSamplesInATree = 20000;//200000;
         const size_t nTrainingEpisodes = 0;
 
         auto offTreeApproximator = abm::approximators::FNN(

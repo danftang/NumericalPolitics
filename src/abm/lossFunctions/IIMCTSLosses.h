@@ -25,8 +25,9 @@ namespace abm::events {
     };
 
     template<class BODY>
-    struct QEntryObservation {
-        std::map<BODY, minds::IIMCTS::QEntry<BODY::action_type::size>>::iterator qEntryIt;
+    struct QVectorObservation {
+        const BODY &body;
+        const minds::QVector<BODY::action_type::size> &qVector;
     };
 }
 
@@ -216,17 +217,17 @@ namespace abm::lossFunctions {
         static constexpr double sampleVariance = 100.0;
 
         arma::mat   trainingPoints;  // by-column list of training points
-        std::vector<const minds::QVector<BODY::action_type::size> *> qVectorPtrs;
+        std::vector<const minds::QVector<BODY::action_type::size> *> qVectorPtrs; // TODO: this may outlive the treeNode!
         size_t      insertCol = 0;
 
         QEntryLoss(size_t bufferSize) : trainingPoints(BODY::dimension, bufferSize) {
             qVectorPtrs.reserve(bufferSize);
         }
 
-        void on(const events::QEntryObservation<BODY> &observation) {
-            std::cout << "Intercepting QEntryObservation" << std::endl;
-            trainingPoints.col(insertCol) = observation.qEntryIt->first;
-            const minds::QVector<BODY::action_type::size> *qVecPtr = &(observation.qEntryIt->second.qVector);
+        void on(const events::QVectorObservation<BODY> &observation) {
+//            std::cout << "Intercepting QEntryObservation" << std::endl;
+            trainingPoints.col(insertCol) = static_cast<const arma::mat &>(observation.body);
+            const minds::QVector<BODY::action_type::size> *qVecPtr = &(observation.qVector);
             if(insertCol == qVectorPtrs.size()) {
                 qVectorPtrs.push_back(qVecPtr);
             } else {
@@ -247,7 +248,7 @@ namespace abm::lossFunctions {
         bool   bufferIsFull() const { return qVectorPtrs.size() == trainingPoints.n_cols; }
         size_t capacity() const { return trainingPoints.n_cols; }
         size_t bufferSize() const { return bufferIsFull()?capacity():insertCol; }
-        size_t batchSize() const { return capacity(); }
+        size_t batchSize() const { return bufferSize(); }
 
         template<class OUTPUTS, class RESULT>
         void gradientByPrediction(const OUTPUTS &qMeans, RESULT &gradient) {

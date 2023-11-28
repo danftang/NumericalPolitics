@@ -144,19 +144,28 @@ namespace abm::minds {
 
             ~TreeNode() { for (auto &child: children) delete (child.second); }
 
-            /** Qvector for current body state, given complete episode history */
-            qvector_type &operator()(const BODY &body) {
-                auto [qEntryIt, addedEntry ] = findQEntry<false>(body, true);
-                return qEntryIt->second.qVector;
-            }
+            /** Qvector for current body state, given complete episode history.
+             * If body isn't present in qEntries, then it is added.
+             */
+//            qvector_type &operator()(const BODY &body) {
+//                auto [qEntryIt, addedEntry ] = findQEntry<false>(body, true);
+//                return qEntryIt->second.qVector;
+//            }
 
             TreeNode *getChild(message_type message, bool createNodeIfAbsent);
             TreeNode *unlinkChild(message_type message);
             void leavePassiveTrace(const BODY &body);
 
+//            template<bool LEAVETRACE>
+//            std::pair<q_iterator_type, bool>
+//                    findQEntry(const BODY &body, bool canAddEntry);
+
             template<bool LEAVETRACE>
-            std::pair<q_iterator_type, bool>
-                    findQEntry(const BODY &body, bool canAddEntry);
+            std::pair<qvector_type &, bool> getQVeector(const BODY &body) {
+                auto [qEntryIt, didInsert] = qEntries.try_emplace(body);
+                if(LEAVETRACE) ++(qEntryIt->traceCount);
+                return {qEntryIt->qVector, didInsert};
+            }
 
             auto activePlayerBodySampler() {
                 assert(!qEntries.empty());
@@ -191,14 +200,14 @@ namespace abm::minds {
          * if LEAVETRACE is true, and an entry exists, then the trace counter for body is incremented.
          * if no entry exists or can be added, then nullptr is returned.
          * The return value is a pair, the second entry of which, if true, indicates that a new entry was added */
-        template<class BODY>
-        template<bool LEAVETRACE>
-        std::pair<typename TreeNode<BODY>::q_iterator_type, bool> TreeNode<BODY>::findQEntry(const BODY &body, bool canAddEntry) {
-            std::pair<q_iterator_type ,bool> result =
-                    canAddEntry ? qEntries.try_emplace(body) : std::pair(qEntries.find(body), false);
-            if constexpr(LEAVETRACE) if(result.first != qEntries.end()) ++(result.first->second.traceCount);
-            return result;
-        }
+//        template<class BODY>
+//        template<bool LEAVETRACE>
+//        std::pair<typename TreeNode<BODY>::q_iterator_type, bool> TreeNode<BODY>::findQEntry(const BODY &body, bool canAddEntry) {
+//            std::pair<q_iterator_type ,bool> result =
+//                    canAddEntry ? qEntries.try_emplace(body) : std::pair(qEntries.find(body), false);
+//            if constexpr(LEAVETRACE) if(result.first != qEntries.end()) ++(result.first->second.traceCount);
+//            return result;
+//        }
 
 
         /** */
@@ -301,10 +310,9 @@ namespace abm::minds {
             std::vector<double> rewards; // reward between choice points of the player
             bool canAddToTree; // have we added a QEntry to the tree yet?
             offtreeqfunc_type &offTreeQFunction;// current treeNodes for player's experience, null if off the tree
-            TreeNode<BODY>::q_iterator_type lastQEntry;
+//            TreeNode<BODY>::q_iterator_type lastQEntry;
+            QVector<BODY::action_type::size> *lastQVector = nullptr;
             const double discount;
-
-            static constexpr bool INITTREEFROMOFFTREE = true; // Initialise new Q-vectors from the offtree Q-function?
 
             SelfPlayQFunction(TreeNode<BODY> &treeNode, offtreeqfunc_type &offtreeqfunction, const double &discount) :
                     treeNode(treeNode), canAddToTree(DOBACKPROP), offTreeQFunction(offtreeqfunction), discount(discount) {}
@@ -419,24 +427,16 @@ namespace abm::minds {
         TreeNode<BODY>::qvector_type SelfPlayQFunction<BODY, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
         operator ()(const BODY &body) {
             if(isOnTree()) {
-                bool addedNewEntry;
-                std::tie(lastQEntry, addedNewEntry) = treeNode->template findQEntry<LEAVETRACE>(body, canAddToTree);
-                if constexpr(INITTREEFROMOFFTREE) if(addedNewEntry) { // set initial value to offTree value
-                    lastQEntry->second.qVector = offTreeQFunction(body);
-                }
-                canAddToTree = canAddToTree && !addedNewEntry;
-                if(lastQEntry == treeNode->qEntries.end()) { // no qVector and can't add to tree
-                    treeNode = nullptr;
-                    return offTreeQFunction(body);
+                auto [qVec, addedNewEntry] = treeNode->template getQVector<LEAVETRACE>(body);
+                if(addedNewEntry) {
+                    qVec = offTreeQFunction(body);
                 } else {
-                    callback(events::QEntryObservation<BODY>{lastQEntry}, offTreeQFunction); // teach offTreeQFunc on qEntry
+                    callback(events::QVectorObservation<BODY>{body, qVec}, offTreeQFunction); // teach offTreeQFunc on qEntry
                 }
-            } else {
-                lastQEntry == treeNode->qEntries.end();
-                return offTreeQFunction(body);
+                lastQVector = &qVec;
+                return qVec;
             }
-//            std::cout << "Ontree QVec = " << *lastQVector << std::endl;
-            return lastQEntry->second.qVector;
+            return offTreeQFunction(body);
         }
 
     }
@@ -590,7 +590,8 @@ namespace abm::minds {
             auto rootNodeSamples = rootNode->nActivePlayerSamples();
             if(rootNodeSamples < minSelfPlaySamples) selfPlay(minSelfPlaySamples - rootNodeSamples);
 
-            const QVector<action_type::size> &qVec = (*rootNode)(body);
+            auto [qVec, didInsert] = rootNode->template getQVeector<false>(body);
+            if(didInsert) qVec = offTreeQFunc(body);
 
             uint qVecSamples = qVec.totalSamples();
             if(qVecSamples < minQVecSamples) augmentSamples(body, minQVecSamples - qVecSamples);
