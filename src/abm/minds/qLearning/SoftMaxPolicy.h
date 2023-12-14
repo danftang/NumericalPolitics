@@ -54,7 +54,7 @@ namespace abm::minds {
             arma::vec dP_dqa(legalActs.size());
             std::vector<double> P = pmf(qVec, legalActs);
             for(uint i=0; i<legalActs.size(); ++i) {
-                dP_dqa(i) = -P[action]*P[i];
+                    dP_dqa(i) = -P[action]*P[i];
             }
             dP_dqa(action) += P[action];
             dP_dqa *= a;
@@ -63,6 +63,7 @@ namespace abm::minds {
 
 
         /** The probability mass function over actions given a Q-Vector
+         * pmf_i = e^{aQ_i}/sum_j e^{aQ_j}
          * @param qVec the point at which to evaluate the PMF
          * @return A PMF over actions given a Q-Vector
          */
@@ -88,7 +89,7 @@ namespace abm::minds {
             if(!legalActs[action]) return 0.0;
             double maxQ = maxQVal(qVec, legalActs);
             double sumOfExps = 0.0;
-            double exp_a;
+            double exp_a = 0.0;
             for(uint i=0; i<legalActs.size(); ++i) {
                 if(legalActs[i]) {
                     double e = exp(a * (qVec[i] - maxQ));
@@ -96,6 +97,7 @@ namespace abm::minds {
                     if (i == action) exp_a = e;
                 }
             }
+            assert(exp_a != 0.0); // not technically an error, but for now detects QValues getting too big
             return exp_a/sumOfExps;
         }
 

@@ -17,7 +17,7 @@
 //#include "tests/tests.h"
 //#include "tests/mlpacktests.cpp"
 //#include "tests/DQNtest.cpp"
-//#include "tests/IncompleteInformationMCTSTest.cpp"
+#include "tests/IncompleteInformationMCTSTest.cpp"
 //#include "tests/FNN.h"
 
 //#include "tests/mlpacktests.cpp"
@@ -41,6 +41,7 @@ int main() {
 //    cartPoleDQNTest();
 //    tests::DQNCartPole();
 //    pingPongTest();
+
 //    tests::incompleteInformationMCTSTest();
 
 //    abm::societies::RandomEncounterSociety mySociety(abm::PingPongAgent{}, abm::PingPongAgent{});

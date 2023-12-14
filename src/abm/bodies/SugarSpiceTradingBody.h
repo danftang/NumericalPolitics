@@ -43,7 +43,7 @@ namespace abm::bodies {
             YouWonFight,
             YouLostFight,
             size,
-            IndeterminateTerminalMessage = Bandits
+            HighestRecordedMessage = Bandits
         };
 
         typedef message_type in_message_type;
@@ -55,17 +55,21 @@ namespace abm::bodies {
         static constexpr double costOfBanditAttack = 15.0;
         inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
         static const bool encodeOutgoingMessage = false;
-        static const int nOneHotBitsForMessageEncode = static_cast<int>(message_type::IndeterminateTerminalMessage) + 1;
+        static const int nOneHotBitsForMessageEncode = static_cast<int>(message_type::HighestRecordedMessage) + 1;
         static constexpr size_t dimension = nOneHotBitsForMessageEncode * (1 + encodeOutgoingMessage) + 3;
         static constexpr size_t nstates =
                 8 * nOneHotBitsForMessageEncode * (encodeOutgoingMessage ? nOneHotBitsForMessageEncode : 1);
 
         // Agent state
 //        arma::mat::fixed<dimension, 1> netInput; // state in the form of one-hot vectors of action history, plus sugar, spice and preference
-        arma::mat netInput = arma::mat(dimension,1); // state in the form of one-hot vectors of action history, plus sugar, spice and preference
+//        arma::mat netInput = arma::mat(dimension,1); // state in the form of one-hot vectors of action history, plus sugar, spice and preference
 //        bool isTerminal = false;
 //        double reward = 0.0;
+        bool bSugar;
+        bool bSpice;
+        bool bPrefersSugar;
         message_type lastOutgoingMessage;
+        message_type lastIncomingMessage;
         action_mask legalMoves;
 
         SugarSpiceTradingBody(): SugarSpiceTradingBody(false, false, false) { }
@@ -91,74 +95,52 @@ namespace abm::bodies {
         // ---- End of Body interface
 
         void setSugar(int nSugar) {
-            netInput[0] = nSugar;
+            bSugar = nSugar;
             legalMoves[iGiveSugar] = nSugar>0;
         }
 
         void setSpice(int nSpice) {
-            netInput[1] = nSpice;
+            bSpice = nSpice;
             legalMoves[iGiveSpice] = nSpice>0;
         }
 
-        void setPrefersSugar(bool prefersSugar) { netInput[2] = prefersSugar; }
+        void setPrefersSugar(bool prefersSugar) { bPrefersSugar = prefersSugar; }
 
-        [[nodiscard]] const double &sugar() const { return netInput[0]; }
+//        [[nodiscard]] const double sugar() const { return bSugar; }
+//
+//        [[nodiscard]] const double spice() const { return bSpice; }
 
-        [[nodiscard]] const double &spice() const { return netInput[1]; }
+        [[nodiscard]] bool hasSugar() const { return bSugar; }
 
-        [[nodiscard]] bool hasSugar() const { return netInput[0] > 0.0; }
+        [[nodiscard]] bool hasSpice() const { return bSpice; }
 
-        [[nodiscard]] bool hasSpice() const { return netInput[1] > 0.0; }
+        [[nodiscard]] bool prefersSugar() const { return bPrefersSugar; }
 
-        [[nodiscard]] bool prefersSugar() const { return netInput[2] != 0.0; }
-
-        operator const arma::mat &() const {
+        operator arma::mat () const {
+            arma::mat netInput(dimension,1);
+            netInput.zeros();
+            netInput[0] = hasSugar();
+            netInput[1] = hasSpice();
+            netInput[2] = prefersSugar();
+            int lastIncomingMessageInt = static_cast<int>(std::min(message_type::HighestRecordedMessage, lastIncomingMessage));
+            int lastOutgoingMessageInt = static_cast<int>(std::min(message_type::HighestRecordedMessage, lastOutgoingMessage));
+            netInput[3 + lastIncomingMessageInt] = 1.0;
+            if (encodeOutgoingMessage) netInput[3 + nOneHotBitsForMessageEncode + lastOutgoingMessageInt] = 1.0;
             return netInput;
         }
 
         // convert to integer giving the ordinal of this state
         operator size_t() const {
-            return netInput[0] + 2 * netInput[1] + 4 * netInput[2] + 8 * (static_cast<int>(getLastIncomingMessage()) +
+            return hasSugar() + 2 * hasSpice() + 4 * prefersSugar() + 8 * (static_cast<int>(lastIncomingMessage) +
                                                                           (encodeOutgoingMessage ?
                                                                            nOneHotBitsForMessageEncode *
-                                                                                   static_cast<int>(getLastOutgoingMessage())
+                                                                                   static_cast<int>(lastOutgoingMessage)
                                                                                                  : 0));
         }
 
-        void recordIncomingMessage(message_type message) {
-            assert(static_cast<int>(message) >= 0);
-            if(message > message_type::IndeterminateTerminalMessage) message = message_type::IndeterminateTerminalMessage; // don't record type of terminal messages
-            for (int i = 3; i < 3 + nOneHotBitsForMessageEncode; ++i) netInput[i] = 0.0;
-            assert(3 + static_cast<int>(message) < dimension);
-            netInput[3 + static_cast<int>(message)] = 1.0;
-        }
+        void recordIncomingMessage(message_type message) { lastIncomingMessage = message; }
 
-        void recordOutgoingMessage(message_type message) {
-            if (encodeOutgoingMessage) {
-                assert(static_cast<int>(message) >= 0);
-                if(message > message_type::IndeterminateTerminalMessage) message = message_type::IndeterminateTerminalMessage;
-                for (int i = 3 + nOneHotBitsForMessageEncode; i < 3 + 2 * nOneHotBitsForMessageEncode; ++i)
-                    netInput[i] = 0.0;
-                netInput[3 + nOneHotBitsForMessageEncode + static_cast<int>(message)] = 1.0;
-            } else {
-                lastOutgoingMessage = message;
-            }
-        }
-
-        message_type getLastIncomingMessage() const {
-            int m = 0;
-            while (netInput[3 + m] == 0.0) ++m;
-            return static_cast<message_type>(m);
-        }
-
-        message_type getLastOutgoingMessage() const {
-            if(encodeOutgoingMessage) {
-                int m = 0;
-                while (netInput[3 + nOneHotBitsForMessageEncode + m] == 0.0) ++m;
-                return static_cast<message_type>(m);
-            }
-            return lastOutgoingMessage;
-        }
+        void recordOutgoingMessage(message_type message) { lastOutgoingMessage = message; }
 
         void reset(bool hasSugar, bool hasSpice, bool prefersSugar);
 
@@ -170,7 +152,7 @@ namespace abm::bodies {
 
         friend std::ostream &operator<<(std::ostream &out, const SugarSpiceTradingBody &state) {
 //                    out << state.sugar() << state.spice() << state.prefersSugar();
-            out << state.netInput.t();
+            out << state.hasSugar() << " " << state.hasSpice() << " " << state.prefersSugar() << " " << state.lastIncomingMessage << " " << state.lastOutgoingMessage;
             return out;
         }
 
@@ -252,8 +234,8 @@ namespace abm::bodies {
 
     template<bool HASLANGUAGE>
     void SugarSpiceTradingBody<HASLANGUAGE>::reset(bool hasSugar, bool hasSpice, bool prefersSugar) {
-        recordIncomingMessage(message_type::IndeterminateTerminalMessage); // use first terminal state to mean Empty as we don't use this
-        recordOutgoingMessage(message_type::IndeterminateTerminalMessage);
+        recordIncomingMessage(message_type::HighestRecordedMessage); // use first terminal state to mean Empty as we don't use this
+        recordOutgoingMessage(message_type::HighestRecordedMessage);
         setSugar(hasSugar);
         setSpice(hasSpice);
         setPrefersSugar(prefersSugar);
@@ -276,13 +258,13 @@ namespace abm::bodies {
         switch (action) {
             case iGiveSugar:
                 assert(hasSugar());
-                setSugar(sugar() - 1);
+                setSugar(0);
                 response.message = message_type::GiveSugar;
                 response.reward -= (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                 break;
             case iGiveSpice:
                 assert(hasSpice());
-                setSpice(spice() - 1);
+                setSpice(0);
                 response.message = message_type::GiveSpice;
                 response.reward -= (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 break;
@@ -332,15 +314,15 @@ namespace abm::bodies {
             incomingMessage == message_type::Bandits ||
             incomingMessage == message_type::YouWonFight ||
             incomingMessage == message_type::YouLostFight ||
-            (incomingMessage == message_type::WalkAway && getLastOutgoingMessage() == message_type::WalkAway)
+            (incomingMessage == message_type::WalkAway && lastOutgoingMessage == message_type::WalkAway)
         };
         switch (incomingMessage) {
             case message_type::GiveSugar:
-                setSugar(sugar() + 1);
+                setSugar(1);
                 response.reward += (prefersSugar()?utilityOfPreferred:utilityOfNonPreferred);
                 break;
             case message_type::GiveSpice:
-                setSpice(spice() + 1);
+                setSpice(1);
                 response.reward += (prefersSugar()?utilityOfNonPreferred:utilityOfPreferred);
                 break;
             case message_type::YouWonFight:

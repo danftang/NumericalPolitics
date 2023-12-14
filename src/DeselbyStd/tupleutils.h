@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <utility>
 #include "typeutils.h"
+#include "random.h"
 
 namespace deselby {
 

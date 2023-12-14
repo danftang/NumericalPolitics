@@ -33,11 +33,17 @@ namespace abm::minds {
         static size_t max(const QVECTOR &qValues, const ACTIONMASK &legalActs) {
             // choose a legal move with highest Q
             auto indices = legalIndices(legalActs);
-            std::shuffle(indices.begin(), indices.end(), deselby::random::gen); // ...in-case of multiple max values
+//            std::shuffle(indices.begin(), indices.end(), deselby::random::gen); // ...in-case of multiple max values
             auto chosenMove = indices[0];
+            int nTies = 0;
             for(size_t ii = 1; ii < indices.size(); ++ii) {
                 auto act = indices[ii];
-                if(qValues[chosenMove] < qValues[act]) chosenMove = act;
+                if(qValues[chosenMove] < qValues[act]) {
+                    chosenMove = act;
+                    nTies = 0;
+                } else if(qValues[chosenMove] == qValues[act]) {
+                    if(deselby::random::uniform<int,true>(0,++nTies) == 0) chosenMove = act;
+                }
             }
             return chosenMove;
         }

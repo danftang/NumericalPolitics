@@ -72,6 +72,7 @@ namespace abm::lossFunctions {
     public:
         typedef decltype(std::declval<BODY>().legalActs()) mask_type;
 
+
         struct Observation {
             std::vector<std::pair<BODY,uint>> pmf;
             BODY::message_type message;
@@ -101,7 +102,7 @@ namespace abm::lossFunctions {
 
 
         void on(const events::IncomingMessageObservation<BODY> &observation) {
-            std::cout << "Intercepting IncomingMessageObservation" << std::endl;
+//            std::cout << "Intercepting IncomingMessageObservation" << std::endl;
             if(insertCol < observations.size()) {
                 observations[insertCol] = observation;
             } else {
@@ -123,10 +124,10 @@ namespace abm::lossFunctions {
 
         size_t capacity() const { return bufferCapacity; } // number of observations
         size_t bufferSize() const { return observations.size(); } // number of observations
-        size_t batchObservations() const { return batchIndices.size(); } // number of observations
-        size_t batchSize() const { return nTrainingPoints; }
+        size_t batchObservations() const { return batchIndices.size(); } // number of observations (each a set of training points)
+        size_t batchSize() const { return nTrainingPoints; } // number of training points
 
-        /** TODO: Sort this out: need to return a batch of sets rather than individual states.
+        /**
          *
          * @tparam INPUTS
          * @param trainingMat
@@ -152,8 +153,8 @@ namespace abm::lossFunctions {
          * P(a | S, w, Policy) = A\sum_{b' \in S} w(b') P(Policy(Q(b')) == a)
          *
          * so, for each column b_j, for which we now have a Q(b_j)
-         * d(-log(P(a | S,w,Policy)))/dQ(b_j) = (w(b_j) / \sum_{b' \in S} w(b') P(Policy(Q(b')) == a)) dP(Policy(Q(b_j))==a)/dQ(b_j)
-         *      = (1/gamma(S)) w(b_j) dP(Policy(Q(b_j))==a)/dQ(b_j)
+         * d(-log(P(a | S,w,Policy)))/dQ(b_j) = (-w(b_j) / \sum_{b' \in S} w(b') P(Policy(Q(b')) == a)) dP(Policy(Q(b_j))==a)/dQ(b_j)
+         *      = (-w(b_j) /gamma(S)) dP(Policy(Q(b_j))==a)/dQ(b_j)
          * where
          * gamma(S) =  \sum_{b' \in S} w(b') P(Policy(Q(b')) == a)
          *
@@ -168,7 +169,7 @@ namespace abm::lossFunctions {
         template<class OUTPUTS, class RESULT>
         void gradientByPrediction(const OUTPUTS &qVectors, RESULT &result) {
             result.zeros();
-
+//            std::cout << "Calculating gradient of MessageLoss" << std::endl;
             uint col = 0;
             for(const uint &i : batchIndices) {
                 auto &message = observations[i].message;
@@ -177,14 +178,21 @@ namespace abm::lossFunctions {
                 for(const auto &[body, weight] : observations[i].pmf) {
                     auto act = body.messageToAct(message);
                     result.col(col) = -weight * policy.gradient(qVectors.col(col), body.legalActs(), act);
-                    gamma += weight * policy.probability(qVectors.col(col), body.legalActs(), act);
+                    gamma += weight * (policy.probability(qVectors.col(col), body.legalActs(), act) + std::numeric_limits<double>::epsilon());
+                    // ...add epsilon for numerical stability if all samples are very low prob
+//                    std::cout << body.legalActs() << " " << act << " " << qVectors.col(col) << " " << weight << " " << gamma << " " << body << std::endl;
                     ++col;
                 }
+//                std::cout << std::endl;
+//                assert(gamma != 0.0);
                 while(startCol != col) {
-                    result.col(startCol) /= gamma;
+                    for(int row = 0; row < result.n_rows; ++row) {
+                        result(row,startCol) /= std::max(gamma,std::abs(result(row,startCol))); // clamp to +-1.0
+                    }
                     ++startCol;
                 }
             }
+//            std::cout << "Gradient = " << std::endl << result << std::endl;
             // resample batchIndices for next time
             for(uint &i : batchIndices) {
                 nTrainingPoints -= observations[i].pmf.size();
@@ -216,22 +224,22 @@ namespace abm::lossFunctions {
     public:
         static constexpr double sampleVariance = 100.0;
 
-        arma::mat   trainingPoints;  // by-column list of training points
-        std::vector<const minds::QVector<BODY::action_type::size> *> qVectorPtrs; // TODO: this may outlive the treeNode!
+        arma::mat   trainingPoints;  // by-column list of training points (body states)
+        std::vector<minds::QVector<BODY::action_type::size>> qVectors; // the buffer of recorded QVectors for each training point
         size_t      insertCol = 0;
 
         QEntryLoss(size_t bufferSize) : trainingPoints(BODY::dimension, bufferSize) {
-            qVectorPtrs.reserve(bufferSize);
+            qVectors.reserve(bufferSize);
         }
 
         void on(const events::QVectorObservation<BODY> &observation) {
 //            std::cout << "Intercepting QEntryObservation" << std::endl;
             trainingPoints.col(insertCol) = static_cast<const arma::mat &>(observation.body);
-            const minds::QVector<BODY::action_type::size> *qVecPtr = &(observation.qVector);
-            if(insertCol == qVectorPtrs.size()) {
-                qVectorPtrs.push_back(qVecPtr);
+            // const minds::QVector<BODY::action_type::size> *qVecPtr = &(observation.qVector);
+            if(insertCol == qVectors.size()) {
+                qVectors.push_back(observation.qVector);
             } else {
-                qVectorPtrs[insertCol] = qVecPtr;
+                qVectors[insertCol] = observation.qVector;
             }
             insertCol = (insertCol + 1)%trainingPoints.n_cols;
         }
@@ -245,7 +253,7 @@ namespace abm::lossFunctions {
             }
         }
 
-        bool   bufferIsFull() const { return qVectorPtrs.size() == trainingPoints.n_cols; }
+        bool   bufferIsFull() const { return qVectors.size() == trainingPoints.n_cols; }
         size_t capacity() const { return trainingPoints.n_cols; }
         size_t bufferSize() const { return bufferIsFull()?capacity():insertCol; }
         size_t batchSize() const { return bufferSize(); }
@@ -255,10 +263,11 @@ namespace abm::lossFunctions {
             size_t s = batchSize();
             gradient.zeros();
             for(size_t col = 0; col < s; ++col) {
-                const minds::QVector<BODY::action_type::size> &qVec = *qVectorPtrs[col];
+                // const minds::QVector<BODY::action_type::size> &qVec = *qVectorPtrs[col];
+//                std::cout << "Calculating QEntryLoss on " << std::endl << qMeans.col(col).t() << std::endl << qVectors[col] << std::endl;
                 for(size_t action = 0; action < qMeans.n_rows; ++action) {
                     gradient(action,col) =
-                            qVec[action].sampleCount * (qMeans(action,col) - qVec[action].mean())
+                            qVectors[col][action].sampleCount * (qMeans(action,col) - qVectors[col][action].mean())
                             / sampleVariance;
                 }
             }
@@ -287,7 +296,7 @@ namespace abm::lossFunctions {
         static constexpr size_t defaultQEntryBufferSize = 16;
         static constexpr size_t defaultMessageBatchSize = 16;
         static constexpr size_t defaultMessageBufferSize = 512;
-        static constexpr double selfOtherLearningRatio = 2.0;
+        static constexpr double otherSelfLearningRatio = 0.5;
 
         OffTreeLoss(size_t qEntryBufferSize = defaultQEntryBufferSize,
                     size_t messageBufferSize = defaultMessageBufferSize,
@@ -296,13 +305,10 @@ namespace abm::lossFunctions {
                 base_type(
                         QEntryLoss<BODY>(qEntryBufferSize),
                         WeightedLoss(
-                                selfOtherLearningRatio,
+                                otherSelfLearningRatio,
                                 MessageLoss<BODY,QPOLICY>(messageBufferSize, messageBatchSize, qPolicy))) {
         }
-
     };
-
-
 }
 
 

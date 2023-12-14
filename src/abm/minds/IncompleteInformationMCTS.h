@@ -83,7 +83,7 @@
 #include "../minds/qLearning/QVector.h"
 #include "../minds/qLearning/GreedyPolicy.h"
 #include "../minds/qLearning/UpperConfidencePolicy.h"
-#include "ZeroIntelligence.h"
+// #include "ZeroIntelligence.h"
 #include "../../DeselbyStd/stlstream.h"
 #include "../episodes/SimpleEpisode.h"
 #include "../lossFunctions/SumOfLosses.h"
@@ -103,14 +103,14 @@ namespace abm::minds {
          * then assume it's a raw approximator and wrap it in a DifferentiableAdaptiveFunction with OffTreeLoss
          * as a loss function.
          * Uses default optimizer and buffer sizes.  */
-        template<class BODY, DifferentiableParameterisedFunction<lossFunctions::OffTreeLoss<BODY>> QFUNC> requires (!HasCallback<QFUNC, events::QEntryObservation<BODY>>)
+        template<class BODY, DifferentiableParameterisedFunction<lossFunctions::OffTreeLoss<BODY>> QFUNC> requires (!HasCallback<QFUNC, events::QVectorObservation<BODY>>)
         static auto convertToOffTreeQFunc(QFUNC &&qFunc) {
             return approximators::DifferentiableAdaptiveFunction(
                     std::forward<QFUNC>(qFunc),
                     lossFunctions::OffTreeLoss<BODY>());
         }
 
-        template<class BODY, class QFUNC> requires HasCallback<QFUNC, events::QEntryObservation<BODY>>
+        template<class BODY, class QFUNC> requires (HasCallback<QFUNC, events::QVectorObservation<BODY>> || !DifferentiableParameterisedFunction<QFUNC,lossFunctions::OffTreeLoss<BODY>>)
         static std::remove_reference_t<QFUNC> convertToOffTreeQFunc(QFUNC &&qFunc) {
             return std::forward<QFUNC>(qFunc);
         }
@@ -142,6 +142,16 @@ namespace abm::minds {
 //            std::array<TreeNode *, static_cast<size_t>(message_type::size)> children;   // ...indexed by actId. nullptr if child not present.
         public:
 
+            TreeNode() = default;
+
+            TreeNode(TreeNode<BODY> &other) = default;
+
+            TreeNode(const TreeNode<BODY> &other) : qEntries(other.qEntries), otherPlayerDistribution(other.otherPlayerDistribution) {
+                for(const auto &[message, nodePtr] : other.children) { // copy children
+                    children[message] = new TreeNode<BODY>(*nodePtr);
+                }
+            }
+
             ~TreeNode() { for (auto &child: children) delete (child.second); }
 
             /** Qvector for current body state, given complete episode history.
@@ -161,10 +171,10 @@ namespace abm::minds {
 //                    findQEntry(const BODY &body, bool canAddEntry);
 
             template<bool LEAVETRACE>
-            std::pair<qvector_type &, bool> getQVeector(const BODY &body) {
+            std::pair<qvector_type &, bool> getQVector(const BODY &body) {
                 auto [qEntryIt, didInsert] = qEntries.try_emplace(body);
-                if(LEAVETRACE) ++(qEntryIt->traceCount);
-                return {qEntryIt->qVector, didInsert};
+                if(LEAVETRACE) ++(qEntryIt->second.traceCount);
+                return {qEntryIt->second.qVector, didInsert};
             }
 
             auto activePlayerBodySampler() {
@@ -311,7 +321,7 @@ namespace abm::minds {
             bool canAddToTree; // have we added a QEntry to the tree yet?
             offtreeqfunc_type &offTreeQFunction;// current treeNodes for player's experience, null if off the tree
 //            TreeNode<BODY>::q_iterator_type lastQEntry;
-            QVector<BODY::action_type::size> *lastQVector = nullptr;
+            QVector<BODY::action_type::size> *lastQVectorPtr = nullptr;
             const double discount;
 
             SelfPlayQFunction(TreeNode<BODY> &treeNode, offtreeqfunc_type &offtreeqfunction, const double &discount) :
@@ -332,6 +342,10 @@ namespace abm::minds {
             // ==== Mind interface
 
             TreeNode<BODY>::qvector_type operator()(const body_type &);
+
+            void on(const events::AgentStartEpisode<body_type> &event) {
+                if(!event.isFirstMover) treeNode->leavePassiveTrace(event.body);
+            }
 
             void on(const events::AgentStep<action_type, message_type> &);
             void on(const events::PostActBodyState<body_type> &);
@@ -377,7 +391,7 @@ namespace abm::minds {
         void SelfPlayQFunction<TREENODE, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
         on(const events::AgentStep<action_type,message_type> &event) {
             if(isOnTree()) {
-                if constexpr (DOBACKPROP) qValues.push_back(&((lastQEntry->second.qVector)[event.act]));
+                if constexpr (DOBACKPROP) qValues.push_back(&(lastQVectorPtr->operator[](event.act)));
                 treeNode = treeNode->getChild(event.message, canAddToTree);
             }
             rewards.push_back(event.reward); // new reward entry
@@ -429,11 +443,14 @@ namespace abm::minds {
             if(isOnTree()) {
                 auto [qVec, addedNewEntry] = treeNode->template getQVector<LEAVETRACE>(body);
                 if(addedNewEntry) {
-                    qVec = offTreeQFunction(body);
+                    auto offTreeQ = offTreeQFunction(body);
+                    assert(!std::isnan(offTreeQ[0]));
+                    qVec = offTreeQ;
                 } else {
                     callback(events::QVectorObservation<BODY>{body, qVec}, offTreeQFunction); // teach offTreeQFunc on qEntry
                 }
-                lastQVector = &qVec;
+                lastQVectorPtr = &qVec;
+                assert(!std::isnan(qVec[0].mean()));
                 return qVec;
             }
             return offTreeQFunction(body);
@@ -522,7 +539,7 @@ namespace abm::minds {
                 offTreeQFunc(IIMCTS::convertToOffTreeQFunc<BODY>(offTreeApproximator)),
                 selfStatePriorSampler(selfStatePriorSampler),
                 otherStatePriorSampler(otherStatePriorSampler),
-                rootNode(nullptr),
+                rootNode(new IIMCTS::TreeNode<BODY>()),
                 minSelfPlaySamples(minSelfPlaySamples),
                 minQVecSamples(minSelfPlaySamples / SelfPlayQVecSampleRatio),
                 discount(discount),
@@ -530,7 +547,7 @@ namespace abm::minds {
         }
 
         IncompleteInformationMCTS(const IncompleteInformationMCTS<OffTreeApproximator, BODY, SelfPlayPolicy> &other) :
-        rootNode(nullptr),
+        rootNode(new IIMCTS::TreeNode<BODY>(*other.rootNode)),
         discount(other.discount),
         selfPlayPolicy(other.selfPlayPolicy),
         offTreeQFunc(other.offTreeQFunc),
@@ -539,7 +556,18 @@ namespace abm::minds {
         minSelfPlaySamples(other.minSelfPlaySamples),
         minQVecSamples(other.minQVecSamples)
         {
-            assert(other.rootNode == nullptr);
+        }
+
+        IncompleteInformationMCTS(IncompleteInformationMCTS<OffTreeApproximator, BODY, SelfPlayPolicy> &&other)  :
+                rootNode(other.rootNode),
+                discount(other.discount),
+                selfPlayPolicy(std::move(other.selfPlayPolicy)),
+                offTreeQFunc(std::move(other.offTreeQFunc)),
+                selfStatePriorSampler(std::move(other.selfStatePriorSampler)),
+                otherStatePriorSampler(std::move(other.otherStatePriorSampler)),
+                minSelfPlaySamples(other.minSelfPlaySamples),
+                minQVecSamples(other.minQVecSamples) {
+            other.rootNode = nullptr;
         }
 
         ~IncompleteInformationMCTS() { delete (rootNode); }
@@ -588,9 +616,11 @@ namespace abm::minds {
             assert(rootNode != nullptr);
 
             auto rootNodeSamples = rootNode->nActivePlayerSamples();
-            if(rootNodeSamples < minSelfPlaySamples) selfPlay(minSelfPlaySamples - rootNodeSamples);
+            if(rootNodeSamples < minSelfPlaySamples) {
+                selfPlay(minSelfPlaySamples - rootNodeSamples);
+            }
 
-            auto [qVec, didInsert] = rootNode->template getQVeector<false>(body);
+            auto [qVec, didInsert] = rootNode->template getQVector<false>(body);
             if(didInsert) qVec = offTreeQFunc(body);
 
             uint qVecSamples = qVec.totalSamples();
@@ -599,7 +629,7 @@ namespace abm::minds {
             return qVec;
         }
 
-    protected:
+//    protected:
 
         void shiftRoot(message_type message) {
             IIMCTS::TreeNode<BODY> *newRoot = rootNode->unlinkChild(message);
@@ -608,20 +638,29 @@ namespace abm::minds {
 //                std::cerr << "Warning: Reality has gone off=tree (probably a sign of not enough samples in the tree)." << std::endl;
 //                newRoot = new IIMCTS::TreeNode<BODY>();
                 // TODO: Deal with particle depletion. Probably with MCMC over trajectories since the start
-                //  of the episode, given the observations. This can be done without modelling the other
-                //  agent, as the observations make the internal states of each agent independent.
-                //  The Q-function itself defines a likkelihood function, so can be used to approximate the
-		        //  posterior!!
+                //   of the episode, given the observations. This can be done without modelling the other
+                //   agent, as the observations make the internal states of each agent independent.
+                //   The Q-function itself defines a likkelihood function, so can be used to approximate the
+		        //   posterior!! Or, could use the off-tree function and the episode-start prior
             }
             delete(rootNode);
             rootNode = newRoot;
         }
 
+        /** Delete current tree and create a new root node given this agent's state and first-mover status */
+        void initRootNode() {
+
+        }
+
+        /** play-out with start states sampled from current root-node distribution */
         void selfPlay(uint nEpisodes) {
+            assert(rootNode != nullptr);
             doSelfPlay<true>(rootNode->activePlayerBodySampler(), rootNode->passivePlayerBodySampler(), nEpisodes);
         }
 
+        /** Augment number of samples in a particular body state of root node */
         void augmentSamples(const BODY &body, uint nEpisodes) {
+            assert(rootNode != nullptr);
             doSelfPlay<false>([&body]() { return body; }, rootNode->passivePlayerBodySampler(), nEpisodes);
         }
 

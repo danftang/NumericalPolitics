@@ -1,3 +1,8 @@
+// An Agent is a mind/body pair. The Agent generates certain events in response to
+// messages, and passes on externally generated events.
+//
+//
+// Message passing view (deprecated):
 // An agent is a node in a computational graph which implements handleMessage(...) methods
 // for some number of message types. The handling of a message may (or may not)
 // cause other messages to be sent.
@@ -25,6 +30,7 @@
 #include "CallbackUtils.h"
 #include "../DeselbyStd/OptionalDouble.h"
 #include "Concepts.h"
+#include "episodes/SimpleEpisode.h"
 
 namespace abm::events {
 

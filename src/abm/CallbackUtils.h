@@ -6,6 +6,8 @@
 #define MULTIAGENTGOVERNMENT_CALLBACKUTILS_H
 
 #include <tuple>
+#include "../DeselbyStd/typeutils.h"
+#include "../DeselbyStd/tupleutils.h"
 
 /** Namespace for event types to be used when doing callbacks.
  *

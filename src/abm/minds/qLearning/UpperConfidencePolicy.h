@@ -50,17 +50,31 @@ namespace abm::minds {
 
             const double N = qValues.totalSamples();
             assert(N > 1);
-            double nStandardErrors = 2.0*sqrt(log(N));
+            double nStandardErrors = sqrt(2.0*log(N));
+            double minQ = std::numeric_limits<double>::infinity();
+            double maxQ = -std::numeric_limits<double>::infinity();
+            for (size_t actId : legalActIndices) {
+                double q = qValues[actId].mean();
+                if (q < minQ) minQ = q;
+                if (q > maxQ) maxQ = q;
+            }
+            assert(minQ <= maxQ);
+            double qScale = maxQ - minQ;
             size_t bestActId;
             double bestQ = -std::numeric_limits<double>::infinity();
+            int nTies = 0; // number of tied bestQ states
             for (size_t actId : legalActIndices) {
                 const QValue &qVal = qValues[actId];
 //                double upperConfidenceQ = qVal.mean() + nStandardErrors * 3.0 * qVal.standardErrorOfMean();
-                double upperConfidenceQ = qVal.mean() + nStandardErrors * 16.0/sqrt(qVal.sampleCount);
+//                double upperConfidenceQ = qVal.mean() + 16.0 * nStandardErrors/sqrt(qVal.sampleCount);
+                double upperConfidenceQ = qVal.mean() + 2.0*qScale * nStandardErrors/sqrt(qVal.sampleCount);
                 assert(!std::isnan(upperConfidenceQ));
-                if (upperConfidenceQ >= bestQ) {
+                if (upperConfidenceQ > bestQ) {
                     bestQ = upperConfidenceQ;
                     bestActId = actId;
+                    nTies = 0;
+                } else if(upperConfidenceQ == bestQ) {
+                    if(deselby::random::uniform<int, true>(0, ++nTies) == 0) bestActId = actId;
                 }
             }
             assert(bestQ > -std::numeric_limits<double>::infinity()); // make sure we found an act

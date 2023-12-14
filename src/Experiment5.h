@@ -127,7 +127,7 @@ namespace experiment5 {
     /** Iterates through all 64 games between two agents (32 joint start states times two possible first movers) */
     template<class AGENT1, class AGENT2>
     void showBehaviour(AGENT1 &agent1, AGENT2 &agent2) {
-        for(int startState = 0; startState < 32; ++startState) {
+        for(int startState = 0; startState < 16; ++startState) {
             setStartState(agent1, agent2, startState);
             abm::episodes::runAsync(agent1, agent2, abm::callbacks::Verbose());
             setStartState(agent1, agent2, startState);
