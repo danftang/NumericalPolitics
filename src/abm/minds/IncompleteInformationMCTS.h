@@ -134,6 +134,8 @@ namespace abm::minds {
             typedef QVector<BODY::action_type::size> qvector_type;
             typedef std::map<BODY, QEntry<BODY::action_type::size>> qentries_type;
             typedef qentries_type::iterator q_iterator_type;
+            static constexpr bool trainOnChildren = false; // when training, do we train on children too?
+            static constexpr bool initQVecsWithOffTreeFunc = false;
 
             qentries_type qEntries; // qVectors for current player.
             std::map<BODY, uint> otherPlayerDistribution; // sample counts of other player body states during self play
@@ -170,11 +172,14 @@ namespace abm::minds {
 //            std::pair<q_iterator_type, bool>
 //                    findQEntry(const BODY &body, bool canAddEntry);
 
-            template<bool LEAVETRACE>
-            std::pair<qvector_type &, bool> getQVector(const BODY &body) {
+            template<bool LEAVETRACE, class INITIALISER>
+            qvector_type & getQVector(const BODY &body, INITIALISER &offTreeQFunc) {
                 auto [qEntryIt, didInsert] = qEntries.try_emplace(body);
-                if(LEAVETRACE) ++(qEntryIt->second.traceCount);
-                return {qEntryIt->second.qVector, didInsert};
+                if constexpr (LEAVETRACE) ++(qEntryIt->second.traceCount);
+                if constexpr (initQVecsWithOffTreeFunc) {
+                    if(didInsert) qEntryIt->second.qVector = offTreeQFunc(body);
+                }
+                return qEntryIt->second.qVector;
             }
 
             auto activePlayerBodySampler() {
@@ -195,6 +200,19 @@ namespace abm::minds {
                 size_t count = 0;
                 for(auto &item : qEntries) count += item.second.traceCount;
                 return count;
+            }
+
+            /** Send QVectorObservation events to qFunction for all QVectors in this tree */
+            template<class QFUNC>
+            void trainQFunction(QFUNC &qFunction) {
+                for(const auto &[body, qEntry] : qEntries) {
+                    callback(events::QVectorObservation<BODY>{body, qEntry.qVector}, qFunction);
+                }
+                if constexpr (trainOnChildren) {
+                    for (const auto &[message, childPtr]: children) {
+                        childPtr->trainQFunction(qFunction);
+                    }
+                }
             }
 
 //            const BODY *sampleActorBodyGivenMessage(message_type actorMessage);
@@ -324,8 +342,8 @@ namespace abm::minds {
             QVector<BODY::action_type::size> *lastQVectorPtr = nullptr;
             const double discount;
 
-            SelfPlayQFunction(TreeNode<BODY> &treeNode, offtreeqfunc_type &offtreeqfunction, const double &discount) :
-                    treeNode(treeNode), canAddToTree(DOBACKPROP), offTreeQFunction(offtreeqfunction), discount(discount) {}
+//            SelfPlayQFunction(TreeNode<BODY> &treeNode, offtreeqfunc_type &offtreeqfunction, const double &discount) :
+//                    treeNode(&treeNode), canAddToTree(DOBACKPROP), offTreeQFunction(offtreeqfunction), discount(discount) {}
 
             template<class TREE>
             SelfPlayQFunction(TREE &tree, deselby::ConstExpr<LEAVETRACE> /* LeaveTrace */, deselby::ConstExpr<DOBACKPROP> /* DoBackprop */) :
@@ -354,7 +372,7 @@ namespace abm::minds {
 
             // =====
         protected:
-            bool isOnTree() const { return treeNode != nullptr; }
+            bool isOnTree() const { return(treeNode != nullptr); }
 
             QVector<action_type::size> offTreeQVector(const BODY &body) {
                 QVector<action_type::size> offTreeQVec;
@@ -441,16 +459,8 @@ namespace abm::minds {
         TreeNode<BODY>::qvector_type SelfPlayQFunction<BODY, OFFTREEQFUNC, LEAVETRACE, DOBACKPROP>::
         operator ()(const BODY &body) {
             if(isOnTree()) {
-                auto [qVec, addedNewEntry] = treeNode->template getQVector<LEAVETRACE>(body);
-                if(addedNewEntry) {
-                    auto offTreeQ = offTreeQFunction(body);
-                    assert(!std::isnan(offTreeQ[0]));
-                    qVec = offTreeQ;
-                } else {
-                    callback(events::QVectorObservation<BODY>{body, qVec}, offTreeQFunction); // teach offTreeQFunc on qEntry
-                }
+                typename TreeNode<BODY>::qvector_type &qVec = treeNode->template getQVector<LEAVETRACE>(body, offTreeQFunction);
                 lastQVectorPtr = &qVec;
-                assert(!std::isnan(qVec[0].mean()));
                 return qVec;
             }
             return offTreeQFunction(body);
@@ -515,7 +525,7 @@ namespace abm::minds {
         const uint minSelfPlaySamples;              // minimum no of samples in a tree before a Q-vector is returned
         const uint minQVecSamples ;                 // minimum number of samples in a returned Q-vector.
 
-        static constexpr uint SelfPlayQVecSampleRatio = 10;
+        static constexpr uint SelfPlayQVecSampleRatio = 10; // ratio of minSelfPlaySamples / minQVecSamples
 
         /** 
          * @param offTreeApproximator If this is a DifferentiableParameterisedFunction. If it doesn't intercept
@@ -579,6 +589,7 @@ namespace abm::minds {
          * the draw we take from otherSampler(), i.e. is the same for all states in the
          * support of the distribution. */
         void on(const events::AgentStartEpisode<BODY> & event) {
+            if(rootNode != nullptr) rootNode->trainQFunction(offTreeQFunc);
             delete(rootNode);
             rootNode = new IIMCTS::TreeNode<BODY>();
             auto otherSampler = [&selfBody = event.body, &sampler = otherStatePriorSampler]() {
@@ -620,11 +631,11 @@ namespace abm::minds {
                 selfPlay(minSelfPlaySamples - rootNodeSamples);
             }
 
-            auto [qVec, didInsert] = rootNode->template getQVector<false>(body);
-            if(didInsert) qVec = offTreeQFunc(body);
-
+            QVector<action_type::size> & qVec = rootNode->template getQVector<false>(body, offTreeQFunc);
             uint qVecSamples = qVec.totalSamples();
             if(qVecSamples < minQVecSamples) augmentSamples(body, minQVecSamples - qVecSamples);
+
+            std::cout << qVec << std::endl;
 
             return qVec;
         }
@@ -637,12 +648,26 @@ namespace abm::minds {
                 throw(std::logic_error("Reached a tree-node with no samples. Resampling not implemented yet. Try increasing the number of samples in the tree."));
 //                std::cerr << "Warning: Reality has gone off=tree (probably a sign of not enough samples in the tree)." << std::endl;
 //                newRoot = new IIMCTS::TreeNode<BODY>();
-                // TODO: Deal with particle depletion. Probably with MCMC over trajectories since the start
-                //   of the episode, given the observations. This can be done without modelling the other
+                // TODO: Deal with particle depletion.
+                //   Probably with MCMC over trajectories (state/actions) since the start
+                //   of the episode, given the observations (messages passed). This can be done without modelling the other
                 //   agent, as the observations make the internal states of each agent independent.
-                //   The Q-function itself defines a likkelihood function, so can be used to approximate the
-		        //   posterior!! Or, could use the off-tree function and the episode-start prior
+                //   The off-tree Q-function can be used to define a likkelihood function, so can be used to approximate the
+                //   posterior!!
+                //   Suppose a state/action pair defines a unique end-state, so an initial state and set of actions defines
+                //   a unique trajectory. (does a state/out-message pair define a unique end-state? and a state/in-message pair?
+                //   yes, I think it does... in which case messages become the fundamental objects of analysis and a start state
+                //   defines a whole trajectory given a set of observed messages. The probability of a transition is then the
+                //   sum of probabilities of the actions that lead to the observed message. A suitable proposal perturbation of the start state
+                //   is Agent dependent, but perhaps can be informed from the current gradient of posterior probability [finite-difference
+                //   in the case of integer dimensions], or Gibbs sampling)
+                //   The problem starts when we re-sample the root node from the current samples, we should ensure that the
+                //   effective samples remains high, not just the total samples (in-fact if we have a good enough way
+                //   of resampling the root, we needn't keep track of the agent distribution in the nodes).
+                //
             }
+            // TODO: teach offTreeQfunction on nodes that are to be deleted
+            rootNode->trainQFunction(offTreeQFunc);
             delete(rootNode);
             rootNode = newRoot;
         }

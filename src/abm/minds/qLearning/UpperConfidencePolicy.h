@@ -16,23 +16,29 @@
 
 namespace abm::minds {
 
-    /** Implements a version of UCT that makes use of the standard deviation of QValue samples
-     * to provide better performance.
-     * @tparam ACTION the action type to be returned from sample(). Should be convertible from an integer
+    /** Implements UCT as described in
+     *  Kocsis, Szepesvári 2006: Bandit Based Monte-Carlo Planning. in ECML 2006, LNAI 4212, pp. 282–293.
+     *
+     * Given a QVector with means q_i and sample counts n_i, sample(.) chooses the action, i, that maximises
+     * q_i + sqrt(2ln(\sum_j n_j) / n_i)
+     *
+     * Note that the range of possible Qvalues, i.e. q_max - q_min should be around 1.0. The absolute value
+     * can be anything.
+     *
+     * @tparam ACTION the action type to be returned from sample(). Should be convertible from an integer.
      */
     template<class ACTION>
     class UpperConfidencePolicy {
     public:
-//        bool i;
         typedef ACTION action_type;
 
         /**
-         * Calculates the best action according to UCT. i.e. the action with maximum
-         * meanQ + S*sqrt(ln(N))
-         * where
-         *  meanQ = the mean of all samples
-         *  S = standard error in the mean
-         *  N = the total number of samples
+         * Calculates the best action according to UCT. i.e. given a QVector with means q_i and sample counts n_i
+         * choose the action, i, that maximises
+         *   q_i + sqrt(2ln(\sum_j n_j) / n_i)
+         *
+         * Note that the range of possible Qvalues, i.e. q_max - q_min should be around 1.0. The absolute value
+         * can be anything.
          *
          * @return the chosen act
          */
@@ -51,23 +57,14 @@ namespace abm::minds {
             const double N = qValues.totalSamples();
             assert(N > 1);
             double nStandardErrors = sqrt(2.0*log(N));
-            double minQ = std::numeric_limits<double>::infinity();
-            double maxQ = -std::numeric_limits<double>::infinity();
-            for (size_t actId : legalActIndices) {
-                double q = qValues[actId].mean();
-                if (q < minQ) minQ = q;
-                if (q > maxQ) maxQ = q;
-            }
-            assert(minQ <= maxQ);
-            double qScale = maxQ - minQ;
             size_t bestActId;
             double bestQ = -std::numeric_limits<double>::infinity();
             int nTies = 0; // number of tied bestQ states
             for (size_t actId : legalActIndices) {
                 const QValue &qVal = qValues[actId];
 //                double upperConfidenceQ = qVal.mean() + nStandardErrors * 3.0 * qVal.standardErrorOfMean();
-//                double upperConfidenceQ = qVal.mean() + 16.0 * nStandardErrors/sqrt(qVal.sampleCount);
-                double upperConfidenceQ = qVal.mean() + 2.0*qScale * nStandardErrors/sqrt(qVal.sampleCount);
+                double upperConfidenceQ = qVal.mean() + nStandardErrors/sqrt(qVal.sampleCount);
+//                double upperConfidenceQ = qVal.mean() + 8.0*qScale * nStandardErrors/sqrt(qVal.sampleCount);
                 assert(!std::isnan(upperConfidenceQ));
                 if (upperConfidenceQ > bestQ) {
                     bestQ = upperConfidenceQ;

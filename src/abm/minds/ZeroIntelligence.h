@@ -36,7 +36,7 @@ namespace abm::minds {
 //            }
             action_type chosenMove;
             size_t maxMoves = size_t(64)*legalMoves.size();
-            std::uniform_int_distribution<action_type> randomElement(legalMoves.size());
+            std::uniform_int_distribution<action_type> randomElement(0, legalMoves.size()-1);
             do { // rejection sampling has expected runtime of legalMoves.size()/legalMoves.count()
                 chosenMove = randomElement(deselby::random::gen);
                 assert(--maxMoves > 0);

@@ -49,10 +49,10 @@ namespace abm::bodies {
         typedef message_type in_message_type;
         typedef const SugarSpiceTradingBody<HASLANGUAGE> & init_type;
 
-        static const int utilityOfPreferred = 10;      // utility of holding sugar/spice
-        static const int utilityOfNonPreferred = 1;
-        static constexpr double costOfFighting = 1.5;
-        static constexpr double costOfBanditAttack = 15.0;
+        static constexpr double utilityOfPreferred = 0.5;       // utility of holding sugar/spice
+        static constexpr double utilityOfNonPreferred = 0.05;   // utilities are scaled so that Q values are roughly in range +-0.5
+        static constexpr double costOfFighting = 0.075;
+        static constexpr double costOfBanditAttack = 0.75;
         inline static double pBanditAttack = 0.02; // probability of a bandit attack per message received
         static const bool encodeOutgoingMessage = false;
         static const int nOneHotBitsForMessageEncode = static_cast<int>(message_type::HighestRecordedMessage) + 1;

@@ -110,15 +110,15 @@ namespace experiment5 {
 
 
     /** trains agents by running nTrainingEpisodes with random start state and random first-mover */
-    template<class AGENT1, class AGENT2>
-    void train(AGENT1 &agent1, AGENT2 &agent2, size_t nTrainingEpisodes) {
+    template<class AGENT1, class AGENT2, class... CALLBACKS>
+    void train(AGENT1 &agent1, AGENT2 &agent2, size_t nTrainingEpisodes, CALLBACKS... callbacks) {
         std::cout << "Starting " << nTrainingEpisodes << " training episodes" << std::endl;
         while(nTrainingEpisodes-- > 0) {
-            setStartState(agent1, agent2, deselby::random::uniform(32));
+            setStartState(agent1, agent2, deselby::random::uniform(16));
             if(deselby::random::uniform<bool>()) {
-                abm::episodes::runAsync(agent1, agent2);
+                abm::episodes::runAsync(agent1, agent2, callbacks...);
             } else {
-                abm::episodes::runAsync(agent2, agent1);
+                abm::episodes::runAsync(agent2, agent1, callbacks...);
             }
         }
     }
@@ -127,11 +127,13 @@ namespace experiment5 {
     /** Iterates through all 64 games between two agents (32 joint start states times two possible first movers) */
     template<class AGENT1, class AGENT2>
     void showBehaviour(AGENT1 &agent1, AGENT2 &agent2) {
+        std::cout << "Showing behaviour..." << std::endl;
+        auto callback = abm::callbacks::Verbose();
         for(int startState = 0; startState < 16; ++startState) {
             setStartState(agent1, agent2, startState);
-            abm::episodes::runAsync(agent1, agent2, abm::callbacks::Verbose());
+            abm::episodes::runAsync(agent1, agent2, callback);
             setStartState(agent1, agent2, startState);
-            abm::episodes::runAsync(agent2, agent1, abm::callbacks::Verbose());
+            abm::episodes::runAsync(agent2, agent1, callback);
         }
     }
 
@@ -140,8 +142,8 @@ namespace experiment5 {
     void trainAndShow(MIND1 &&mind1, MIND2 &&mind2, const int NTRAININGEPISODES) {
         abm::Agent agent1(body_type(), std::move(mind1));
         abm::Agent agent2(body_type(), std::move(mind2));
-        train(agent1, agent2, NTRAININGEPISODES);
-        body_type::pBanditAttack = 0.002;
+        train(agent1, agent2, NTRAININGEPISODES, abm::callbacks::Verbose());
+        body_type::pBanditAttack = 0.005;
         agent1.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
         agent2.mind.policy.explorationStrategy = abm::explorationStrategies::NoExploration();
         showBehaviour(agent1, agent2);
@@ -223,8 +225,8 @@ namespace experiment5 {
     */
     void iimctsSugarSpice() {
         const double discount = 1.0;
-        const size_t nSamplesInATree = 20000;//200000;
-        const size_t nTrainingEpisodes = 0;
+        const size_t nSamplesInATree = 50000;//200000;
+        const size_t nTrainingEpisodes = 100;
 
         auto offTreeApproximator = abm::approximators::FNN(
                 mlpack::HeInitialization(),

@@ -65,9 +65,9 @@ namespace abm::events {
         AGENT2 &agent2;
 
         friend std::ostream &operator <<(std::ostream &out, const EndEpisode<AGENT1,AGENT2> &event) {
-            out << "------- Ending episode -------" << std::endl;
             deselby::invoke_if_invocable(deselby::streamoperator, out, event.agent1);
             deselby::invoke_if_invocable(deselby::streamoperator, out, event.agent2);
+            out << "-------    End episode   -------" << std::endl;
             return out;
         }
     };
