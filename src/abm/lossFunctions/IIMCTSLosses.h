@@ -65,7 +65,9 @@ namespace abm::lossFunctions {
      * In the implementation we have a batch of PMFs (S_i,w_i), from which we form a matrix of training points by
      * concatenating the members of each S_i. The start of each S_i is signalled by a non-zero in isPMFStart.
      *
-     *
+     * TODO: Should this be replaced by vanilla Q-learning from experience (i.e. an incoming message implies a
+     *  constraint between two Q-values)?
+     *  However, this is a bit weaker in that it doesn't imply that I copy your behaviour if I'm in your situation.
      */
     template<class BODY, class POLICY = minds::SoftMaxPolicy>
     class MessageLoss {
@@ -296,12 +298,13 @@ namespace abm::lossFunctions {
         static constexpr size_t defaultQEntryBufferSize = 16;
         static constexpr size_t defaultMessageBatchSize = 16;
         static constexpr size_t defaultMessageBufferSize = 512;
-        static constexpr double otherSelfLearningRatio = 0.5;
+        static constexpr double otherSelfLearningRatio = 1.0;
+        static constexpr double softMaxSteepness = 10.0;
 
         OffTreeLoss(size_t qEntryBufferSize = defaultQEntryBufferSize,
                     size_t messageBufferSize = defaultMessageBufferSize,
                     size_t messageBatchSize = defaultMessageBatchSize,
-                    QPOLICY qPolicy = minds::SoftMaxPolicy()):
+                    QPOLICY qPolicy = minds::SoftMaxPolicy(softMaxSteepness)):
                 base_type(
                         QEntryLoss<BODY>(qEntryBufferSize),
                         WeightedLoss(

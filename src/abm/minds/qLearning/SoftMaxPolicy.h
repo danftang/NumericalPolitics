@@ -39,7 +39,8 @@ namespace abm::minds {
         }
 
 
-        /** The rate of change of action probability with respect to an element of the Q-vector.
+        /** The rate of change of probability of a given action i with respect to each element j of the Q-vector,
+         * as given by:
          *
          * dP(Q)_{i \ne j}/dq_j = -ae^{a.(q_i + q_j)}/A^2 = -aP(Q)_iP(Q)_j
          * and

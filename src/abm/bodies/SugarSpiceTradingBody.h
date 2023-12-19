@@ -88,8 +88,6 @@ namespace abm::bodies {
 
         std::bitset<action_type::size> legalActs() const;
 
-//        template<class A1, class A2> void on(const events::EndEpisode<A1,A2> &);
-
         action_type messageToAct(message_type message) const;
 
         // ---- End of Body interface

@@ -221,7 +221,7 @@ namespace experiment5 {
     }
 
 
-    /** Test a Incomplete Information Monte-Carlo tree search on binary, repeated SugarSpiceTrading
+    /** Test an Incomplete Information Monte-Carlo tree search on binary, repeated SugarSpiceTrading
     */
     void iimctsSugarSpice() {
         const double discount = 1.0;
@@ -244,11 +244,6 @@ namespace experiment5 {
 //            return qVec;
 //        };
 
-
-//        auto selfStateSampler = [](const body_type &myTrueState) {
-//            return body_type(myTrueState.hasSugar(), myTrueState.hasSpice(), deselby::random::uniform<bool>());
-//        };
-
         std::function<body_type(const body_type &)> bodyStateSampler = [](const body_type &myTrueState) {
             return body_type(!myTrueState.hasSugar(), !myTrueState.hasSpice(), deselby::random::uniform<bool>());
         };
@@ -266,88 +261,8 @@ namespace experiment5 {
         auto mind2 = mind1;
 
         trainAndShow(std::move(mind1), std::move(mind2), nTrainingEpisodes);
-
-//        abm::Agent agent1(body_type(), std::move(mind1));
-//        abm::Agent agent2(body_type(), std::move(mind2));
-//        showBehaviour(agent1,agent2);
-
-//        agent1.body.reset(false, true, true);
-//        agent1.mind.on(abm::events::AgentStartEpisode(agent1.body, true));
-//        std::cout << "QVec = " << agent1.mind(agent1.body) << std::endl;
-//        std::cout << "act = " << agent1.mind.act(agent1.body) << std::endl;
-//        std::cout << "QVec = " << agent1.mind(agent1.body) << std::endl;
-        //        train(agent1, agent2, 1);
-
     }
 
 }
-
-
-
-
-
-
-
-
-
-
-// Can 4 agents with no way to distinguish between each other generate a shared langauge?
-//void experiment5b() {
-//    const int NTRAININGITERATIONS = 8000000;
-//    const int NPERFORMINGITERATIONS = 100;
-//    const bool HASLANGUAGE = true;
-//    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE> agents[4];
-//
-//    // train
-//    for(int iterations = 0; iterations < NTRAININGITERATIONS; ++iterations) {
-//        if(iterations%10000 == 0) std::cout << iterations << std::endl;
-//        // Choose agents to play
-//        int agent0Index = deselby::Random::nextInt(0, 4);
-//        int agent1Index = deselby::Random::nextInt(0, 3);
-//        if (agent1Index >= agent0Index) agent1Index += 1;
-//        agents[agent0Index].connectTo(agents[agent1Index]);
-//        agents[agent1Index].connectTo(agents[agent0Index]);
-//
-//        // set initial state
-//        bool agent0HasSugar = deselby::Random::nextBool();
-//        bool agent0HasSpice = deselby::Random::nextBool();
-//        agents[agent0Index].reset(agent0HasSugar, agent0HasSpice, deselby::Random::nextBool());
-//        agents[agent1Index].reset(!agent0HasSugar, !agent0HasSpice, deselby::Random::nextBool());
-//
-//        agents[agent0Index].start().exec();
-//    }
-//
-//    // perform
-//    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::verboseMode = true;
-//    abm::agents::SugarSpiceTradingAgent<HASLANGUAGE>::pBanditAttack = 0.0;
-//    for(int agent = 0; agent<4; ++agent) {
-//        agents[agent].policy.setExploration(0.0);
-//    }
-//    for(int state = 0; state < 32; ++state) {
-//        bool agent0PrefersSugar = (state >> 1) & 1;
-//        bool agent1PrefersSugar = (state >> 2) & 1;
-//        bool agent0HasSugar = (state >> 3) & 1;
-//        bool agent0HasSpice = (state >> 4) & 1;
-//        for(int agent0Index = 0; agent0Index < 4; agent0Index++) {
-//            for(int r=0; r<3; ++r) {
-//                int agent1Index = r;
-//                if (agent1Index >= agent0Index) agent1Index += 1;
-//                agents[agent0Index].connectTo(agents[agent1Index]);
-//                agents[agent1Index].connectTo(agents[agent0Index]);
-//
-//                agents[agent0Index].reset(agent0HasSugar, agent0HasSpice, agent0PrefersSugar);
-//                agents[agent1Index].reset(!agent0HasSugar, !agent0HasSpice, agent1PrefersSugar);
-//
-//                std::cout << "------- Starting game -------" << std::endl << agents[agent0Index].state << agents[agent1Index].state;
-//                agents[agent0Index].start().exec();
-//                std::cout << agents[agent0Index].state << agents[agent1Index].state;
-//                std::cout << std::endl << std::endl;
-//
-//            }
-//        }
-//
-//
-//    }
-//}
 
 #endif //MULTIAGENTGOVERNMENT_EXPERIMENT5_H
