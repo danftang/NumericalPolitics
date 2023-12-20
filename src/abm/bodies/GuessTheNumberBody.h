@@ -22,27 +22,29 @@ namespace abm::bodies {
             sayA,
             sayB,
             sayC,
+            size,
             // !iHavePlayed, iAmGuesser -> !iAmGuesser
             guess1 = sayA,
             guess2 = sayB,
             guess3 = sayC,
             // iHavePlayed
             wrong = 0,
-            right = 1,
-            size
+            right = 1
         };
 
         typedef action_type message_type;
+
+        static constexpr size_t dimension = 5;
 
         bool iAmGuesser;
         bool iHavePlayed;
         action_type state; // stores hidden number, (right/wrong) or received hint
 
 
-        void init(bool isGuesser) {
+        void reset(bool isGuesser) {
             iHavePlayed = false;
             iAmGuesser = isGuesser;
-            state = action_type(deselby::random::uniform<int>(action_type::size));
+            state = action_type(isGuesser?0:deselby::random::uniform<int>(action_type::size));
         }
 
         // ----- Body interface -----
@@ -79,13 +81,28 @@ namespace abm::bodies {
         std::bitset<action_type::size> legalActs() const {
             if(iHavePlayed && state == right) return std::bitset<action_type::size>(2);
             if(iHavePlayed && state == wrong) return std::bitset<action_type::size>(1);
+//            if(!iAmGuesser) return 1<<state; // TODO: TEST!!!
             return std::bitset<action_type::size>("111");
         }
 
         action_type messageToAct(message_type message) const { return message; }
 
+        operator arma::mat () {
+            arma::mat vecState(5,1);
+            vecState(0,0) = iAmGuesser;
+            vecState(1,0) = iHavePlayed;
+            vecState(2,0) = state == sayA;
+            vecState(3,0) = state == sayB;
+            vecState(4,0) = state == sayC;
+            return vecState;
+        }
+
         // ---- End of Body interface
 
+        friend std::ostream &operator<<(std::ostream &out, const GuessTheNumberBody &body) {
+            out << body.iAmGuesser << " " << body.iHavePlayed << " " << body.state;
+            return out;
+        }
 
     };
 }

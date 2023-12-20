@@ -8,6 +8,7 @@
 #include "../../DeselbyStd/typeutils.h"
 #include "../Concepts.h"
 #include "../CallbackUtils.h"
+#include "UpdateStep.h"
 
 namespace abm::events {
     template<class PARAM>
@@ -65,38 +66,33 @@ namespace abm::approximators {
      *     intercepts an event).
      */
     template<LossFunction LOSSFUNCTION, DifferentiableParameterisedFunction<LOSSFUNCTION> APPROXIMATOR,
-            class UPDATESTEP = ens::AdamUpdate,
+            class ENSUPDATE = ens::AdamUpdate,
             class SCHEDULE = UpdateOnLossFunctionEvent<LOSSFUNCTION>>
     class DifferentiableAdaptiveFunction : public APPROXIMATOR {
     public:
         using APPROXIMATOR::parameters;
         using APPROXIMATOR::gradientByParams;
 
+        typedef std::remove_cvref_t<decltype(std::declval<APPROXIMATOR>().parameters())>                     param_type;
+        typedef std::remove_cvref_t<decltype(std::declval<APPROXIMATOR>().gradientByParams(std::declval<LOSSFUNCTION>()))>   grad_type;
+
         LOSSFUNCTION    lossFunction;
-        UPDATESTEP      update;
+        UpdateStep<ENSUPDATE,param_type,grad_type>      update;
         double          stepSize;
         SCHEDULE        schedule;
-
-        typedef std::remove_cvref_t<decltype(std::declval<APPROXIMATOR>().parameters())>                     param_type;
-        typedef std::remove_cvref_t<decltype(std::declval<APPROXIMATOR>().gradientByParams(lossFunction))>   grad_type;
-        typedef UPDATESTEP::template Policy<param_type, grad_type>              update_policy_type;
-
-        update_policy_type updatePolicy; // requires gradient to be same type as param type
-
 
         DifferentiableAdaptiveFunction(
                 APPROXIMATOR approximator,
                 LOSSFUNCTION lossFunction,
-                UPDATESTEP update = UPDATESTEP(),
+                ENSUPDATE ensUpdate = ENSUPDATE(),
                 double stepSize = 0.001,
                 SCHEDULE schedule = SCHEDULE())
                 :
                 APPROXIMATOR(std::move(approximator)),
                 lossFunction(std::move(lossFunction)),
-                update(std::move(update)),
+                update(std::move(ensUpdate),this->parameters().n_rows, this->parameters().n_cols),
                 stepSize(stepSize),
-                schedule(std::move(schedule)),
-                updatePolicy(this->update, this->parameters().n_rows, this->parameters().n_cols)
+                schedule(std::move(schedule))
         { }
 
 
@@ -105,15 +101,17 @@ namespace abm::approximators {
 //            std::cout << "Intercepting event in DifferentialAdaptiveFunction" << std::endl;
             callback(event, lossFunction);
             if (deselby::invoke_or(schedule, false, event)) { // Update parameters
-                updatePolicy.Update(parameters(), stepSize, gradientByParams(lossFunction));
+                assert(!parameters().has_nan());
+                update.Update(parameters(), stepSize, gradientByParams(lossFunction));
+                assert(!parameters().has_nan());
                 callback(events::ParameterUpdate(parameters()), lossFunction);
             }
         }
 
-        template<class EVENT>
-        static consteval bool doTrain(const EVENT & /*event */) {
-            return abm::HasCallback<LOSSFUNCTION,EVENT>;
-        }
+//        template<class EVENT>
+//        static consteval bool doTrain(const EVENT & /*event */) {
+//            return abm::HasCallback<LOSSFUNCTION,EVENT>;
+//        }
     };
 }
 

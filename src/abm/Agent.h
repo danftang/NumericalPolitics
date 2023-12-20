@@ -150,7 +150,7 @@ namespace abm::events {
 //    };
 
 
-    /** Mind's act and Body's reward and message in response to the act */
+    /** Mind's act and Body's reward and outgoing message in response to the act */
     template<class ACTION, class MESSAGE>
     struct AgentStep : OutgoingMessage<MESSAGE> {
         ACTION act;

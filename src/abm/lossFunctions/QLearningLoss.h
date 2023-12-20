@@ -8,6 +8,7 @@
 #include <armadillo>
 #include "../minds/qLearning/QLearningStepMixin.h"
 #include "../Concepts.h"
+#include "../approximators/AdaptiveFunction.h"
 
 namespace abm::lossFunctions {
     template<ParameterisedFunction ENDSTATEPREDICTOR>
@@ -64,6 +65,11 @@ namespace abm::lossFunctions {
             actionIndices(insertCol) = actEvent.act;
         }
 
+        template<class MESSAGE>
+        void on(const events::IncomingMessage<MESSAGE> &event) {
+            if(insertCol < rewards.size()) rewards(insertCol) += event.reward; // TODO: don't record second mover's first incoming message of episode
+        }
+
 
         template<class BODY>
         void on(const events::AgentEndEpisode<BODY> & /* event */) {
@@ -115,6 +121,15 @@ namespace abm::lossFunctions {
                         - rewards(batchIndex)
                         - batchEndStateQVectors.col(i).max() * effectiveDiscount(batchIndex)) * scale;
             }
+//            std::cout << "Predictions:\n" << predictions << std::endl;
+//            std::cout << "Start states:\n" << stateHistory.cols(batchCols) << std::endl;
+//            std::cout << "Actions:\n" << actionIndices.cols(batchCols) << std::endl;
+//            std::cout << "Rewards:\n" << rewards.cols(batchCols) << std::endl;
+//            std::cout << "End States:\n" << batchEndStates << std::endl;
+//            std::cout << "End State Q-vectors: \n" << batchEndStateQVectors << std::endl;
+//            std::cout << "Effective discount:\n" << effectiveDiscount.cols(batchCols) << std::endl;
+//            std::cout << "Training on gradient: \n" << gradient << std::endl;
+            assert(!gradient.has_nan());
         }
 
 

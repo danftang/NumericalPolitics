@@ -7,8 +7,9 @@
 //#include "abm/agents/agents.h"
 //#include "Experiment1.h"
 //#include "Experiment2.h"
+//#include "Experiment5.h"
 
-#include "Experiment5.h"
+#include "Experiment6.h"
 
 //#include "abm/societies/RandomEncounterSociety.h"
 // #include "abm/PingPongAgent.h"
@@ -17,7 +18,7 @@
 //#include "tests/tests.h"
 //#include "tests/mlpacktests.cpp"
 //#include "tests/DQNtest.cpp"
-#include "tests/IncompleteInformationMCTSTest.cpp"
+//#include "tests/IncompleteInformationMCTSTest.cpp"
 //#include "tests/FNN.h"
 
 //#include "tests/mlpacktests.cpp"
@@ -34,8 +35,9 @@ int main() {
 //    experiment5a();
 //    experiment5b();
 
-    experiment5::iimctsSugarSpice();
+//    experiment5::iimctsSugarSpice();
 
+    experiment6::qLearningGuessTheNumber();
 
     // ---- TESTS
 //    cartPoleDQNTest();

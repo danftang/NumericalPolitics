@@ -60,10 +60,13 @@ namespace abm::approximators {
             return Y;
         }
 
-        MatType &parameters() { return params; }
+        MatType &parameters() {
+            return params;
+        }
 
         template<LossFunction LOSS>
         MatType gradientByParams(LOSS &&loss) {
+//            std::cout << "Params:\n" << parameters().t() << std::endl;
             // get the training set on which the loss function is defined
             MatType inputs(network.InputDimensions()[0], loss.batchSize());
             loss.trainingSet(inputs);
@@ -90,6 +93,8 @@ namespace abm::approximators {
             MatType dLoss_dParams(this->params.n_rows, this->params.n_cols);
             network.Gradient(inputs, dLoss_dPred, dLoss_dParams);
 
+            assert(!dLoss_dParams.has_nan());
+//            std::cout << "Gradient by params:\n" << dLoss_dParams.t() << std::endl;
             return dLoss_dParams;
         }
 
