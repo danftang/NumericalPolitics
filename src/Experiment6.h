@@ -40,6 +40,7 @@
 #include "abm/approximators/FNN.h"
 #include "abm/approximators/AdaptiveFunction.h"
 #include "abm/minds/qLearning/GreedyPolicy.h"
+#include "abm/societies/RandomEncounterSociety.h"
 
 namespace experiment6 {
     typedef abm::bodies::GuessTheNumberBody body_type;
@@ -53,8 +54,8 @@ namespace experiment6 {
         uint nGames;
 
         GameLogger() {
-            for(int i=0; i<N; ++i) {
-                for(int j=0; j<N; ++j) {
+            for (int i = 0; i < N; ++i) {
+                for (int j = 0; j < N; ++j) {
                     hintStats[i][j] = 0;
                     guessStats[i][j] = 0;
                 }
@@ -64,39 +65,50 @@ namespace experiment6 {
         }
 
         template<class M1, class M2>
-        void on(const abm::events::Message<abm::Agent<body_type,M1>, abm::Agent<body_type,M2>, body_type::message_type> &event) {
-            if(event.source.body.iAmGuesser) {
+        void
+        on(const abm::events::Message<abm::Agent<body_type, M1>, abm::Agent<body_type, M2>, body_type::message_type> &event) {
+            if (event.source.body.iAmGuesser) {
                 ++guessStats[event.source.body.state][event.message];
             } else {
-                if(event.dest.body.iHavePlayed) {
+                if (event.dest.body.iHavePlayed) {
                     assert(event.message < 2);
                     ++nGames;
-                    if(event.message == 1) ++nWins;
+                    if (event.message == 1) ++nWins;
                 } else {
                     ++hintStats[event.source.body.state][event.message];
                 }
             }
         }
 
-        friend std::ostream &operator <<(std::ostream &out, const GameLogger &logger) {
+        friend std::ostream &operator<<(std::ostream &out, const GameLogger &logger) {
             out << "Hint stats:" << std::endl;
-            for(int i=0; i<N; ++i) {
-                for(int j=0; j<N; ++j) {
-                    out << static_cast<double>(logger.hintStats[i][j])/logger.nGames << '\t';
+            for (int i = 0; i < N; ++i) {
+                for (int j = 0; j < N; ++j) {
+                    out << static_cast<double>(logger.hintStats[i][j]) / logger.nGames << '\t';
                 }
                 out << std::endl;
             }
             out << "Guess stats:" << std::endl;
-            for(int i=0; i<N; ++i) {
-                for(int j=0; j<N; ++j) {
-                    out << static_cast<double>(logger.guessStats[i][j])/logger.nGames << '\t';
+            for (int i = 0; i < N; ++i) {
+                for (int j = 0; j < N; ++j) {
+                    out << static_cast<double>(logger.guessStats[i][j]) / logger.nGames << '\t';
                 }
                 out << std::endl;
             }
-            out << "Win stats:" << logger.nWins*1.0/logger.nGames << std::endl;
+            out << "Win stats:" << logger.nWins * 1.0 / logger.nGames << std::endl;
             return out;
         }
     };
+
+    template<class AGENT>
+    std::string semantics(AGENT &agent) {
+        std::stringstream buf;
+        buf << agent.mind(body_type(true, false, body_type::sayA)).t();
+        buf << agent.mind(body_type(true, false, body_type::sayB)).t();
+        buf << agent.mind(body_type(true, false, body_type::sayC)).t();
+        return buf.str();
+    }
+
 
     void qLearningGuessTheNumber() {
         const int NTRAININGEPISODES = 200000; // 4000000;
@@ -106,8 +118,9 @@ namespace experiment6 {
         const double discount = 1.0;
         const size_t endStateFnnUpdateInterval = 2;
 
-        auto burnInThenTrainEveryStep = [burnin = 2]<class BODY>(const abm::events::PreActBodyState<BODY> & /* event */) mutable {
-            if(burnin > 0) --burnin;
+        auto burnInThenTrainEveryStep = [burnin = 2]<class BODY>(
+                const abm::events::PreActBodyState<BODY> & /* event */) mutable {
+            if (burnin > 0) --burnin;
             return burnin == 0;
         };
 
@@ -151,25 +164,71 @@ namespace experiment6 {
         deselby::random::gen.seed(1235);
         std::cout << "Starting " << nTrainingEpisodes << " training episodes" << std::endl;
         auto logger = GameLogger();
-        while(nTrainingEpisodes-- > 0) {
-            bool agent1IsGuesser = deselby::random::uniform<bool>();
-            agent1.body.reset(agent1IsGuesser);
-            agent2.body.reset(!agent1IsGuesser);
-            if(agent1IsGuesser) {
+        while (nTrainingEpisodes-- > 0) {
+            if (deselby::random::uniform<bool>()) {
                 abm::episodes::runAsync(agent2, agent1, logger);
             } else {
                 abm::episodes::runAsync(agent1, agent2, logger);
             }
         }
         std::cout << logger;
-        std::cout << "\nAgent 1's Q-value semantics:\n";
-        std::cout << agent1.mind(body_type(true, false, body_type::sayA)).t();
-        std::cout << agent1.mind(body_type(true, false, body_type::sayB)).t();
-        std::cout << agent1.mind(body_type(true, false, body_type::sayC)).t();
-        std::cout << "\nAgent 2's Q-value semantics:\n";
-        std::cout << agent2.mind(body_type(true, false, body_type::sayA)).t();
-        std::cout << agent2.mind(body_type(true, false, body_type::sayB)).t();
-        std::cout << agent2.mind(body_type(true, false, body_type::sayC)).t();
+        std::cout << "\nAgent 1's Q-value semantics:\n" << semantics(agent1);
+        std::cout << "\nAgent 2's Q-value semantics:\n" << semantics(agent2);
+    }
+
+
+    void qLearningGuessTheNumberSociety() {
+        const int NTRAININGEPISODES = 50000; // 800000;
+        const double updateStepSize = 0.001;
+        const size_t bufferSize = 128;
+        const size_t batchSize = 16;
+        const double discount = 1.0;
+        const size_t endStateFnnUpdateInterval = 2;
+
+        auto burnInThenTrainEveryStep = [burnin = 2]<class BODY>(
+                const abm::events::PreActBodyState<BODY> & /* event */) mutable {
+            if (burnin > 0) --burnin;
+            return burnin == 0;
+        };
+
+        abm::approximators::FNN approximatorFunction(
+                body_type::dimension,
+                mlpack::Linear(6),
+                mlpack::ReLU(),
+                mlpack::Linear(6),
+                mlpack::ReLU(),
+                mlpack::Linear(body_type::action_type::size)
+        );
+
+        abm::lossFunctions::QLearningLoss loss(
+                bufferSize,
+                body_type::dimension,
+                batchSize,
+                discount,
+                approximatorFunction,
+                endStateFnnUpdateInterval);
+
+        auto mind = abm::minds::QMind(
+                abm::approximators::DifferentiableAdaptiveFunction(
+                        std::move(approximatorFunction),
+                        std::move(loss),
+                        ens::AdamUpdate(),
+                        updateStepSize,
+                        burnInThenTrainEveryStep),
+                abm::minds::GreedyPolicy(
+                        abm::explorationStrategies::ExponentialDecay(1.0, NTRAININGEPISODES, 0.005)
+                )
+        );
+
+        abm::Agent agent(body_type(), std::move(mind));
+
+        abm::societies::RandomEncounterSociety society(4, agent);
+
+        society.run(NTRAININGEPISODES); //, abm::callbacks::Verbose());
+
+        for(auto &agent : society.agents) {
+            std::cout << "Agent's semantics:\n" << semantics(agent);
+        }
     }
 }
 

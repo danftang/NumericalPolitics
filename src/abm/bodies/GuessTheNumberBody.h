@@ -81,11 +81,15 @@ namespace abm::bodies {
         std::bitset<action_type::size> legalActs() const {
             if(iHavePlayed && state == right) return std::bitset<action_type::size>(2);
             if(iHavePlayed && state == wrong) return std::bitset<action_type::size>(1);
-//            if(!iAmGuesser) return 1<<state; // TODO: TEST!!!
             return std::bitset<action_type::size>("111");
         }
 
         action_type messageToAct(message_type message) const { return message; }
+
+        void on(const events::AgentStartEpisode<GuessTheNumberBody> &event) {
+//            std::cout << "intercepted AgentStartEpisode\n";
+            reset(!event.isFirstMover);
+        }
 
         operator arma::mat () {
             arma::mat vecState(5,1);

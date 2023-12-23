@@ -14,10 +14,12 @@ namespace abm::lossFunctions {
     template<ParameterisedFunction ENDSTATEPREDICTOR>
     class QLearningLoss {
     public:
+        static constexpr int unsetAct = -1; // value in action column that indicates "empty"
+
         // the buffer...
         arma::mat stateHistory;
         arma::rowvec effectiveDiscount;
-        arma::urowvec actionIndices;
+        arma::irowvec actionIndices;
         arma::rowvec rewards;
         size_t insertCol;
         bool bufferIsFull;
@@ -35,7 +37,7 @@ namespace abm::lossFunctions {
                 effectiveDiscount(bufferSize),
                 actionIndices(bufferSize),
                 rewards(bufferSize),
-                insertCol(-1),
+                insertCol(0),
                 bufferIsFull(false),
                 endStatePredictor(endStatePredictor),
                 endStateParameterUpdateInterval(endStateParameterUpdateInterval),
@@ -43,17 +45,13 @@ namespace abm::lossFunctions {
                 discount(discount),
                 batchCols(batchSize)
         {
+            actionIndices.fill(-1);
         }
 
 
         /** Remember body state directly before act */
         template<class BODY>
         void on(const events::PreActBodyState<BODY> &event) {
-            if(++insertCol >= capacity()) {
-                bufferIsFull = true;
-                insertCol = 0;
-            }
-            effectiveDiscount(insertCol) = discount; // reset pending AgentStartEpisode event
             stateHistory.col(insertCol) = static_cast<const arma::mat &>(event.body);
         }
 
@@ -67,13 +65,20 @@ namespace abm::lossFunctions {
 
         template<class MESSAGE>
         void on(const events::IncomingMessage<MESSAGE> &event) {
-            if(insertCol < rewards.size()) rewards(insertCol) += event.reward; // TODO: don't record second mover's first incoming message of episode
+            if(actionIndices(insertCol) != unsetAct) { // don't record second mover's first incoming message of episode
+                rewards(insertCol) += event.reward;
+                effectiveDiscount(insertCol) = (event.isEndEpisode?0.0:discount);
+                advanceInsertCol();
+            }
         }
 
 
         template<class BODY>
         void on(const events::AgentEndEpisode<BODY> & /* event */) {
-            effectiveDiscount(insertCol) = 0.0;
+            if(actionIndices(insertCol) != unsetAct) { // if we sent last outgoing message.
+                effectiveDiscount(insertCol) = 0.0;
+                advanceInsertCol();
+            }
         }
 
         template<class PARAMS>
@@ -132,9 +137,15 @@ namespace abm::lossFunctions {
             assert(!gradient.has_nan());
         }
 
-
-
     protected:
+        void advanceInsertCol() {
+            if(++insertCol >= capacity()) {
+                bufferIsFull = true;
+                insertCol = 0;
+            }
+            actionIndices(insertCol) = unsetAct;
+        }
+
     };
 }
 

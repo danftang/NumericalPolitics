@@ -115,7 +115,10 @@ namespace abm::episodes {
 
          /** Runs a number of episodes asynchronously (i.e. agents take turns to send messages) */
         void runAsync() {
-            callback(events::StartEpisode{agent0, agent1}, agent0, agent1, callbacks);
+            events::StartEpisode startEpisodeEvent(agent0,agent1);
+            callback(startEpisodeEvent, agent0); // guarantee that agent0 gets message before agent1
+            callback(startEpisodeEvent, agent1);
+            callback(startEpisodeEvent, callbacks);
             passMessagesAsync(agent0.startEpisode());
             callback(events::EndEpisode{agent0, agent1}, agent0, agent1, callbacks);
         }
@@ -123,7 +126,10 @@ namespace abm::episodes {
 
         /** Runs a number of episodes asynchronously (i.e. agents take turns to send messages) */
         void runSync() {
-            callback(events::StartEpisode{agent0, agent1}, agent0, agent1, callbacks);
+            events::StartEpisode startEpisodeEvent(agent0,agent1);
+            callback(startEpisodeEvent, agent0); // guarantee that agent0 gets message before agent1
+            callback(startEpisodeEvent, agent1);
+            callback(startEpisodeEvent, callbacks);
             passMessagesSynchronously(agent1.startEpisode(), agent0.startEpisode());
             callback(events::EndEpisode{agent0, agent1}, agent0, agent1, callbacks);
         }

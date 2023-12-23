@@ -37,7 +37,8 @@ int main() {
 
 //    experiment5::iimctsSugarSpice();
 
-    experiment6::qLearningGuessTheNumber();
+//    experiment6::qLearningGuessTheNumber();
+    experiment6::qLearningGuessTheNumberSociety();
 
     // ---- TESTS
 //    cartPoleDQNTest();

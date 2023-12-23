@@ -50,14 +50,14 @@ namespace abm::societies {
         // returns the total number of messages passed
         template<class...CALLBACKS>
         void run(uint nEpisodes, CALLBACKS &&...callbacks) {
-            auto callbackTuple = std::tie(callbacks...);
+//            auto callbackTuple = std::tie(callbacks...);
             while(nEpisodes != 0) {
                 --nEpisodes;
                 deselby::ElementID agent1ID = deselby::randomElementIndex(agents);
                 deselby::ElementID agent2ID = deselby::randomElementIndex(agents);
                 deselby::visit_tuple(agents,
-                                            [nEpisodes, &callbackTuple](auto &agent1, auto &agent2) {
-                                                episodes::runAsync(agent1, agent2, callbackTuple);
+                                            [nEpisodes, &callbacks...](auto &agent1, auto &agent2) {
+                                                episodes::runAsync(agent1, agent2, callbacks...);
                                             },
                                             agent1ID, agent2ID);
             }
@@ -67,16 +67,27 @@ namespace abm::societies {
     template<deselby::IsUniquelyConvertibleToTemplate<std::vector>... VECTORS> requires(sizeof...(VECTORS)>1 && deselby::AllDifferentAndNotEmpty<VECTORS...>)
     RandomEncounterSociety(VECTORS &&...vectors) -> RandomEncounterSociety<typename deselby::converts_to_template_t<std::remove_reference_t<VECTORS>,std::vector>::value_type...>;
 
-    // ----- Specialization for just one type of agent
+
+    /** Society where all agents are of the same type */
     template<class AGENT>
     class RandomEncounterSociety<AGENT> {
-    protected:
-        std::vector<AGENT> agents;
     public:
+        std::vector<AGENT> agents;
 
+        /** Default constructs n Agents */
         explicit RandomEncounterSociety(size_t nAgents): agents(nAgents) { }
-        template<class ...TS> requires (std::same_as<TS,AGENT> && ...)
-        explicit RandomEncounterSociety(TS &&... agents): agents{agents...} { }
+
+        /** Construct n copies of a given agent */
+        RandomEncounterSociety(size_t nAgents, const AGENT &agent) : agents(nAgents, agent) { }
+
+        /** Move a list of agents into this */
+        template<class... MORE> requires (std::same_as<MORE,AGENT> &&...)
+        explicit RandomEncounterSociety(AGENT &&agent, MORE &&... moreAgents) {
+            agents.reserve(1 + sizeof...(MORE));
+            agents.push_back(std::move(agent));
+            (agents.push_back(std::move(moreAgents)),...);
+        }
+
 
         void insert(const AGENT &agent) { agents.push_back(agent); }
         void insert(AGENT &&agent) { agents.push_back(std::move(agent)); }
@@ -86,27 +97,30 @@ namespace abm::societies {
         // returns the total number of messages passed
         template<class... CALLBACKS>
         void run(uint nEpisodes, CALLBACKS... callbacks) {
-            auto callbackTuple = std::tie(callbacks...);
             while(nEpisodes != 0) {
                 --nEpisodes;
                 auto [agent1, agent2] =  chooseAgentPair();
-                episodes::runAsync(agent1, agent2, callbackTuple);
+                episodes::runAsync(agent1, agent2, callbacks...);
             }
         }
 
 
-        // Randomly choose a pair of agent's without replacement
+        /** Randomly choose a pair of agent's without replacement */
         std::pair<AGENT &, AGENT &> chooseAgentPair() {
             assert(agents.size() >= 2);
-            int firstAgentIndex = deselby::random::uniform(0, agents.size());
-            int secondAgentIndex = deselby::random::uniform(0, agents.size()-1);
+            auto firstAgentIndex = deselby::random::uniform(agents.size());
+            auto secondAgentIndex = deselby::random::uniform(agents.size()-1);
             if(secondAgentIndex >= firstAgentIndex) ++secondAgentIndex;
             return { agents[firstAgentIndex], agents[secondAgentIndex] };
         }
     };
 
-    template<class T, class... TS> requires (std::same_as<std::remove_reference_t<T>,std::remove_reference_t<TS>> && ...)
-    RandomEncounterSociety(T &&, TS &&...) -> RandomEncounterSociety<std::remove_reference_t<T>>;
+    template<class AGENT>
+    RandomEncounterSociety(size_t nAgents, const AGENT &agent) -> RandomEncounterSociety<AGENT>;
+
+    template<class AGENT, class... MORE> requires (std::same_as<MORE,AGENT> &&...)
+    RandomEncounterSociety(AGENT &&agent, MORE &&... moreAgents) -> RandomEncounterSociety<AGENT>;
+
 }
 
 
