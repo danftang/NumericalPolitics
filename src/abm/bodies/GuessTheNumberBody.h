@@ -86,7 +86,8 @@ namespace abm::bodies {
 
         action_type messageToAct(message_type message) const { return message; }
 
-        void on(const events::AgentStartEpisode<GuessTheNumberBody> &event) {
+
+        void on(const events::AgentStartEpisode<GuessTheNumberBody,GuessTheNumberBody> &event) {
 //            std::cout << "intercepted AgentStartEpisode\n";
             reset(!event.isFirstMover);
         }

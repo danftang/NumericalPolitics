@@ -2,11 +2,11 @@ Mixed strategies
 ----------------
 The game of Rock Paper Scissors has no point attractor, instead there is a 6 state limit cycle. However, this is not how people play the game. Instead they have a non-pure stratey, where they choose certain actions with a given probability. In this case, there is a point attractor where both actors choose with uniform probability.
 
-So, should we deal in pure policies or mixed-policies?
+So, should we deal in pure policies or mixed-policies? (or, pure yet dynamic policies)
 
 Flow-state societies
 --------------------
-How about considering the flow of assets between agents, where each agent has a stock of each asset class and flow arrangements with other agents. Labour is classed as an asset that is created by agents and can transform/mine other assets. An agent's wellbeing is a function of stock and flow state and each agent is trying to maximise this. At each timestep the stock is changes in relation to the surplus/deficit of flow and an agent can choose to change flow levels or create new relationships.
+How about considering the flow of assets between agents, where each agent has a stock of each asset class and flow arrangements with other agents. Labour is classed as an asset that is created by agents and can transform/mine other assets. An agent's wellbeing is a function of stock and flow state and each agent is trying to maximise this. At each timestep the stock changes in relation to the surplus/deficit of flow and an agent can choose to change flow levels or create new relationships.
 
 Agents can identify eachother (perhaps only through the flow relationship) and can remember past behaviour of each relationship.
 
@@ -30,6 +30,58 @@ At each timestep an agent must make a number of decisions (each one can be contr
  - which relationships to break (or perhaps just reduce flow to zero).
  - whether to start a new relationship.
 
+
+Subcultures
+-----------
+If agents are able to gain information on what subculture another agent belongs to (perhaps from given info at the start of an episode) and the agent can either choose which agents to interact with, either through relational ties or by choosing to terminate a transaction depending on subculture membership of other, then there's the possibility of subcultures emerging where a society has an equilibrium containing different social norms within different subcultures. This could be demonstrated with language subcultures (or any system where multiple equilibria exist and inter-culture interactions are preferable to intra-culture interactions [could we get subcultures within the prisoner's dilemma? Perhaps with random public signals such as skin colour emerging as the subculture marker]).
+
+Markers could be fixed (e.g. skin colour) or variable by agent action. If variable, there must be a barrier to transition to another culture (barrier to leaving original and/or integration into new culture). A spatial simulation would be interesting: if a spatial segregation emerges, there is a high barrier for agents in the middle of a cultural patch, but lower towards the edges, but it's not clear under what circumstances this would lead to erosion of lower performing subcultures at the edges, and what would lead to a spatial separation (a no-mans land) between subcultures. In the case of random spatial jumps (as in Schelling) once subcultures are formed, seggregation will be maintained. This could be encapsulated as the (new) concept of "emergent segregation" where segregation emerges in a society of agents born with identical bodies and minds (and no intrinsic socio-cultural bias). The segregation emerges entirely rationally from a Q-learning point of view.
+
+
+Social learning vs individual learning
+======================================
+
+Learning curricula beyond ones lifetime
+---------------------------------------
+If an agent's lifetie is finite, it may not have time to learn a long curriculum from scratch. However, society may act as a memory of generational learning, allowing newly born agents to quickly learn to the boundary of social learning, and to increment social learning in a lifetime. However, under what circumstances will this happen?
+
+Examples: arms race between predator/prey, or the "harnessing of nature" and the response of "nature" to harness. Or, the modular building-up of longer binary episodes from shorter ones...perhaps the evolution of an ever more expressive language?
+
+Can Q-learners learn to describe the location of food [or predators] in a spatial environment? [this would seem to require evolution in addition, or some personal gain from feeding others, i.e. a dependence on others, perhaps the communal preparation of food is more efficient, or staying in groups is better protection from predators]
+
+Can Q-learners learn hunting strategies? [more likely to catch if with others, surroundking prey, maybe different strategies for different animals, language to inform the group]
+
+
+Specialization
+--------------
+If agent's mental abilities are finite, it may be impossible for a single agent to learn to perform a given task (even though it is physically capable). However, if agents specialise in performing a sub-task, then a society can perform a task that is beyond the ability of a single agent. Under what circumstances will specialization occur?
+
+The emergence of generative structuring of the environment
+----------------------------------------------------------
+Consider an environment that admits a continuum of Pareto solutions but is so complex that the Pareto frontier includes points that are beyond the mental abilities of the agents to learn. In this case the agents will learn a simpler part of the frontier, this will be seen as an imposition of (generative) structure on the environment, even though such structure isn't intrinsic to the environment. This will be seen most easily when language use is intrinsic to successful behaviour: language develops to describe the environment, but the agents also structure their environment in order to allow a limited language to successfully describe it.
+
+Examples: 
+
+
+High complexity (low information) systems
+=========================================
+
+All this assumes intelligent agents as given. However, in reality, intelligent agents are already a complex system on the laws of physics. Another interesting question is: what is it about the laws of physics that makes the emergence of complexity possible? [although we live in a very, very unusually complex part of the universe!]. The same question exists for intelligent agents: what leads intelligent agents to form complex societies? Is a mature international relations a next level of complexity beyond individual society?
+
+Perhaps a key part of this is the low information in the system. If the whole system emerges from a simple set of physical laws, then the system has low Kolmogorov complexity but high "structural" complexity [i.e. we can describe the system conceptually (i.e. using theories) at many different scales or levels of abstraction]. It wouldn't be surprising if these two things are equivalent, or at least that one implies the other. 
+
+This way of thinking expands our study from that of simulating worlds to simulating universes, in which worlds emerge. It is related to Conway's game of life and Wolfram's new science. We can easily show the density of complex universes by defining a space of universes and sampling [if we can formally define a "complex universe", although, a universe can be non-complex for a long time before complexity emerges, so how long do we simulate a universe before we deem it non-complex? Suppse, for example, that every universe has a complex part on one of its attractors...if the configuration space is very large, and the complex part is relatively small, how would we ever know by sampling? We'd need a more analytic way of asking "can this universe sustain structured complexity?"].
+
+What's the relationship between Kolmogorov complexity and entropy of the resulting system? Can this help us ifentify potentially complex universes? Is complexity nothing more than a long attractor and an appropriate conceptualisation? Does spatial locality imply complexity over different spatial scales?
+
+The heat death of the universe seems to imply that the emergence of complexity is also time limited, which would perhaps imply that the emergence of complexity occurs off the attractor (of the whole universe)...which means to say we're better off thinking of the system as an open sub-system being externally forced.
+
+
+
+
+ABM Framework
+=============
+
 Decentralised message passing ABM
 ------------------
 Rather than returning a schedule, handlers send scheduled events (i.e. <time, runnable> pairs) directly to other agents. Each agent has a local time, which can move forward up until the earliest neighbour_local_time + channel_transmit_time. When an agent moves forward in time (i.e. it gets a thread) it executes events until blocked on the first channel
@@ -47,3 +99,152 @@ Timestepping message passing
 We can maintain a message passing viewpoint within a timestepping context by having a schedule that is optimised to deal with many messages scheduled for the same time, then at time t, agents send messages to be delivered at time t+0.5. Agents then have handlers to receive "observation" messages, and then a loop message scheduled at t+1 for the timestep. The scheduler can then also deal with parallelisation.
 
 The alternative is to have read channels instead of write. A model step consists of all agents doing an "observe", then a "timestep". During the observe step, an agent can change its non-observable state (i.e. to store information about the observations) but should not change its observable state. During the "timestep" step any state can change. This is appropriate when the observations made depend on an agent's state, which would take 2 steps in the message passing paradigm. This is equivalent to POMDP.
+
+Connected graph paradigm
+------------------------
+There exist nodes in a graph and directed edges down which can pass messages and events. A graph executor can be timestepping-synchronous (all nodes get to pass a message/event at each timestep) timestepping-asynchronous (at each timestep one node gets to pass a message/event, we then need to define how the next node is chosen, e.g. at random, round-robin), probabilistic-Poisson (each node has a propensity to send each type of message and the sending is a Poisson process), timestepping-spreading-activation (at each timestep, nodes that have not stepped since receiving a message get a step, either synchronously or asynchronously), autonomous-scheduled (a node can schedule timesteps of itself and/or its neighbours, and/or can tail-call the timestep of a single node)  [any other paradigms?]
+
+The nodes of a timestepping graph each have a step() method which gives the node an opportunity to send messages/events.
+
+Graphs can also be static (edges are fixed) or dynamic (nodes can decide to close their edges and open new edges).
+
+When a node opens a channel to another node, it sends an "open channel" request, along with a specification of messages the channel must handle. The other node then sends a channel identifier (a pointer to an object that has handleMessage methods for each type, possibly a pointer to self) if the node can create such a channel, or an error if not.
+
+Reinforcement learning in graphs
+--------------------------------
+A node can learn behaviour in the following way:
+A node's body consists of some function from the history of received messages to a vector of doubles (the node's state) and a function from integer-action to outgoing message.
+In each state, define a finite number of messages (or message combinations) that can be sent down the currently open channels, or perhaps the act of closing any combination of channels. These comprise the actions.
+A reward is associated with the receipt of certain messages, along with a state change. A step is considered to be the time between one execution of step() to another, the reward is the sum of rewards of messages received in this time, and the transition function is the change of state from all messages between these times.
+
+Self-play over graphs
+---------------------
+Self-play can most generally be considered over a graph, where each node that has a compatible mind is modelled by a tree over state histories [or, most generally, incoming message histories, although if we define over state histories, then the MCTS tree is independent of body type]. Or, why shouldn't we just use a state/action lookup table in the same space as the mind?
+In each state we have the Q-vector and the posterior distribution of states of the graph (assuming the graph is symmetrical about the agents, or separated by agent index if not. In the case of binary interactions, this is just the state of the other agent).
+This makes it harder to "read other's minds" as we have to back out the distribution of other's actions from our state change (or at least from received messages, although this has to be done in any case...so far we've assumed there is an inverse function from message to action...this could be provided by the body as a likelihood function over actions for a fixed message).
+
+Serial binary episodes
+----------------------
+We can slightly simplify the graph picture by restricting interactions with neighbours to a series of uninterruptable binary episodes. This is also computationally convenient as the computation of an episode is independent of the rest of the graph. If an agent has the address of another agent, it can attempt to initiate an episode with that agent by sending a StartEpisode request. Certain nodes could act as meeting-points of agents, for example, a random episode node would have a number of agents' addresses and, on receipt of a StartEpisode message, would connect to a randomly chosen other agent.
+
+Which node gets compute time to start an episode? This could be random, round-robin...if more than one node can get compute time in parallel, what happens if two agents both try to initiate episodes with each-other [probably race-condition for first mover, with the other agent failing to start the episode. Also if a node tries to start an episode with a node that is already in an episode. However, in the worst case, each node has a processor and a lot of time is spent trying to start an episode]?
+
+Alternatively, there could be "marketplaces" of agents that aren't currently in an episode...
+
+runner nodes
+------------
+Episodes could end with the start of a new episode. Suppose the graph contains "runner" nodes that can sustain multuple episodes and can end an episode with the start of a binary episode between two agents, so that every agent always has an ongoing episode either with another agent or with the runner itself (a bit like a phone call passed between people in different departments). At the end of a binary episode, both agents are handed back to (start a new episode with) the runner. The runner can be of any complexity and can sustain an episodic dialogue in order to make a match. The runner also computes the binary episodes (this also removes the need for agents to keep a pointer to their "current other agent" as matches could be stored on the runner). Spatial models could then be implemented either by having a runner that matches agents based on their "position" state, or by having a network of runners which can hand-off agents between themselves. Agents could intentionally move around via episodic communication with the runner.
+
+In this scenario, the end of an episode doens't mark a zero expected reward, as we know we'll be handed on to the next episode. Rather, it marks a transition to a new message recipient.
+
+If an episode is a task to be executed, it should end with the scheduling of another episode.
+
+
+Learning to communicate with a runner
+-------------------------------------
+At its simplest, the runner just executes episodes, one after the other. But in more complex environments (e.g. spatial) an agent may want to communicate with the runner. A binary episode then becomes part of a larger episode between the runner and the agent, and can be treated as a single step if the agent requests the episode.
+
+An episode is a self-contained piece of history such that the Q-values of the decision points in the episode are independent of policy after the episode (up to an additive constant) That is, the Q-values of all states after the end of the episode are equal. This is guaranteed if we always end in the same state, or if the differences between outcomes can never make a difference in the future. We can relax this a little by saying that any differences wouldn't make any difference to the decision how to act during the episode. It seems there are plenty of examples of social ineractions that don't have this property (e.g. I buy something off A in order to sell to B at a profit). So, we can't treat episodes as separate w.r.t Q-values. However, we can still use different approximators for different episodes, as long as we join them when learning.
+
+[does starting with a fast discount rate and slowly increasing lookahead improve stability in non-episodic Q-learning? Also, does this help with curriculum learning?]
+
+So, the agent must know what kind of dialogue it is currently having in order to know how to respond...or perhaps there are different "message palettes", where a fixed set of actions are mapped to a different palette of messages. It is likely we'll want to use different approximators for each palette, though it's up to the approximator designer.
+
+So, all agents are always in binary dialogue with another actor, either another agent or a runner (or equivalently we can consider this to be always in dialogue with a runner, but the messages may or may not be being passed to another agent by the runner). We'll call a dialogue between two agents an episode, but this doesn't imply that the discount at the end of the episode is zero. At the end of an agent episode, a dialogue with the runner is assumed to be resumed.
+
+Society
+-------
+A society handles the execution of binary Episodes, and as such it is a Runner on an Environment that takes matches from the Environement and executes them. Multiple societies may exist together and exchange Agents (probably as a network of Environments).
+
+An Environment is a container of agents that chooses binary Episodes between agents and may support multiple simulataneous Episodes directly with agents. An Environment may itself consist of multiple sub-Environments that pass agents between eachother. An Environment may also be part of a network of Environments that pass Agents between eachother (through episodic interaction with the Environment, e.g. the Environment can offer an Agent the option to move to another Environment, and the Agent can choose to take that option or not). This abstracts from the details of the physical execution of the society.
+
+An Environment should be a passive provider of tasks to the Runner. If necessary, an active Environment (that submits tasks) can be wrapped in a task list [or, for that matter a passive Environment can be made active by wrapping tasks so that at the end of one task, the next is submitted]. An Environment can return no-task if there are no tasks to execute. If a process can't get a task, 
+
+If all Environemtns return no-task then the simulation is over [in the case of a network of runners, the simulation doesn't end until all runners have no tasks. So there needs to be a shared counter that tracks how many Runners are currently active, and when this reaches zero, an end-of-sim message is broadcast].
+
+Alternatively, an Environment is just an agnet that accepts simultaneous Episodes, and agents deal with their own execution by submitting to a global task scheduler. Agents would then have to keep track of their environment. A Simulation would then be a container of Agents that initiates execution and deletes Agents at the end of the simulation. This has the advantage of being very flexible (MASON view) but requires more computation and memory [do we care?]
+
+The case for active Environments:
+    - Reduces to MASON type schedule/agent architecture, allowing
+      simulated-time and self-scheduling.
+    - Can use standard task-based multiprocessing.  
+    - thread safety dealt with in runner (although still need thread safety if
+      we want a single Environement to run Episodes in parallel).
+The case for passive Environments:
+    - No need for startSimulation() mthod
+    - No need for global Runner for task submission.
+    - Runner gets to decide how many Episodes to run in parallel, but must
+      deal intelligently with no-task [i.e. run a piece of code at the end of a
+      task to start new tasks, up to some max number, or end if there are no
+      tasks to perform].
+    - Active naturally decomposes into passive + task-deque, so passive
+      is, in that sense, more primitive.
+
+Episode protocol
+----------------
+An episode consists of a sequence of messages sent between two agents.
+An episode can be requested by an agent, or initiated by the runner.
+
+An episode begins with a call to startEpisode(recipient) on the first mover. It is up to the the agent/protocol to negotiate with the second mover to initialise the episode if necessary (e.g. by calling helo(...) or handleMessage(Helo) on recipient). startEpisode returns a boolean which signals whether the initialisation succeeded. The first mover is then called again with step(recipient), compile-time handling can be done based on the type/capabilities of recipient. The second mover is then called on step(recipient) etc. This doesn't allow synchronous comms but this can be simulated on the agent itself (i.e. second mover's action must be independent of last received message...e.g. only reads message after acting). step(...) must return a boolean which is true if the episode is unfinished (i.e. false if the agent has ended the episode). It is up to the agent/protocol to ensure the recipient knows that the episode has ended (e.g. by calling endEpisode() or handleMessage(EndEpisode()) on recipient).
+
+One way of dealing with agent communication is to define a different message type for each protocol, and implement handleMessage(message) methods on the agent, so that another agent can inspect the protocol handling capabilities of another agent at compile time and decide on an appropriate episode protocol based on its own capabilities.
+
+Mind interface
+--------------
+The mind decides on action. It depends on body-state vector, action-mask and possibly last incoming message. So, the mind is a function from <state-vector, action-mask> to action. Mind also receives IncomingMessage, OutgoingMessage, StartEpisode, Reward and EndEpisode events. An action-mask should be templated over and allow/default to the trivial mask that is always true for all actions, but should have compile-time action size.
+
+Q-approximator
+--------------
+A Q-approximator is a function from state-vectors to Q-vectors which optionally handles (i.e. learns from) observational events.
+
+A Q-mind implements a mind interface, but abstracts over a Q-approximator.
+
+Approximator
+------------
+An approximator is any function that approximates some partially known function. It allows eveluation of the function and handles events of relevant observations that inform the approximation. Often, the approximation should be the member of a parameterised family of functions that minimises a loss function, where the loss function depends on the observations so far.
+
+Events
+------
+Events are, in effect, optional "on(..)" methods of a templated type. If an event is sent to a templated object that has a handler for that event type, then the handler is called. If no handler is present, the call is quietly optimised out at compile time. A handler can return a value, but at the call site, a default must be supplied, which becomes the value if no handler is present. If there is no return value, or the return value is to be discarded, an event can be broadcast to any number of objects..
+
+Agent
+-----
+An agent can abstract over its mind. The mind can then be contained as a member of the agent (accessible from a mind() method [or inherit from MIND?]), or if the mind is to have more than one body, it can have a reference to a mind as member. This means that we can't refer to a body alone, but we can refer to the state vector. We should be able to set the body state to a state vector (getBody(), setBody(...)) and to construct from a state-vector and a mind.
+
+An agent must also send the correct start/end-episode, in/out-message and reward events to the mind ().
+
+So, in the case of MCTS, a node is a distribution over state-vectors to Q-vectors and sample counts (i.e. it's a Q-approximator), which can then be plugged into a UCT Q-policy to create a Q-mind which can then be plugged into an agent to create a self-play agent. The distribution of other, however, could be a complete self-play agent whose mind is a reference to the current tree. Since the mind is performing the self-play, it can directly probe body state so need not rely on any special events from body.
+
+Learning in a binary encounter society
+--------------------------------------
+Since binary episodes are isolated from all other agents, we would like to account for this independence when learning. That is, the rewrd to the end of an episode depends only on the states of self and other [but how does this help us?]
+
+
+Learning as Bayesian optimisation
+---------------------------------
+Let us suppose that an agent learns how to act via reward, but also learns about (forms a model of) the society in which it is embedded.
+
+At its simplest, we have a binary interaction society with pure Q-learning on the environment [how do we learn a model of the environment?]. In binary interactions with other agents we assume the other agent has our mind and body.
+
+Observational evidence comes from two sources:
+ 1) (start-state, action, reward, end-state) quadruplets. If our mind produces Q-vectors we can calculate the probability that mind is generating mean Q-values from the student-t distribution.
+ 2) (belief in other's internal state, other's observed behaviour) pairs. If we assume a probabilistic Q-policy, then we can also calculate the (marginal) probability of our mind producing the observed behaviours. [although, here we should take the hindcast belief in other's internal state]
+
+
+Generalised self-play
+---------------------
+If an agent makes an assumption about the society of agents it is in, then it can use self-play as a generic learning strategy (i.e. run a simulation to generate training data). If it also assumes some or all other agents are of the same type (have the same body) then it can legitimately use its own mind to simulate their behaviours, and we end up with single-mind/many-body learning (i.e. training data from many bodies).
+
+Self-learning provides (start-state, action, reward, end-state) quadruplets. We also have these from direct experience. We may also have experience of other's behaiour in the form (state-distribution, observed behaviour) pairs.
+
+The data from self-learning should be combined with data from experience by parameterising the self-learning society and optimising such that the mind that optimises reward in that society best fits the experiential data (these parameters may include a measure of other's irrationality/unpredictability in relation to own mind).
+
+
+Alternatively, if mind is a generator of Q-vectors and we experience other's behaviour and we assume a probabilistic Q-policy, then we can calculate the probability of a mind generating the observed behaviour. If we also interpret simulated and actual reward as Gaussian distributed about a mean (the Q-value is the mean) then there is a probability over the mean given a set of reward evidence (i.e. mean with standard error in the mean, or Student-t), so we can join these probabilities and optimise mind over the overall probability.
+
+However, the volume of data collected through self-play is much higher, but possibly lower quality, than that collected through direct experience, so we need to prevent experience data being drowned out by self play data. This would happen if there are multiple minima for the self-play mind. We can imagine a pair of agents in an environment that allows two Q-minima, and the agents in diferent minima. Once in this state, self-play could keep them stuck in their respective minima despite observational evidence to the contrary. One training strategy is to begin by optimising on the observational evidence only (perhaps including own behaviour: copying self), then slowly introducing self-play data. In this way, any small fluctuations in behaviour will end in a symmetry breaking and a tendency to agents reaching the same minimum. This will be more pronounced in many-agent societies. Agents could also go through phases in life: learning from copying, learning from self-play, fixed behaviour [do these phases naturally come out of learning when an understanding of one's surroundings and ones own reward function is not given? How do we come to learn that we live in a world of other agents that think in ways similar to us?]
+
+Proper collection of self-play data amounts to partial-information MCTS:
+During self-play, an agent is free to decide which states of society it wishes to simulate. However, it would make sesnse to train on data that informs our current situation, so we play out from our current situation multiple times. However, playing-out requires a function (sampler) over the states of other agents in our self-play society. At its simplest, we just sample over a fixed prior. Alternatively we may be able to extract a sample from the posterior given the agent's state. However, a psterior given agent state and history can be recursively generated from self-play data, along with posteriors for all agents. This makes the self-play Q-vector potentially more accurate than the approximator we're trying to train and we have partial-information MCTS: each agent has a separate table from history/state to Q-vector and distribution over other(s).
+
+[the agent state becomes an encoding of reward we'll get for a step given an action, and information on the state after the action (but shouldn't state be defined as all the information we'll ever get? If we remember self-play information from one step to the other, this should by definition become part of agent state...it becomes complicated as we split body state from mind state. Body state must define a method of generating reward for a given acton/incoming-message)]

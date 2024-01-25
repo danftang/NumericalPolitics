@@ -61,6 +61,7 @@
 //  N.B. The test of the whole algorithm is whether we end up with a society that ends up converging to social norms.
 //  (e.g. can it converge to language use by convention?)
 //
+//
 // Created by daniel on 09/07/23.
 //
 
@@ -333,6 +334,7 @@ namespace abm::minds {
             typedef body_type::action_type action_type;
             typedef OFFTREEQFUNC offtreeqfunc_type;
 
+            TreeNode<BODY> *rootNode; // current root of the tree
             TreeNode<BODY> *treeNode;// current treeNodes for player's experience, null if off the tree
             std::vector<QValue *> qValues; // Q values at choice points of the player
             std::vector<double> rewards; // reward between choice points of the player
@@ -347,22 +349,26 @@ namespace abm::minds {
 
             template<class TREE>
             SelfPlayQFunction(TREE &tree, deselby::ConstExpr<LEAVETRACE> /* LeaveTrace */, deselby::ConstExpr<DOBACKPROP> /* DoBackprop */) :
-                    treeNode(tree.rootNode), canAddToTree(DOBACKPROP), offTreeQFunction(tree.offTreeQFunc), discount(tree.discount) {}
+                    rootNode(tree.rootNode), treeNode(tree.rootNode), canAddToTree(DOBACKPROP), offTreeQFunction(tree.offTreeQFunc), discount(tree.discount) {}
 
 
-            void init(TreeNode<BODY> *rootNode) {
-                treeNode = rootNode;
-                qValues.clear();
-                rewards.clear();
-                canAddToTree = DOBACKPROP;
-            }
+            // void init(TreeNode<BODY> *rootNode) {
+            //     treeNode = rootNode;
+            //     qValues.clear();
+            //     rewards.clear();
+            //     canAddToTree = DOBACKPROP;
+            // }
 
             // ==== Mind interface
 
             TreeNode<BODY>::qvector_type operator()(const body_type &);
 
-            void on(const events::AgentStartEpisode<body_type> &event) {
-                if(!event.isFirstMover) treeNode->leavePassiveTrace(event.body);
+            void on(const events::AgentStartEpisode<body_type, body_type> &event) {
+                treeNode = rootNode;
+                qValues.clear();
+                rewards.clear();
+                canAddToTree = DOBACKPROP;
+                if(!event.isFirstMover) treeNode->leavePassiveTrace(event.secondMoverBody);
             }
 
             void on(const events::AgentStep<action_type, message_type> &);
@@ -588,21 +594,22 @@ namespace abm::minds {
          * Note that we assume that other's belief about our body state is independent of
          * the draw we take from otherSampler(), i.e. is the same for all states in the
          * support of the distribution. */
-        void on(const events::AgentStartEpisode<BODY> & event) {
+        void on(const events::AgentStartEpisode<BODY,BODY> & event) {
             if(rootNode != nullptr) rootNode->trainQFunction(offTreeQFunc);
             delete(rootNode);
             rootNode = new IIMCTS::TreeNode<BODY>();
-            auto otherSampler = [&selfBody = event.body, &sampler = otherStatePriorSampler]() {
-                return sampler(selfBody);
-            };
-            auto selfSampler = [otherBody = otherSampler(), &sampler = selfStatePriorSampler]() {
-                return sampler(otherBody);
-            };
-            if(event.isFirstMover) {
-                doSelfPlay<true>(selfSampler, otherSampler, minSelfPlaySamples);
-            } else {
-                doSelfPlay<true>(otherSampler, selfSampler, minSelfPlaySamples);
-            }
+            doSelfPlay<true>(minSelfPlaySamples);
+            // auto otherSampler = [&selfBody = event.body, &sampler = otherStatePriorSampler]() {
+            //     return sampler(selfBody);
+            // };
+            // auto selfSampler = [otherBody = otherSampler(), &sampler = selfStatePriorSampler]() {
+            //     return sampler(otherBody);
+            // };
+            // if(event.isFirstMover) {
+            //     doSelfPlay<true>(selfSampler, otherSampler, minSelfPlaySamples);
+            // } else {
+            //     doSelfPlay<true>(otherSampler, selfSampler, minSelfPlaySamples);
+            // }
         }
 
         /** Train off-tree QFunction on message and shift the root */
@@ -628,13 +635,12 @@ namespace abm::minds {
 
             auto rootNodeSamples = rootNode->nActivePlayerSamples();
             if(rootNodeSamples < minSelfPlaySamples) {
-                selfPlay(minSelfPlaySamples - rootNodeSamples);
+                doSelfPlay<true>(minSelfPlaySamples - rootNodeSamples);
             }
 
             QVector<action_type::size> & qVec = rootNode->template getQVector<false>(body, offTreeQFunc);
             uint qVecSamples = qVec.totalSamples();
             if(qVecSamples < minQVecSamples) augmentSamples(body, minQVecSamples - qVecSamples);
-
             std::cout << qVec << std::endl;
 
             return qVec;
@@ -677,11 +683,11 @@ namespace abm::minds {
 
         }
 
-        /** play-out with start states sampled from current root-node distribution */
-        void selfPlay(uint nEpisodes) {
-            assert(rootNode != nullptr);
-            doSelfPlay<true>(rootNode->activePlayerBodySampler(), rootNode->passivePlayerBodySampler(), nEpisodes);
-        }
+        // /** play-out with start states sampled from current root-node distribution */
+        // void selfPlay(uint nEpisodes) {
+        //     assert(rootNode != nullptr);
+        //     doSelfPlay<true>(rootNode->activePlayerBodySampler(), rootNode->passivePlayerBodySampler(), nEpisodes);
+        // }
 
         /** Augment number of samples in a particular body state of root node */
         void augmentSamples(const BODY &body, uint nEpisodes) {
@@ -689,31 +695,33 @@ namespace abm::minds {
             doSelfPlay<false>([&body]() { return body; }, rootNode->passivePlayerBodySampler(), nEpisodes);
         }
 
-        template<bool TRACECURRENTPLAYER, class SAMPLER1, class SAMPLER2>
+        template<bool TRACECURRENTPLAYER>
         void doSelfPlay(
-                SAMPLER1 &&player1BodySampler,
-                SAMPLER2 &&player2BodySampler,
+                // SAMPLER1 &&player1BodySampler,
+                // SAMPLER2 &&player2BodySampler,
                 uint nEpisodes) {
+            assert(rootNode != nullptr);
             constexpr bool BACKPROPOTHERPLAYER = TRACECURRENTPLAYER; // just to be explicit
             Agent player1(
-                    player1BodySampler(),
+                    body_type(),
                     QMind(
                             IIMCTS::SelfPlayQFunction(*this, deselby::ConstExpr<TRACECURRENTPLAYER>(), deselby::ConstExpr<true>()),
                             selfPlayPolicy)
                     );
             Agent player2(
-                    player2BodySampler(),
+                    body_type(),
                     QMind(
                             IIMCTS::SelfPlayQFunction(*this, deselby::ConstExpr<true>(), deselby::ConstExpr<BACKPROPOTHERPLAYER>()),
                             selfPlayPolicy)
                     );
             for (int nSamples = 0; nSamples < nEpisodes; ++nSamples) {
 //                episodes::runAsync(player1, player2, callbacks::Verbose());
-                episodes::runAsync(player1, player2);
-                player1.body = player1BodySampler();
-                player2.body = player2BodySampler();
-                player1.mind.init(rootNode);
-                player2.mind.init(rootNode);
+                episodes::runAsync(player1, player2);         // TODO: need to be able to restart from mid-episode
+
+                // player1.body = player1BodySampler();
+                // player2.body = player2BodySampler();
+                // player1.mind.init(rootNode);
+                // player2.mind.init(rootNode);
             }
         }
     };

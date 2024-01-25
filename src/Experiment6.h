@@ -41,6 +41,7 @@
 #include "abm/approximators/AdaptiveFunction.h"
 #include "abm/minds/qLearning/GreedyPolicy.h"
 #include "abm/societies/RandomEncounterSociety.h"
+#include "abm/minds/IncompleteInformationMCTS.h"
 
 namespace experiment6 {
     typedef abm::bodies::GuessTheNumberBody body_type;
@@ -224,12 +225,68 @@ namespace experiment6 {
 
         abm::societies::RandomEncounterSociety society(4, agent);
 
-        society.run(NTRAININGEPISODES); //, abm::callbacks::Verbose());
+        society.run(NTRAININGEPISODES);
 
+        int i=0;
         for(auto &agent : society.agents) {
-            std::cout << "Agent's semantics:\n" << semantics(agent);
+            std::cout << "Agent " << ++i << "'s semantics:\n" << semantics(agent);
         }
     }
+
+
+    void iimctsGuessTheNumberSociety() {
+        const int NTRAININGEPISODES = 50000; // 800000;
+        const int nSamplesInATree = 10000;
+        const double updateStepSize = 0.001;
+        const size_t bufferSize = 128;
+        const size_t batchSize = 16;
+        const double discount = 1.0;
+        const size_t endStateFnnUpdateInterval = 2;
+
+        auto burnInThenTrainEveryStep = [burnin = 2]<class BODY>(
+                const abm::events::PreActBodyState<BODY> & /* event */) mutable {
+            if (burnin > 0) --burnin;
+            return burnin == 0;
+        };
+
+        abm::approximators::FNN offTreeApproximator(
+                body_type::dimension,
+                mlpack::Linear(6),
+                mlpack::ReLU(),
+                mlpack::Linear(6),
+                mlpack::ReLU(),
+                mlpack::Linear(body_type::action_type::size)
+        );
+
+
+        // TODO: how to do initialization of an episode? [Should a body be able to initialize itself?...yes:
+        //          first mover chooses state, then second mover chooses state, given first mover]
+        //          Mind/Body receives a AgentStartEpisode event, with own and other's body states and
+        //          a isFirstMover flag.
+
+        auto mind = abm::minds::QMind(
+                abm::minds::IncompleteInformationMCTS(
+                        offTreeApproximator,
+                        bodyStateSampler,
+                        bodyStateSampler,
+                        discount,
+                        nSamplesInATree
+                ),
+                abm::minds::GreedyPolicy(abm::explorationStrategies::NoExploration())
+        );
+
+        abm::Agent agent(body_type(), std::move(mind));
+
+        abm::societies::RandomEncounterSociety society(4, agent);
+
+        society.run(NTRAININGEPISODES);
+
+        int i=0;
+        for(auto &agent : society.agents) {
+            std::cout << "Agent " << ++i << "'s semantics:\n" << semantics(agent);
+        }
+    }
+
 }
 
 #endif //MULTIAGENTGOVERNMENT_EXPERIMENT6_H

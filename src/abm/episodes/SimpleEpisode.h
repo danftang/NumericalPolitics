@@ -1,3 +1,12 @@
+// A runner for episodes between two agents.
+// TODO: An episode should conisit of
+//  AGENT1                          AGENT2
+//  firstMoverStartEpisode()
+//                                  secondMoverStartEpisode(Agent1body)
+//                                  handleMessage(..)
+//  handleMessage(..)               ...
+//                                  handleMEssage(..)
+//  otherPlayerEndedEpisode()
 //
 // Created by daniel on 14/08/23.
 //
@@ -134,7 +143,6 @@ namespace abm::episodes {
             callback(events::EndEpisode{agent0, agent1}, agent0, agent1, callbacks);
         }
 
-    protected:
 
         template<class MESSAGE>
         void passMessagesAsync(MESSAGE messageFor1) {

@@ -50,7 +50,7 @@ namespace abm::societies {
         // returns the total number of messages passed
         template<class...CALLBACKS>
         void run(uint nEpisodes, CALLBACKS &&...callbacks) {
-//            auto callbackTuple = std::tie(callbacks...);
+            std::cout << "Starting " << nEpisodes << " episodes of a heterogeneous society" << std::endl;
             while(nEpisodes != 0) {
                 --nEpisodes;
                 deselby::ElementID agent1ID = deselby::randomElementIndex(agents);
@@ -97,6 +97,7 @@ namespace abm::societies {
         // returns the total number of messages passed
         template<class... CALLBACKS>
         void run(uint nEpisodes, CALLBACKS... callbacks) {
+            std::cout << "Starting " << nEpisodes << " episodes of a homogeneous society" << std::endl;
             while(nEpisodes != 0) {
                 --nEpisodes;
                 auto [agent1, agent2] =  chooseAgentPair();
