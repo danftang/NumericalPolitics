@@ -215,10 +215,33 @@ An agent must also send the correct start/end-episode, in/out-message and reward
 
 So, in the case of MCTS, a node is a distribution over state-vectors to Q-vectors and sample counts (i.e. it's a Q-approximator), which can then be plugged into a UCT Q-policy to create a Q-mind which can then be plugged into an agent to create a self-play agent. The distribution of other, however, could be a complete self-play agent whose mind is a reference to the current tree. Since the mind is performing the self-play, it can directly probe body state so need not rely on any special events from body.
 
-Learning in a binary encounter society
---------------------------------------
-Since binary episodes are isolated from all other agents, we would like to account for this independence when learning. That is, the rewrd to the end of an episode depends only on the states of self and other [but how does this help us?]
+Agent reasoning about other/environment
+---------------------------
+An agent can reason about another agent, or about its environment, in order to predict how it will act. For this, the agent must assume a model of other (given the state of other, how will it behave in response to our actions?) and a belief about other's state (a distribution over state). In this case, the agent's belief about other's state becomes part of its state.
 
+Symmetric reasoning about other
+-------------------------------
+If an agent interacts with one or more other agents, it can assume each other agent has the same state space as itself, and uses the same reasoning to act. However, if one's belief over other's states is contained within ones own state it would at first seem that the size of the state would have to be infinite. However, it is perfectly possible for each state in a fnite state space to encode a distribution over the same state space, or indeed a distribution over tuples of that state space. We need only specify a suitable encoding.
+
+Public belief state
+-------------------
+If we assume an agent's internal state consists of self-state, a (weighted) set of samples of other's self-state representing my belief in your self-state and a (weighted) set of samples of self-state representing your belief in my self-state, 
+
+then given a function of qualities from self/other state, the quality of any state is given.
+
+nth-order psychology
+--------------------
+In a similar way, we can encode an nth-order psychology as an n-dimensional distribution over states, where the first dimension is my belief in your self state, the second is your belief in my self-state given your self-state, the third is my belief in your belief about my state given my belief in your self-state and your actual belief in my state etc...or equivalently, my belief  (probability) that your internal state is x_1 and you believe my internal state is x_2 and you belive my belif in your internal state is x_3 etc...[no, a belief state is a distribution, not a value, so my belief about your belief is properly a distribution over distributions over internal states. However, we only care about expectation values, perhaps. Ultimately, I care about the probability distribution over your behaviour, marginalised over belief states. So, the marginalisation can be approximated with samples. Or, any expectation over a belief about beliefs (i.e. a distribution over distributions) is the same as the expectation over the expectation of your belief (which is just a distribution over states) so we can represent all the informatio we need about n'th order beliefs in just a distribution].
+
+Reasoning under uncertain belief should be reducible to sums over reasoning under certain belief. That is, if all beliefs are delta functions on a single state (is this true?).
+
+public closure of nth-order psychology
+--------------------------------------
+
+
+Learning in a binary episode society
+--------------------------------------
+Since binary episodes are isolated from all other agents, we would like to account for this independence when learning. That is, the rewrd to the end of an episode depends only on the states of self and other, and not on how we got here. However, the quality of the state we end up in does depend on other stuff (i.e. the quality values inside an episode can be espressed as a constant plus linear combination of qualities of end states). If we can split the state into information pertaining to a binary episode (i.e. self and other state), and information pertaining to other agents / environment. Then, an episode can only change the state of self and other, so we can express states in an episode as perturbations on the full start state. The quality of the end state is then the end perturbation applied to the start state, which may depend on other agent states.
 
 Learning as Bayesian optimisation
 ---------------------------------

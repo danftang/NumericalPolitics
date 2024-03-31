@@ -1,0 +1,86 @@
+We're interested in the emergence of complex structures/behaviours in a
+computational system, but what is a complex structure or complex behaviour
+and what is emergence?
+
+Our specific interest is to identify necessary and/or sufficient conditions for a dynamic system to exhibit "emergence", especially un-bounded (probably heirarchical) structure [that is, structure at many scales], and in-particular in systems consisting of learning agents [to what extent is our society heirarchical?]. More specifically, we want to build systems which we know will exhibit un-bounded emergence: we begin in a state that can be described in a relatively short manner, and the available memory/state is filled with "interesting stuff".
+
+Emergence
+---------
+Emergence is relative to a measure of "order". At its most abstract, given a dynamic system, we assign a measure to each state and, given an initial PMF over states, the probabilistic trajectory of this PMF leads to a PMF at some later time (or integrated over some later period) that has a higher expected "order" than the start PMF. This will be true if the states on the attractor(s) are high "order". So far so boring. We also require that the "rules" of the dynamic system are in some way "simple". This can be formalised as the length of the computer program necessary to calculate the timestep function, given a model of computation. However, if we define a universal computer over the state space (i.e. the timestep function is contained within the state) then for every computable dynamic system, S, there exists a basin of attraction in the universal system that is isomorphic to S. Also, every uiversal dynamic system is isomorphic to every other, so we can choose a convenient universal dynamic system. Given this, our task is to find a basin of attraction that has emergent properties with respect to a given measure of order [if we fix the measure of order, is there universality over all measures of order?]. This doesn't seem to help us...
+
+However, not all measures are measures of order. What are the necessary conditions for a measure to be a measure of order? [Or, perhaps we should go the other way: we start with a state space with well defined "order" measure, then ask how do we define a dynamic system on this state space that exhibits emergence?]
+
+Emergence also seems to require some kind of "interestingness", a short program that produces just a stream of 1s doesn't seem emergent, nor does any infinite repetition of some short string. However, a random number generator also doesn't seem emergent.
+
+Perhaps an interesting measure to us would be "functional order". Does a group of objects seem to perform some function? In a competitive environment, this could be survival. Yes, perhaps we should restrict ourselves to "evolutionary" environments.
+
+[It seems that abstraction over dynamic systems is an important concept to understand this. Especially probabilistic abstraction over a finite, deterministic dynamic system, as we know that the attractor of this is just a loop of states. Every (stochastic) dynamic system with rational transition probabilities is an abstraction of a deterministic dynamic system: Assign an integer to each edge and each node such that the probability of transition is an edge's integer divided by the source node's integer. Let "multiply a node by X" mean multiply its integer and the integers of all output edges by X. Now take an arbitrary node and insert it into the "super-node" set. Now let M be this node's value, let I be the sum of all its inputs and let L be the largest common divisor of I and M. Multiply the each predecessor node by M/L and multiply M by I/L, so that the new M now equals the new I. Add each of the predecessor nodes to the super-node set. Now choose any non-super-node neighbour of a super-node-node and repeat the same, treating the super-node as a single node with value equal to the sum of its output edges. We end up with edge values such that for each node M = the sum of inputs = sum of outputs (or the node has no input edges). This can now be projected into a deterministic dynamic system with an abstraction operator such that each probabilistic node is an abstraction of M deterministic nodes and each edge, with value i, is an abstraction of i deterministic edges from any of the source nodes to any of the destination nodes (although this doesn't guarantee all states being on a single attractor...although an abstraction may have fewer attractors than its concretisation). So, in-fact every probabilistic dynamic system is the abstraction of a large number of concrete systems. By ordering the deterministic nodes, we can generate a deterministic system with the same number of attractors as the probabilistic system. Given a concrete system, we can induce one measure of "order" as -log(Omega) where Omega is the value of a state. This is the "Entropy" measure.]
+
+[Perhaps we should restrict ourselves to a subset of dynamic systems...]
+
+
+Object-oriented computation
+---------------------------
+What if we define computation to make these concepts clear? Suppose we have
+an object-oriented programming language with reflection and run-time typing. We define a set of primitive objects:
+   - Double
+   - Int
+   - Ptr
+   - New(Obj) [see later]
+   - Delete(ptr) [see later]
+   - Compose(First,Second)
+   - If(cond,then,else)
+   - While(cond,body)
+   - Call(ptr, memberIndex, args)
+   - Schedule(call)
+   - Plus(A,B)
+   - Negate(A)
+   - Multiply(A,B)
+   - Divide(A,B)
+   - Set(ptr, memberIndex, value)
+   - Get(ptr, memberIndex)
+
+A new object is defined as an ordered list of member objects. Objects with parentheses are "callable".
+
+A computation is defined as a set of objects and a partially ordered list of scheduled calls. Since a call can schedule new calls, this may result in a long sequence of computations. Since calls may create new objects, with run-time typing, then a sequence of computations can create increasingly complex objects, which can be thought of as trees of objects whose leaves are primitive objects.
+
+The complexity of an object can be measured as a function of the depth of its tree and the number of nodes (possibly with expanded calls, or restricted to data members only).
+
+[What if we allow objects to modify themselves (i.e. add members to themselves)? We can then require a single Simulation object which deals with New and Delete.]
+
+[What if objects are conserved and interact depending on their context in an object? The Simulation is then a self-modifying tree. The primitives above can support this view if the arguments for functions come from a node in the tree relative to the function itself (i.e. arguments are members and the object itself may be runnable), and New and Delete are relative too so the state of the Simulation is the state of the tree]
+
+[What if Scheduling is also heirarchical, that a function must submit tasks to its parent, which are then submitted up the tree to the Simulation (though what does this achieve?)].
+
+
+New and Delete
+--------------
+Should New and Delete be emergent too, as is the case on Earth? If there is conservation of primitive objects, then an object will need to "kill" another object and rearrange its primitive objects in order to reproduce. This provides a competitive environment wherein an open-ended "arms race" can emerge, perhaps leading to the emergence of increasing complexity.
+
+Thermodynamic computation
+-------------------------
+This would require a mechanism for re-organising an object (if the simulation itself is an object, the trajectory of the whole ecosystem can be described as self-reorganisation). Perhaps we can have "chemical reactions": suppose a "Plus" object has three Ints as members and the "Energy" of the object is much lower if the third (result) Int is the sum of the first two...and we have a thermodynamic model of computation...inserting a new operand requires energy...a Plus represents an immutable Int (the result), so a Plus with another Plus in its result position and incompatible operands cannot get to the low energy state so can be used as a store of energy. If such a configuration comes close to a primitive Int in an "input" position, perhaps the immutable Int would swap position to reduce energy, and transmit the energy through the object-tree.
+
+
+[How can we reduce this idea to its minimal requirements?]
+
+[We need to decide at what level of abstraction we want to model. The appropriate level depends on what we want to achieve. Also, we may want to run multiple models at different levels of abstraction so that the results at a lower level justify the abstraction at a higher level.]
+
+[Perhaps we should instead focus on "emergent optimisation" where we have competitive optimizers which create their own curriculum and learn increasingly complex strategies]
+
+[Does a geme that requires a "throey of mind" to model other's behaviour induce an open-ended strategy space? (i.e. if I learn your strategy I can form a strategy that beats yours, but if you then learn my strategy you can form a new strategy that beats mine ad infinitum...under what conditions would this lead to the emergence of complex behaviour?]
+
+What needs to be endogenous/emergent?
+-------------------------------------
+We'd like to endogenise as much as possible. However, it may be interesting and important to endogenise reward, since reward is a means to learning which is a means to survival. So, there is a dynamics of expected reward in response to the development of different abilities (and the hypothesis is that the intelligence of Homo Sapiens hasn't done us any favours in terms of reward. Right now, we seem to have largely gone beyond the physical demands of the evolution of the individual, but we are, more than ever (thanks to the internet), slaves to the evolution of society, in that social norms are multiplying at the expense of our wellbeing. Herein lies a project:
+  - The state of a society is defined by a network of social ties made from a finite vocabulary/ecosystem of social ties.
+  - Social ties reproduce through behavioural copying and mutate through innovation, as do social structures (i.e. social subnetworks) 
+  - From this view, a new social tie or social subnetowrk has a "fitness" in a given social ecosystem defined by its expected rate of reproduction.
+  - We can compare this fitness landscape in the space of new social ties/subnetworks against the change in expected reward of the agents...and ask what is the fitness/reward correlation? Social states with positive correlation should evolve to better societies, whereas negative/zero correlation would get worse.
+  - Perhaps a more useful way of thinking is in terms of the attractor of a society (i.e. which basin of attraction are we in?) projected onto the expected wellbeing.
+  - The attractor may depend on the way the agents learn, so we can also measure how sensitive a society is to the learning algorithm. Two benchmarks would be reward maximising agents and zero-intelligence agents. Ideally, we would like to find a society that has a reward maximising attractor for both of these benchmarks. At the other extreme are societies that minimise expected reward even when agents try to maximise their reward (e.g. prisoner's dilemma).
+  - The hypothesis is: Currently there is no link between the "fitness" of a social tie and the "wellbeing" of the individuals, even if agents act to maximise their reward.
+  - Given an innovation mechanism, I, the dynamics of society can be understood as a number of attractors. We can then ask how the introduction of a specific innovation, outside of that endogenously available through I, into an ecosystem on one attractor can perturb the system to the basin of attraction of a different attractor (revolution).   
+  - This opens the question of an algorithm to find these innovations. If we include this in the endogenous innovation mechanism then the perturbation can be seen to change the landscape of basins of attraction/attractors, and sets the agenda to find innovation algorithms that change our current attractor to a better one. Social innovation is the exogenous intervention.  
+).
+

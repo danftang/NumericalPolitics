@@ -1,0 +1,47 @@
+Emergence of Fuedalism
+----------------------
+Agents can own land, corn and labour, and have a number of "outward" social ties to other agents. Social ties have an associated "context/type" which is just an integer ID.
+
+The life of an agent consists of the repetition of a meta-game which consists of deciding which game to play from a set of available games, based on current state. At the end of each game an agent's body goes through a timestep and the game repeats, so the quality of ending a game in state s is the quality of starting a meta-game in state b(s), where b is the body timestep function.
+
+One of the games is the "eat" game. At the start of the game, corn += 100*min(land,labour) and labour is reset to 1, the agent then gets to decide how much corn to eat, and receives a reward based on amount eaten.
+
+One of the games could be the "do-nothing" game.
+
+For each of an agent's social ties, there is an "encounter" game. An encounter consists of a turns-based game with another agent, with the initiator of the game taking the first move. During an encounter an agent can:
+ - give land
+ - give corn
+ - give labour
+ - hit other with a stick
+ - say 0
+ - say 1
+ - say goodbye
+
+An encounter ends when both agents say goodbye, or the initiating agent begins the conversation with goodbye (effectively deciding not to initiate an encounter).
+
+If the expectation of choosing an encounter with a given tie falls below some threshold, the tie is removed and replaced by a new tie by uniform-randomly choosing a tie context and choosing another agent by following links uniform-randomly in the social graph and stopping with a fixed probability if an edge of that context to that agent doesn't already exist.
+
+Agents begin with one unit of land each, and a random set of edges. [for a small number of agents, could start with a fully connected graph and have only edge attrition]
+
+Implementation
+--------------
+There exists the following quality values:
+  - expected quality of the meta-game
+  - expected quality of a sub-game
+  - expected quality of a type of tie
+each can be for a given state or integrated over a distribution of states.
+For a given tie-type, an agent should use learning from other ties of the same type, but should also be able to learn the behaviour of the other agent. We can do this with priors and Bayes' rule.
+
+We suppose there is a public buffer of encounter behaviours randomly selected from the population, simulating third party observation of others along with cultural zeitgeist. This provides a prior over behaviour for both parties in an encounter. If two agents decide to enter into an encounter based on the prior behaiours, then it would seem that conforming to priors is in both agent's interests.
+
+If behaviour is conditioned on encounter history then, after taking the expectation over state of other, other's move is just an action distribution given encounter history. Given this, we can use self-play to calculate our own state-action quality values and policy.
+
+However, over multiple encounters with the same agent, we should learn the individual characteristics of the agent (which should influence our eagerness to enter into further encounters). The evidence is the public behaviour buffer and the set of encounters with a given agent.
+
+Option 1: Mind reading. Assume that other has the same reward and state transition functions as self, that policy decisions only have access to current episode history, that policy maximises individual reward and priors over state at the start of encounter maximise probability of observed encounters in the buffer. After an encounter, we update the prior over start state using Bayes' rule.
+
+Option 2: Assume the majority adopt a single "social norm" policy while a minority of "deviants" choose a policy uniform randomly. If we posit a Gaussian prior on the proportion of deviants in society, then we assume the distribution of policies in the population is the MAP given the public buffer. The distribution over policies of a given acquaintance can then be updated using Bayes given the observations of his behaviour. This can then be integrated over the policy space to give a posterior action distribution given encounter history, and so an expected quality.
+
+[Perhaps the whole point of roles is to allow agents to interact without having to "read minds". Once we've negotiated roles, I don't really care what your state of mind is, all I care is that you fulfil your role (or alternatively, knowing your state of mind wouldn't make me act any differently)...it simplifies theory of mind (this perhaps explains the dehumanising effect of roles)]
+
+Taking option 2, we can play out against an agent with posterior behaviour in order to update our own policies. [So, an abstract description of self-play would be to have a model of the world against which self can play. The model is an approxiating function that is updated with evidence from reality (and possibly from self-play). Self policy is updated by self-play with the modelled world (and possibly also directly from real world).] 

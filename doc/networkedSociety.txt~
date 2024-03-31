@@ -1,0 +1,12 @@
+A Networked society is a set of objects that have pointers/references to other objects of other objects. Addresses can be fixed or dynamic in value and fixed or dynamic in number. If not fixed/fixed then a mechanism must be defined for identifying new objects. Simplest is random encounter (in addition to encounters via pointers), or diffusive encounter (probability is sum of exponentials of lengths of paths between agents, for all paths greater than 1) which can be sampled easily by following pointers at random and stopping with a fixed probability at each node after the first.
+
+Action space of an agent in a networked society
+-----------------------------------------------
+If we assume:
+  - there is a set of existing social ties, and a special "random encounter" pointer that gets set by the environment
+  - interactions are binary, episodic and uninterrupted.
+then the action-space of the meta-game is just: have an episode with pointer n, break social-tie n, make social-tie with random encounter.
+
+...or perhaps agents have a finite deque of social ties, and a random enounter is added to the top at each step, and the "oldest" (i.e. no episodes for the longest time) forgotten. Ties are brought to the top when an episode is initiated. Ties also include a descriptor containing the "state" of the tie. At each timestep an agent gets a chance to initiate an episode with each of the ties in turn (or, perhaps, a randomly chosen tie). So, the meta game is just to decide whether or not to initiate an episode with a given tie.
+
+More generally, agents have a memory which consists of a map from agent address to descriptor. An agent can put a probability on initiating an episode with each agent (or, just decide, perhaps probabilistically, which agent to initiate an episode with). Perhaps "initiate a random encounter" could be one option (pull) or decide to take random encounter given opportunity (push).

@@ -1,0 +1,52 @@
+Experiments
+-----------
+What are our ultimate aims?
+    - To understand the "dynamics of society".
+    i.e. to build theories that have predictive power on some abstract level, using the scientific method and numerical experiments to confirm/refute hypothetical, abstract theories. A theory that describes a certain society can be sensitive or insensitive to various parameters of agent behaviour. A theory that is more insensitive is more robust and so more transferable to other societies.
+
+    - To find transferable social structures (stable sets of social norms) that are good at optimising social welfare.
+    A "social norm" is a learnable, public set of behaviours defined over a subset of situations (i.e. message or perception histories) an agent may find itself in. A social norm is stable if, universal adoption of the norm is Pareto optimal w.r.t. reward, or more generally, a society of agents with certain psychological properties do not decide to change the norm - pareto optimality assumes universal rationality).
+    If a norm can be integrated into human society, we can compare these alternative structures against existing structures (all else being equal) to see if they improve expected wellbeing. We can also show how sensitive wellbeing changes are to behavioural parameters of the agents. If it is relatively insensitive, we can be more confident that any gains are not dependent on the specifics of the behavioural model (we can also test against zero-intelligence agents and a society of agents that enjoy harming others [perhaps more generally, we can have a parameter that controls how much we care about other's wellbeing and plot aggregate wellbeing against this. A social structure that can optimise aggregate wellbeing at lower values of this parameter is more robust]).
+
+    - To understand social change.
+    To build theories of social change using the scientific method and numerical experiment. To understand under what circumstances social change is possible, and when possible, what events precipitate the change (or alternatively, what is preventing the change). A change may be precipitated by a new idea (i.e. computational constraint is preventing the change), may require coordinated behaviour change (i.e. the lack of a coordination mechanism is preventing change), a physical change, a generational change, informational (i.e. some agents are lacking information that would change their behaviour).
+
+How do we express our aims in mathematical terms? [see ontology.txt]
+    - In a society of agents with minds, we would like to make statements of the form "A society of agents that satisfy psychological predicate M (and physiological predicates P) has an attractor that satisfies social norm N" and/or "A society with attractor that satisfies social norm N implies that agents satisfy psychological predicate M".
+
+How can numerical experiments help us achieve our aims, in terms of experimental design patterns?
+    - Existence proof that a particular social norm emerges in the absence of certain agent properties. This may challenge preconceptions. e.g. Segregation.
+    - Testing of hypotheses of the form "A society of agents with property A implies the emergence of social norm B". We can test this by sampling agents in the set of agents with property A, but one can always argue that there may be something about human behaviour that would negate the result. The hypothesis can be tested quite strongly by making agents that have property A but, beyond this, act in a way to try to disprove the hypothesis. Although stronger, this is still open to the (weaker argument) that humans would find a way of "breaking" the system that the agents are not able to find. Of course, an existance proof can refute the implication.
+    - If we find a social norm is stable for a society of agents satisfying predicate A, we can ask how robust this is w.r.t. perturbations from universal satisfaction of A. Most generally, if we define a distance metric on how far a society is from universal satisfaction of A, we can define the robustness of a set of social norms as the minimum distance that would cause the social norm to break down. We may like to put bounds on this distance or identify such perturbations. In our case we may like to take local reward maximisation as our reference predicate. A distance measure may, for example, be the number of agents that do not maximise reward, or may be a measure of how much reward is "sacrificed" compared to maximisation. [computational methodologies...?]
+
+What have we already shown?
+    - Prisoner's dilemma:
+      - That a Society of learning agents can have multiple attractors / disjoint Nash equilibria.
+      - that learning agents can get
+      - that a neural network can't learn the optimal 
+
+What are some interesting research questions can we ask about societies?
+    - How many attractors are there? What are their basins of attraction (can we characterise in abstract terms)?
+    - Are the attractors point attractors / limit cycles / chaotic?
+    - What is the expected value of some aggregate measure on an attractor? [on the whole, we'll be interested in the attractor projected into some lower dimensional space that encodes the (aggregate) variables we're interested in (especially aggregate wellbeing). In this space, the transition becomes non-deterministic. We can ask whether the image of the attractor is wholly contained within a given volume or, more generally, the probability of finding the system in a given volume.]
+    - What is the timescale of convergence to the attractor [how is this calculated in the discrete case]?
+    - Does the attractor have semi-stable "regimes". If so, under what circumstances can we nudge to change regime?
+    - How does the attractor (and its image) change in response to parameters controlling the behaviour of the agents?
+        - Can we prove implications between mental and sociocultural categories? For example, that a given mental ability gives rise to a given class of behaviours, or that a given class of behaviours requires a given mental ability. [We understand the Society in terms of social strategies and social constructs, social behavioural norms.]
+        - Can we construct reduced dimensionality models of a given society? (Perhaps with the help of neural networks. Perhaps with the constraint that they are able to predict a given set of abstract variables).
+    - What social constructs emerge? How effective are they at optimising wellbeing? [The search is for a set of social behavioural norms that put agents in games that are easy to understand and to solve, and the solution should lead to optimised social wellbeing. From this view numerical experiments are just a tool to do this search, rather than a way to study a dynamic system].
+    - Under what circumstances do subcultures emerge and how does this affect the wellbeing of the subcultures and the whole society.
+    - Why do social norms exist at all? Are there societies where there are no social norms (or, the social norm is for everyone to behave in a different, but well defined way) that are better than societies with social norms? (probably need social norms in order to interact in any meaningful way with strangers).
+
+Building an increasingly complex society.
+-----------------------------------------
+In most general terms, we fix some aspects of society by providing a space of societies with certain properties, then provide a dynamics within this space (the dynamics itself can be subject to the value of parameters. These give us separate attractors, but we can ask what properties hold given a prior over parameters). We then provide an objective function on the space of societies (e.g. aggregate wellbeing) and ask which attractor maximises this (possibly integrated over a probability distribution over the fixed parameters, attractor then becomes the fixed probability distribution, i.e. the weighted sum of attractors)?
+
+If we assume that agents have a mind/body split with the body providing rewards and wellbeing defined as aggregate reward, then for a fixed body, certain sets of social norms can be shown to be Pareto optimal and, at least theoretically, globally optimal, independently of mind.
+
+Given this, we can design bodies/societies where we know certain social norms are globally optimal, and ask what mental abilities are required for a society to adopt this norm. If the society has a non-optimal social norm, we can also ask under what circumstances / what abilities / what minimal change in behaviours are necessary for the society to escape to a better set.
+
+So there is likely to be a hierarchy of societies that present increasingly difficult social "problems" (i.e. that require agents to learn increasingly more difficult/complex social norms) and so require increasingly powerful minds to solve these problems.
+
+
+

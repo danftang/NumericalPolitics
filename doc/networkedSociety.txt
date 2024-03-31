@@ -1,0 +1,20 @@
+A Networked society is a set of objects that have pointers/references to other objects of other objects. Addresses can be fixed or dynamic in value and fixed or dynamic in number. If not fixed in value and number then a mechanism must be defined for identifying new objects. Simplest is random encounter (in addition to encounters via pointers), or diffusive encounter (probability is sum of exponentials of lengths of paths between agents, for all paths greater than 1) which can be sampled easily by following pointers at random and stopping with a fixed probability at each node after the first.
+
+Action space of an agent in a networked society
+-----------------------------------------------
+Agents have a finite map of "social ties" from agent address to descriptor which comprise the set of agents an agent can start an episode with. The environment randomly adds ties by diffusion length, and removes ties through disuse. At any moment, at most one tie is active. If one tie is active, then the action spae is the action space of messages that can be sent to the active other. If no ties are active then the action space is the activation of any one of the ties (i.e. initiation of an episode). If another agent initiates an episode, the tie becomes active at the end of any current episode.
+
+What is the tie descriptor and how does it get associated to a tie?
+-------------------------------------------------------------------
+The tie descriptor identifies the posterior over the policy of the other agent given the history of episodes with that agent, P(pi|H). So, a stranger has the prior P(pi) (though perhaps there are contextual clues, e.g. the stranger standing behind the counter in a coffee shop is more likely to make me a cup of coffee than the guy at the bus stop), and after each interaction this is updated. The update is well defined by Bayes' rule. We can also define the "empirical policy", P(a|H) = \sum_s0\sum_pi P(pi(f(s0,H))=a)P(pi|H)P(s0). where s=f(s0|H) is the state of an agent given a start state s0 and a set of actions H. But this implies a single policy on the history space which encodes the prior/posterior over policies.
+
+The descriptor, D, is part of the approximation:
+P(a|D(H)) \approx P(a|H)
+and
+D(a+H) = g(a,D(H))
+for some action a. [How does this translate to role negotiation and role playing? TODO: think about how agents that could play either of two games, but the beneficial game depends on their joint hidden state...will negotiation emerge?]
+
+It is the prior over policies, P(pi), (or P(a|H)) that defines social norms. In a society that tends to conform to social norms, I expect you to conform to social norms, and you expect me to do the same, unless evidence suggests otherwise.
+
+[So, if we suppose agents have access to the empirical policy, then do social norms/roles emerge? How about if agents use finite sample size, or just their own experience (along with function approximation)?]
+

@@ -1,0 +1,60 @@
+In a complex society, agents are likely to perform roles within society.
+Each role is a set of social norms. An agent must be aware of the roles played by other agents it interacts with (in order to calculate expectations of others behaviour) and the role it plays (in order to calculate other's expectations of its own behaviour). This requires the establishment of some kind of (possibly non-verbal) method to negotiate roles in an interaction [perhaps this is a social norm too]. Is this fundamental to the establishment of a complex society?
+
+Agents may be quite fluid in their roles, wearing different "hats" for different situations [can an agent wear more than one hat at a time?].
+
+[Perhaps] We can assume that agents have access to a shared set of roles [or they emerge by observation. Perhaps roles emerge as a way to predict other's behaviour]. New roles should emerge in an evolutionary manner, through innovation and adoption. In this way, roles which describe Nash equilibria become stable within society, and the society as a whole becomes a finder of Nash equilibria, or roles become the units of evolution which survive or die in the envoronment of other roles, while the minds of the agents are the selection process.
+
+Given a set of roles applicable to a given situation, the choice of role becomes a meta-game.
+
+Our interest, then, is the dynamics of the emergence of roles.
+
+[Do roles themselves emerge given minds that have a propensity to copy? i.e. in the space of all possible behaviours, if a small number of deltas are present in society (i.e. roles) then only these deltas will be copied, so will self-sustain.]
+
+What if we add survival of the agent?
+An agent's reward function is arbitrary in this view (defines the fitness of the role), but while an agent aims to maximise its reward, the reward function defines an agent's fitness to survive...[does this fall within our interest here?]
+
+Social status
+-------------
+Is social status something more than the playing of a role? Being a king requires not only that I play the role of a king, but also that a number of people play the role of subject when interacting with me. In this way I cannot unilaterally decide to be king. What is the dynamics of the emergence of these social relationships and how do they remain stable and how do they crumble? 
+
+This requires agents to be able to identify each-other, in order to learn and identify the social status of other during an interaction [it also implies that during an interaction, I'm not only interacting with a single agent, but rather a node in a whole social network].
+
+Social network
+--------------
+This would come naturally out of a social network topology: an edge is a social tie that joins two agents in a well defined pair of roles. Social status comes in an agent's relationship to other agents through social ties. In this picture, an agent can then decide to make or break social ties, or enter into episodes with existing socially tied agents. Social tie types become the units of evolution, but these can be embeded within wider social networks which may themselves be considered units of replication (which may outlive the constituent agents)...[is this part of the explanationn for the success of capitalism?]...this could lead to interesting dynamics. A social structure that can expel agents that don't fulfil their requirements and recruit new ones would be stable over a very wide range of individual agent behaviours, given a diversity of agents in society. [Could we expand capitalism to zero-intelligence even if we include the formation and management of companies?]
+
+A good test of a social network representation, for our needs, is: can it represent capitalism? Followed by: is it flexible enough to represent, e.g. feudalism, communism, sub-cultures, government, law-enforcement, Elinor Ostrom's cooperative groups... this is a pre-requisite to asking how structures can change.  
+
+The edges in this graph can be thought of as social contracts: mutual agreements that each participant will play their role, including when the contract may end, and perhaps even with restrictions on what other social contracts an agent may enter into (monogamy, employment, conflict of interest). If the representation of contracts are expressive enough, then agents can innovate by offering new contract types as well as forming novel structures using existing contract types. 
+
+A contract between two objects consists of an public interface for each object (this defines the set of "actions" each may take on the other) and a constraint on the strategy of each object (i.e. two sets of socially acceptable strategies, one for each participant). At its simplest, this can be a single strategy for each agent, but more realistic seems to be very simple contracts, but using quite complicated abstractions. Part of the evolution of society, in this case, becomes the evolution of the abstractions available for creating contracts.
+
+[What if the contract is expressed as code (smart contract) and is seen as injecting code into the participating agents. In this way, it is the smart-contract code that is the unit of evolution]
+
+[Is it important to have rewards for social status, or is it already contained in the rewards that come from status? In reality, there seems to be a "double counting" of rewards: If i have a job I hate and win the lottery, I'm happy about winning, presumably because my expectation of future rewards has increased, but this is in addition to the future rewards themselves. Does this, along with selective memory, explain why people are willing to make negative expectation gambles?]
+
+Given a set of roles, agents could be aware of the need for a given tie, which could direct behaviour to fulfill that need.
+
+Can two agents be linked by two different ties? i.e. play different roles in respect to each-other: it would seem so (perhaps my wife is also my dentist). In this case, how do agents distinguish roles?
+
+Emergence of roles
+------------------
+If a society is defined by its available roles and its state of social tie, how does a society develop new roles? Once agents are identifiable, roles can be encoded in a policy, so the existance and evolution of social roles is really just an abstract way of talking about policy learning. So, what are the necessary/sufficient conditions on learning that lead to the emergence of social roles?
+
+Can roles emerge without agent identifiability? [if roles are made clear at the start of the episode: i.e. there needs to be a negotiation of roles until agents agree on a social tie that would be Nash equilibrium for them. Can agents learn this? It would seem that if agents can learn from eachother and are commonly placed in the same position (i.e. there are a finite number of games they can play) then the Nash equilibria would emerge. In-fact the negotiation is part of the Nash equilibrium. Given a decision tree, an agent can use MCTS to verify that it is a solution.]
+
+When agents are identifiable, roles can be encoded in "folk psychology": Agents assume other agents have an unknown "mind state" which is an input to other's policy. Over a longitudinal social-tie each agent gets to know the others folk psychological mind state.
+
+Roles may emerge out of a lack of ability to track complex probability distributions over other's internal state. If we're both only able to track a small sample of states then the establishment of social roles helps the aganes to cooperate.
+
+
+Stability of roles: If I live in a society of people who know and respect a set of roles,and I enter an epiosode and know what role other is playing and what role he expects me to play...I can use self-play (against the social roles) to form my policy, irrespective of my roles. If my policy coincides with the role I was supposed to play anyway (i.e. the roles identify a Nash equilibrium), then there is stability.
+
+If we're using MCTS then the role can be used as the off-tree policy.
+
+Learning roles: Suppese agents are able to learn from the exhibited behaviour of episodes of other pairs of agents, then roles just identify common Nash equilibria... perhaps we also need to see "lifestyles", i.e. how do multiple social ties fit together into the meta-game?
+
+
+
+

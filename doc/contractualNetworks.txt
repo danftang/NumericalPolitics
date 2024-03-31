@@ -1,0 +1,47 @@
+Capitalism as a contractual network
+-----------------------------------
+The contracts of capitalism consist of:
+  - Labour contract: Employer gives money in exchange for labour, recurring.
+  - Consumer contract: Consumer gives money in exchange for product, one time.
+  - Investor contract: Investor gives money now in exchange for more money in the future [a promise of more money in the future?].
+
+[note that these are all exchanges...how far can we get with nothing other than exchange contracts?
+Suppose there are a number of types of stuff:
+  - money[?]
+  - labour (land -> sugar + land)
+  - labour (land -> spice + land)
+  - sugar
+  - spice
+  - land[?]
+and there exists just an exchange contract that can exchange any pair of these things. Suppose also that there are rewards for free-time and eating. Suppose that land + labour -> sugar or spice + land (labour is a bit different from the other stuff in that it can't be stored, that it can be used to transform stuff, and that it is not fungible: the labour of a tailor is not the same as the labour of an ironmonger).
+
+This leads to the question of how best to represent the space of available offers? If we define a canonical ordering of stuff, then we can define a buyer/seller of any pair of types (buyer is giver of stuff later in the ordering). This defines an exchange-rate/unit-price for an exchange (amount of later-stuff/amount of earlier-stuff) so a contract consists of a <stuff,stuff> pair, plus an amount offered and a unit-price. If the amount offered is more than the seller has, it is capped at that amount. If the amoune requested is more than the buyer can afford, the amount is capped. If individuals have overlapping contracts, the offers are fulfilled at the seller's price. So, the exchange action space is a 2N(N-1) dimensional space, either continuous or discrete. if N=6 this is 60 dimensions...
+
+If we specify that all exchanges are for money, then this reduces to 20. If we constrain to being either a seller or a buyer of a commodity at any time then we can represent a seller as a negative quantity and the action space is 10 dimensional. If we tie labour purchase to land and labour offer when not already employed then this reduces to 6 dimensions.
+
+Perhaps we can assume all contracts are recurring unless cancelled, and that in any timestep one can only make one offer (though perhaps this could be fulfilled by more than one counter-party), this reduces the offer space to 3-dimensions (commodity, quantity, price). If we also restrict to only one cancellatio per timestep then this adds only one more discrete dimension.
+
+Or, we learn a state-quality function, rather than an action-quality function and a policy function. We could then use different neural networks for different decisions (or perhaps we are in a game with the different decision processes within ourselves, and we're trying to find an internal Nash equilibrium!...or, what if we set up contracts with our different decision processes?)]
+
+We assume that:
+  - the consumer contract is fulfilled immediately, and ends.
+  - investor contracts are always fulfilled, where possible.
+  - Labour contracts can be terminated by any party at any time.
+  - an agent is a store of certain commodities (money, land). So, the state of an agent is its currently active contracts and the amount of each commodity stored. 
+  - an agent can choose to make any offer it can fulfil (where an offer is a contract with one side unfilled/unsigned), and that there exists a mechanism by which complementary offers are matched and turned into social ties (signed contracts).
+
+At each timestep, an agent makes the following decisions:
+   - what offers to make in the next timestep, in each of the six categories, within the constraints of being able to satisfy all.
+   - whether to terminate any currently active labour contracts.
+   - how much to consume.
+   
+
+[what about innovation in production technology?..."the means of production"]
+
+Market mechanism
+----------------
+The simplest market mechanism is random selection of pairs of agents and fulfilment of any complimentary offers the pair have.
+
+Here, the contracts are so simple that there is no binary episode strategy to learn. However, the running of a company consists of a complex set of contracts: borrow from an investor, hire labour / buy stock/capital machinary, offer product. So an agent can learn strategy in the meta-game. To learn from this, an agent must be able to observe the meta-game decisions of another agent over some time, beyond just the decisions made within a binary episode. What should be the mechanism of this? Perhaps there is another social tie that allows agents to learn from each-other's meta-strategies.
+
+[Do Q-learners learn capitalism? ]

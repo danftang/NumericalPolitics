@@ -1,0 +1,18 @@
+Interesting questions
+---------------------
+
+Given a society, how can we identify interventions/perturbations that lead to improvements in social Q-value? Where social Q-value is the expected individual instantaneous wellbeing integrated over the population and over discounted time.
+
+Given a society that is stable to individual deviance, how can we identify a stable subculture that increases each member's expected wellbeing without reducing global expectation?
+
+Given a set of social norms and social history on the one hand and individual behaviour on the other (and given that the former emerged from the latter), what can we infer about the set of dynamic systems that fit our prior knowledge and/or the behaviour of such dynamic systems, perhaps compared to existing hypotheses about human behaviour and/or social norms?
+
+What is the smallest set of assumptions about human behaiour that leads to the emergence of a given set of social norms (or, indeed, any kind of social norm)?
+
+Given a set of agents with well defined wellbeing functions, what is the set of stable social norms that maximise expected wellbeing?
+
+If a set of agents with well defined wellbeing functions currently have a stable set of social norms that doesn't maximise expected wellbeing, what social norms (if any) could, from an evolutionary game-theory perspective, out-reproduce the existing norms to create a shift to better wellbeing?
+
+What set of social norms would create a society that consciously tries to modulate social norms so as to maximise expected wellbeing?
+
+

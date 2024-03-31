@@ -1,0 +1,38 @@
+Capitalism as a contractual network
+-----------------------------------
+The contracts of capitalism consist of:
+  - Labour contract: Employer gives money in exchange for labour, recurring.
+  - Consumer contract: Consumer gives money in exchange for product, one time.
+  - Investor contract: Investor gives money now in exchange for more money in the future [a promise of more money in the future?].
+
+[note that these are all exchanges...how far can we get with nothing other than exchange contracts?
+Suppose there are a number of types of stuff:
+  - money[?]
+  - labour (land -> sugar + land)
+  - labour (land -> spice + land)
+  - sugar
+  - spice
+  - land[?]
+and there exists just an exchange contract that can exchange any pair of these things. Suppose also that there are rewards for free-time and eating. Suppose that land + labour -> sugar or spice + land (labour is a bit different from the other stuff in that it can't be stored, that it can be used to transform stuff, and that it is not fungible: the labour of a tailor is not the same as the labour of an ironmonger).
+
+This leads to the question of how best to represent the space of available offers?
+]
+
+We assume that the consumer contract is fulfilled immediately, and ends.
+We assume that investor contracts are always fulfilled, where possible.
+We assume that Labour contracts can be terminated by any party at any time.
+We assume an agent can choose to make any offer it can fulfil (where an offer is a contract with one side unfilled/unsigned), and that there exists a mechanism by which complementary offers are matched and turned into social ties (signed contracts).
+
+At each timestep, an agent makes the following decisions:
+   - what offers to make in the next timestep, in each of the six categories, within the constraints of being able to satisfy all.
+   - whether to terminate any currently active labour contracts.
+
+[what about innovation in production technology?..."the means of production"]
+
+Market mechanism
+----------------
+The simplest market mechanism is random selection of pairs of agents and fulfilment of any complimentary offers the pair have.
+
+Here, the contracts are so simple that there is no binary episode strategy to learn. However, the running of a company consists of a complex set of contracts: borrow from an investor, hire labour / buy stock/capital machinary, offer product. So an agent can learn strategy in the meta-game. To learn from this, an agent must be able to observe the meta-game decisions of another agent over some time, beyond just the decisions made within a binary episode. What should be the mechanism of this? Perhaps there is another social tie that allows agents to learn from each-other's meta-strategies.
+
+[Do Q-learners learn capitalism? ]

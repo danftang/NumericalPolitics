@@ -1,0 +1,119 @@
+Society
+-------
+A Society is a tuple (T,S,M) where T is a set of "Agent" classes, S is a "Schedule" class with methods add(executable) and step() and M is a "Memory" class implementing methods AgentID new<T>(...) and delete(AgentID). [perhaps we explicitly add a remote method calling mechanism?]
+
+A Society defines a discrete-time, dynamic system whose state space is (MxS), the product-space of the state-space of M and the state-space of S. A step is the execution of the "step" method of the schedule. Classes may have access to a random number generator, allowing probabilistic schedule and/or agents. Agents can execute each other's member functions, add tasks to the schedule, create new agents by calling m.new<T>(...) and delete themselves [or perhaps the memory model has automatic deletion on zero reference count]. Some states (i.e. those with no pending tasks) have no successor, so are terminal states.
+
+If we include a special "main" class/member then we reduce to the set of computable functions and an object oriented model of computation. A (Society,main(),randomSeed) tuple defines a trajectory in a Society.
+
+[This is different from computational graph a-la Tensorflow as edges can change and new nodes can be created]
+
+In a "localised" society, we define a distance metric between objects and require that an object can only call methods on objets that have distance zero from itself. A design pattern within this is to reify messages as objects. An agent can pass a message to a distant agent by creating a new message object which then "delivers" itself by moving to the destination agent (i.e. changing its state to one that has zero distance to the destination agent).
+
+In "simulated time" society, each object has a trajectory in "space-time" and an interaction between objects can only happen at points where trajectories cross (i.e. zero distance between two points on the respective trajectories) [how do we compute this?].
+
+In a "continuous time" society, a step of the dynamic system consists of the passing of a message, but each agent has a local real-time and messages are timestamped. An agent must process messages in order of timestamp rather than in order of arrival. To make this work, agents must pass messages over open channels, so that an agent must first open a channel with another agent in order to pass messages. In this way, each channel has a timestamp which is that of the last sent message. If an agent's local time is t, its earliest received message is on channel x and has timestamp t+D and all other channels (not x) have timestamp not earlier than t+D then the message can be processed.
+
+A "directed graph society" is a society where, at any point in time, all agents are able to identify the other agents it is currently able to interact with, so we can draw a directed graph of agents. A design pattern for this is to have a list of pointers or IDs to interfaces on which we can execute member functions. An agent can learn new IDs/pointers from parameters to its own functions or return values from remote functions.
+
+A design pattern to provide agents access to a simulation object, without having to pass references, would be to have a class for each type of "world" (base class is a Schedule, from which is derived "agent finder" classes or any extra global functionality an agent may require). Agents are compile-time aware which class of world they can inhabit (templated if multiple) and can only create agents that expect the same type of world or one of its base classes. Each world class has a thread-local static pointer to an instance of itself [or there exists a single, thread-local std::any that points to the simulation]. When an instance of a world is created, it is supplied with/creates a number of threads to execute the world, and the thread-local pointers for each of these threads are set to point to this instance (also the pointers of any base-classes of the world). In this way we can have multiple instances of a given world without passing/storing references. Type safety can be ensured by requiring the simulation's new() method only create agents of compatible type (agents must have a typedef of the minimal world they can inhabit). The simulation object can also be considered to be an agent, but in this case the graph of interactions is always a star. In full generality, a simulation defines a tree of thread-locally identifiable objects/agents which could supply any set of functionality. The simulation object should detect the end of the simulation (task list empty and all threads joined), and release any remaining resources (i.e. delete agents).
+
+A "binary encounter society" is one where interactions consist of binary encounters between agents [if we allow single-message encounters then all societies are binary encounter societies...perhaps more importantly, in a binary encounter society, each agent can identify the caller when a method is called...or more weakly, can identify the points at which the caller changes (but cannot identify when a new agent has been seen before). Also, does the agent have control over which agents it begins an encounter with, and can it control which agents start an encounter with it? Also, we assume that the other agent isn't having another encounter "behind our back", that is, when an agent starts a new encounter, it must publicly end/close the encounter with the old agent. This also allows us to make inferences on commutivity of tasks (i.e. tasks that are encounters between non-intersecting pairs of agents are commutable).].
+
+Schedule
+--------
+A Schedule is a partially ordered set of executables. Define the "next" executables are the subset of members that have no predecessor. To execute the society, the Schedule repeatedly executes a "next" executable. There is no guarantee which "next" executable is chosen, but there is a guarantee that the partial order is maintained in time.
+
+The partial order is defined as follows: Each executable "involves" some subset of agents consisting of the calling agent and all called agents in the executable [trouble is, the agents it involve may depend on the agent state at execution, which we don't know until execution. So, the involves set must be some upper bound, rather than an exact value]. Each agent, then, can be associated with the most recent executable it was involved in. When an executable is added to the schedule, it comes after the most recent executable of each agent the executable involves. So, executables are atomic. However, this doesn't resolve all race conditions (consider a Schedule with two commutable executables, suppose the executables each add a new executable, but these aren't commutable (i.e. they have intersecting involve-sets). The resulting schedule depends on which member we choose to execute first.) If we want to rid ourselves of these race conditions, we could:
+    * define a canonical ordering of non-intersecting involves-sets
+    * define a local-time for each agent/variable and a duration of executables, which increments the local time of the caller. Newly added executables are timestamped at the incremented local time of the calling agent. We can then safely begin execution of an executable with timestamp t as long as it is commutable with all unexecuted executables whose timestamp is before t, including any currently running executables. However, commutivity becomes more complicated since each executable has an involves-set and an "added executable" set (which is an upper bound on the executables that may be added to the schedule during execution). Each added executable in the added executable set also has an involves set at a time t+Dt and an added executable set...etc... Two executables commute if the involves-set of the later timestamped executable is disjoint with the light-cone of the earlier executable (i.e. there isn't a "ray" that joins the executables).
+
+
+If we wish, we can make this even more fine-grained by associating an executable with the set of data members that it modifies/reads. When added to the Schedule, an executable comes after the most recent executable of each data member it modifies/reads.
+
+From this, it can be seen that two exdecutables are commutable if their involves-sets are disjoint.
+
+
+Agents/Classes
+--------------
+An agent is an object that implements one or more public "handler" methods that can be called by other agents. A handler has access to a global/thread-local environment which allows the adding of tasks to the task schedule and the creation/deletion of new agents. Other than that it can only access its own state and/or call methods on interfaces for which it has an ID/address.
+
+Under this very general description, we can describe a number of design patterns, from which we can quickly build a society to our desired specification. We can supply library classes to make it easy to build within these design patterns.
+
+Behaviour (behavioural predicate)
+---------
+A "behavioural predicate" on an agent is a predicate that depends only on the sequence of public method calls that an agent has made (i.e. that have been called from tasks submitted by a given agent) and that have been made on the agent. If necessary we can distinguish between "empirical behavioural predicate" which depends only on the past behaviour of the agent, and the "encoded behavioural predicate" which makes a commitment about the way the agent would act from its current state under different situations.
+
+Body/Mind split
+---------------
+In this design pattern, an agent has a body and a mind. The body presents handler methods to other agents, sends perceptions to the mind and responds to acts by the mind by updating its own state and executing handlers on other agents. An act of perception consists of the body calling a handler method on the Mind. A perception may give the mind chance to respond by returning an act.
+
+A subset of this design pattern is the "act/reward" sub-design pattern where the mind sends "reward(rwardSize)" preceptions, which cannot be responded to, and "act(bodyState)" perceptions which can return an act to the body. Given objective reward, we can define "social wellbeing" as the expected flux of reward on the attractor, or given a distribution over start states.
+
+If a body wants to send perceptions that may optionally be ignored (e.g. to allow minds that do not even recognize a perception) then the body can use the "event" design pattern where, if there is a method called "on(event)" which takes the event type, then it will be called, but if not then the call will be silently optimised out without raising an error [should message passing use this pattern too, then all objects are potential agents?]
+Or, if we use the on() interface but allow the object to implement default interfaces, we can wrap any object so as to add interception of any set of events (by inheriting, "using BaseClass::on" and implementing default/null handlers), in that way allowing the use of objects that don't recognize events, yet retaining errors when a message is unexpectedly not handled.
+Or, we could provide a base class that implements all default behaviours, then classes can derive from this to implement any subset of default behaviours. This is more standard, but requires the implementer to know it is implementing the interface and requires the base class to implement all possible methods (plus derived class to do a "using" on any overloaded methods).
+
+In a society of agents with body/mind split, we can distinguish between psychological predicates (i.e. ones that depend only on minds), physiological predicates (ones that depend only on body)
+
+Trajectory
+----------
+A Society, looked at as a dynamic system, naturally defines a trajectory, which is an ordered list of states <s_0...s_N> such that the s_t.schedule.step() = s_{t+1}. A trajectory may be open or closed. If closed then s_N.schedule.step() = S_x for some x<=N.
+
+For societies with a finite state space, a state, s, defines a closure (with an associated probability, if probabilistic) which is the closed trajectory which begins with s. So, a trajectory, t, defines a "future" which is the closure of the last state in t.
+
+An attractor of a deterministic, finite society is a trajectory whose end state leads to its start state. An attractor of a non-deterministic, finite society is a stationary probability distribution over states.
+
+Abstraction
+-----------
+An abstraction of a Society is a function on the set of trajectories of that society.
+
+Abstract Implication
+--------------------
+An abstract implication on a society, S, for abstarctions A,A', consists of a pair a->c, such that for all trajectories t such that A(t)=a, A'(future(t))=c.
+
+Abstract Predictive Theory
+--------------------------
+An abstract theory of a society, S, is a function, f, and abstractions A and A' such that for some set of states, s \in T, f(A(s)) = A'(closure(s)). T is called the "validity set" of the theory.
+
+A theory may hold over a set of societies, which case A, A' and f may depend on S and the "validity set" consists of (society, state) pairs.
+
+A theory about properties of a society's attractor can be thought of as a predictive theory that has a validity set that is any state on the attractor.
+
+A theory may make probabilistic predictions in the abstract space so that we have P(f(a) = c).
+
+Meta-theory
+-----------
+We may not be able to fully define a theory, but may be able to make constraining statements about a theory. We'll call these statements meta-theoretical.
+
+Social Norm
+-----------
+A "Social norm" is a predicate on the behaviour of an agent (an agent's behaviour either conforms to or doesn't conform to a social norm). We're particularly interested in making statements about social norms, their "stability", possibly as a function of the agent "abilities" and their relation to "social welfare" or some other objective. We can project the state space onto the [0,1] interval based on the percentage of agents that conform to the norm. An attractor then projects to a density distribution over this interval. A predicate on an agent can be a social norm of an attractor if some sub-culture conforms to the norm on the attractor. An predicate can be a social norm of a trajectory if there exists a sub-trajectory whose duration is the average agent lifetime such that some subculture conformed to the norm on the sub-trajectory.
+
+------------------
+
+handles the execution of binary Episodes, and as such it is a Runner on an Environment that takes matches from the Environement and executes them. Multiple societies may exist together and exchange Agents (probably as a network of Environments).
+
+An Environment is a container of agents that chooses binary Episodes between agents and may support multiple simulataneous Episodes directly with agents. An Environment may itself consist of multiple sub-Environments that pass agents between eachother. An Environment may also be part of a network of Environments that pass Agents between eachother (through episodic interaction with the Environment, e.g. the Environment can offer an Agent the option to move to another Environment, and the Agent can choose to take that option or not). This abstracts from the details of the physical execution of the society.
+
+An Environment should be a passive provider of tasks to the Runner. If necessary, an active Environment (that submits tasks) can be wrapped in a task list [or, for that matter a passive Environment can be made active by wrapping tasks so that at the end of one task, the next is submitted]. An Environment can return no-task if there are no tasks to execute. If a process can't get a task,
+
+If all Environemtns return no-task then the simulation is over [in the case of a network of runners, the simulation doesn't end until all runners have no tasks. So there needs to be a shared counter that tracks how many Runners are currently active, and when this reaches zero, an end-of-sim message is broadcast].
+
+Alternatively, an Environment is just an agnet that accepts simultaneous Episodes, and agents deal with their own execution by submitting to a global task scheduler. Agents would then have to keep track of their environment. A Simulation would then be a container of Agents that initiates execution and deletes Agents at the end of the simulation. This has the advantage of being very flexible (MASON view) but requires more computation and memory [do we care?]
+
+The case for active Environments:
+    - Reduces to MASON type schedule/agent architecture, allowing
+      simulated-time and self-scheduling.
+    - Can use standard task-based multiprocessing.
+    - thread safety dealt with in runner (although still need thread safety if
+      we want a single Environement to run Episodes in parallel).
+The case for passive Environments:
+    - No need for startSimulation() mthod
+    - No need for global Runner for task submission.
+    - Runner gets to decide how many Episodes to run in parallel, but must
+      deal intelligently with no-task [i.e. run a piece of code at the end of a
+      task to start new tasks, up to some max number, or end if there are no
+      tasks to perform].
+    - Active naturally decomposes into passive + task-deque, so passive
+      is, in that sense, more primitive.
