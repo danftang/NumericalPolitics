@@ -1,0 +1,49 @@
+\documentclass[a4paper]{article}
+%\documentclass[a4paper]{report}
+\usepackage{graphics}
+%%\usepackage[english,greek]{babel}
+\setlength{\parindent}{0mm}
+\setlength{\parskip}{1.8mm}
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proof}{Proof}
+\title{Computation as occupation numbers}
+%%\date{$28^{th}$ August, 2007}
+\author{Daniel Tang}
+%%\linespread{1.3}
+
+\begin{document}
+%%\selectlanguage{english}
+\maketitle
+%%\tableofcontents
+
+Let $V$ be a vector of integers. Each element position represents a possible state of an agent and the integer at that position represents the number of agents in that state. We'll call this an occupation vector. We define a transition rate, $\rho$, so that $\rho(V'|V)dt$ is the probability that a vector $V$ will transition to state $V'$ in time $dt$, so we have a Markov model over all possible occupation vectors.
+
+We assume that each possible transition in the Markov model is either a single agent responding to its own state, irrespective of the other agents around it, or is an interaction between two agents. So, the behaviour the agents is defined by two agent action rates:
+\begin{enumerate}
+	\item $\rho_1(\Delta V|\psi)$ which is the rate at which an agent in state $\psi$ will perform an action that results in a perturbation in occupation vector of $\Delta V$ (i.e. $V' = V + \Delta V$) and
+	\item $\rho_2(\Delta V|\psi,\psi')$ which is the rate at which an agent in state $\psi$ will interact with an agent in state $\psi'$ to produce a perturbation of $\Delta V$. 
+\end{enumerate}
+
+So, the total rate of transition 
+\[
+\rho(V + \Delta V|V) = \sum_{\psi} V_\psi \rho_1(\Delta V|\psi) + \sum_{\psi,\psi'} \gamma(V_{\psi},V_{\psi'}) \rho_2(\Delta V|\psi,\psi')
+\]
+where $\gamma(n,m)$ gives the ``aggregation rate'', for now we consider only $\gamma(n,m) = nm$ or $\gamma(n,m) = n(m>0)$
+
+Given this, we can consider probability distributions over the occupation vectors. The transition rates define a rate of change of a probability distribution,
+\[
+\frac{d\Phi(V')}{dt} = \sum_{V} \rho(V'|V)\Phi(V) 
+\]
+so we translate to a dynamic system whose state space is the probability distributions over the set of all occupation vectors. [is it true that all attractors are point attractors in this space? Does it matter?]
+
+
+Now assume we have occupation matrices. The row gives the "interaction state" and the column gives the "agent type". Only agents in the same interaction state can interact.
+
+
+
+
+
+%%\appendix
+
+\end{document}

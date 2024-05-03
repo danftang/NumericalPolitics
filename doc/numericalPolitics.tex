@@ -25,9 +25,11 @@ Eventually, this repo is intended to provide the software necessary to allow any
 
 \section{The framework: thinking clearly about collective behaviour}
 
-The subject matter of numerical politics is the collective behaviour of many interacting agents. Agents interact by passing messages between eachother. Each agent has a number of ``channels'' for receiving messages and any agent with the channel's ID can send a message down the channel. When an agent receives a message, it can respond by updating its internal state and/or sending yet more messages. More formally, the behaviour of an agent can be defined as a probability distribution, $P(a\|m,c,\psi)$, which is the probability that an agent in state $\psi$ performs action $a$ in response to receiving message $m$ in channel $c$. The action $a$ defines the agent's new internal state and/or a set of messages passed to other agent's channels at some time after receipt of the message. At first sight this may seem a bit abstracted from real-world application, but we choose it because it's a very flexible formalism that, on the one hand can easily be adapted to all applications, while on the other makes it easier to parallelise computations.
+The subject matter of numerical politics is the collective behaviour of many interacting agents. In our framework, each agent implements a number of ``interfaces'' and each interface implements a number of ``methods''. The fundememtal action of an agent is to call a method on a known interface. The interface may be on itself or on another agent. The effect of calling a method is that the called agent may update its internal state and/or call yet more methods. So, we can imagine the agents as vertices in a directed graph with typed edges, where an edge of type T from A to B signifies that agent A knows (i.e. can choose to call methods on) the interface of type T on agent B. 
 
-Our particular interest here will be to make predictive statements about individual and collective wellbeing of the agents. For this we assume there exists a function, $W(\psi)$, that is some measure of the wellbeing of an agent in state $\psi$ and define the collective wellbeing of a set of agents, $S$, as the sum of individual wellbeings $\Omega = \sum_{\psi \in S} W(\psi)$. It should be the subject of much debate exactly what the function $W(\psi)$ ought to be.
+Each method on an agent can be defined as a probability distribution, $P_m(\psi',A\|\psi,x)$, which is the probability that, if method $m$ is called with arguments $x$ an agent with internal state $\psi$, then its internal state will change to $/psi'$ and the methods $A$ will be called (perhaps with a specified partial ordering). 
+
+Our particular interest here will be to make predictive statements about individual and collective wellbeing of the agents. For this we assume there exists a function, $W(\psi)$, that is some measure of the wellbeing of an agent in state $\psi$ and define the collective wellbeing, $S$,  of a set of agents as some function of individual wellbeings $\Omega = S( W(\psi_1), ..., W(\psi_N))$. It should be the subject of much debate exactly what the functions $S$ and $W$ ought to be.
 
 Notice that in this definition there is no mention of government. A goverment, if there is one, is encoded within the behaviours of the agents and is part of the model, as opposed to it being an exogenous actor imposing "policy interventions" on the agents. In this way, a government is best thought of as an emergent property of the agents' behaviours. We choose to make government endogenous because our interest here is \textit{not} to simulate specific policy interventions but to understand the fundamental principles of organised, collective behaviour.
 
@@ -113,7 +115,7 @@ Experiment 2 shows what happens as this society grows. We assume agents are able
 
 Agents can own land, corn and labour and are connected by directed edges representing social ties to other agents. Social ties have an associated "context/type" which is just an integer ID.
 
-The life of an agent consists of the repetition of a meta-game which consists of deciding which game to initiate from a set of available games, based on current state. Between games, agents play games initiated by other agents. At the end of each self-initiated game an agent's body goes through a timestep (labour is reset to 1, hunger goes up) and the game repeats.
+The life of an agent consists of the repetition of a meta-game which consists of deciding which binary game to initiate from a set of available games (connections), based on current state. Between games, agents play any games initiated by other agents. At the end of each self-initiated game an agent's body goes through a timestep (labour is reset to 1, hunger goes up) and the game repeats.
 
 One of the games is the "eat" game. At the start of the game, corn += 100*min(land,labour) and labour is reset to 1, the agent then gets to decide how much corn to eat, and receives a reward based on amount eaten and bodily hunger.
 
@@ -133,6 +135,8 @@ An encounter ends when both agents say goodbye, or the first-mover begins the co
 If the expectation of choosing an encounter with a given tie falls below some threshold, the tie is removed and replaced by a new tie by uniform-randomly choosing a tie context and choosing another agent by following links uniform-randomly in the social graph and stopping with a fixed probability if an edge of that context to that agent doesn't already exist.
 
 Agents begin with one unit of land each, and a random set of edges. [for a small number of agents, could start with a fully connected graph and have only edge attrition]
+
+Agents observe encounters between other agent pairs with a probability which is a function of the social distance (i.e. number of social edges) between the observing agent and the players.
 
 \section{Implementation}
 
@@ -265,6 +269,12 @@ but given the population, the probability of observing B is the integral over al
 
 We can play out against an agent with posterior behaviour in order to update our own policies. [So, an abstract description of self-play would be to have a model of the world against which self can play. The model is an approxiating function that is updated with evidence from reality (and possibly from self-play). Self policy is updated by self-play with the modelled world (and possibly also directly from real world).] 
 
+\subsection{Rewards}
 
+Agents get rewards for eating food and -ve rewards for hunger and being hit with a stick. However, agents also get rewards from social praise/disapproval, and from self-praise and self-disapproval (self-esteem). [Which part of this is innate and which learned?]
+
+What if agents have an ``emotional response'' to actions, and unconsciously communicate that emotion. Other agents can then ``empathise'' with that emotion. It is the emotions, not the actions, that are the source of +ve and -ve reward. This explains why our abstract interpretation of a situation is so important: Emotions trigger on abstract interpretations. An agent has an emotional inner state, and so the emotional life of an agent is a model linked to its physical state. It's possible that the emotional mind developed first as a direct model of physical reality, but has been re-purposed as a social model.
+
+So, there is a ``social reality'' which is the sum of everyone's emotional attitude to other, and which interacts with physical reality but is distinct from it.
 
 \end{document}

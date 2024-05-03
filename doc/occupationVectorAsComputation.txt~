@@ -1,0 +1,2 @@
+Let V be a vector of integers. Each element position represents a possible state of an agent and the integer at that position represents the number of agents in that state. We'll call this an occupation vector. We define a transition rate, R, so that R(V'|V)dt is the probability that a vector V will transition to state V' in time dt, so we have a Markov model.
+

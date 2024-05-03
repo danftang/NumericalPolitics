@@ -1,0 +1,11 @@
+Let V be a vector of integers. Each element position represents a possible state of an agent and the integer at that position represents the number of agents in that state. We'll call this an occupation vector. We define a transition rate, R, so that R(V'|V)dt is the probability that a vector V will transition to state V' in time dt, so we have a Markov model over all possible occupation vectors.
+
+We assume that each possible transition in the Markov model is either a single agent responding to its own state or an interaction between two agents so that we can define the behaviour of an agent as
+
+Given this, we can consider probability distributions over the occupation vectors, and the transition rates defines a rate of change of a probability distribution, so we translate to a dynamic system whose state space is the probability distributions over the set of all occupation vectors. [is it true that all attractors are point attractors in this space? Does it matter?]
+
+
+Now assume we have occupation matrices. The row gives the "interaction state" and the column gives the "agent type". Only agents in the same interaction state can interact.
+
+
+
