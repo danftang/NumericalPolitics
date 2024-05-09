@@ -55,6 +55,3 @@ If we're using MCTS then the role can be used as the off-tree policy.
 
 Learning roles: Suppese agents are able to learn from the exhibited behaviour of episodes of other pairs of agents, then roles just identify common Nash equilibria... perhaps we also need to see "lifestyles", i.e. how do multiple social ties fit together into the meta-game?
 
-
-
-

@@ -8,7 +8,7 @@
 \newtheorem{definition}{Definition}
 \newtheorem{theorem}{Theorem}
 \newtheorem{proof}{Proof}
-\title{Computation as occupation numbers}
+\title{Computation as a Poisson events on occupation numbers}
 %%\date{$28^{th}$ August, 2007}
 \author{Daniel Tang}
 %%\linespread{1.3}
@@ -89,7 +89,75 @@ We can calculate higher order rates of change, since $\Phi$ is the only term wit
 
 Now assume we have occupation matrices. The row gives the "interaction state" and the column gives the "agent type". Only agents in the same interaction state can interact.
 
+\section{Simulating}
 
+Given an occupation vector and a set of transitions with associated rates, the probability of a transition along edge $i$ in time $dt$ is $\rho_i dt$ and the probability that there is no transition in $dt$ is $1-\sum_k \rho_k dt$, so the probability that $i$ is the next transition is
+\[
+P_n(i) = \sum_{t=0}^\infty (1-\sum_k \rho_k dt)^t \rho_i dt = \frac{\rho_i}{\sum_k \rho_k}
+\]
+so we just need to choose a transition with probability proportional to the rate.
+
+If we express transitions as perturbations to the occupation vector, then on transition most transitions remain unchanged, so we can implement this as a distribution of transitions from which we choose a transition and use the chosen transition to update the dsitribution.
+
+\section{Spatial agents}
+
+Suppose agents are in a spatial environment (e.g. a 2D grid) and that only agents on the same grid-square can interact. Within a gridsquare, all pairwise interactions are possible, but the rates are dependent on the non-spatial internal states of the agents. An event can consist of a single method call, or a whole turns-based encounter.
+
+If an event is just a method call, then even binary events change only the state of a single agent. which may simplify parallelisation. In this case every agent has a local time set to the time of its last state-change. The time of its next state change is dependent only on the rates of its own state-changing processes which are defined by the states of the other agents in the same grid-square at the agent's current local time. So, a grid-square needs to ``remember'' the states of all agents at each of the local times of the contained agents. An agent cannot step forward until the rates of all its interactions are known.
+
+If an event is a whole binary encounter, then we have improved computational efficiency (more useful computation per event, no need to remember who we're talking with inbetween events, no need for high rate responses). However, if encounters are non-deterministic, given the full state of both agents, then we need to encode probabilistic consequences of an event (this could be encoded by simulation of the encounter). If agents are identifiable, an agent can have high rates of interaction with known others.
+
+In either case, a binary interaction has a primary and a secondary agent (i.e. an interaction is not symmetrical, one of the agents initiates the interaction, so an interaction of A and B is not necessarily the same as an interaction of B and A). It is also up to the initiator to set the rate of the interaction i.e. the rate of a binary interaction of A and B can depend on the complete state of A but only the public state of B.
+
+\subsection{Parallelism in spatial ABMs}
+
+Suppose we assign local times to grid-squares so that all agents within a gridsqure are at the same gridsquare local time. Each gridsquare is computed with at most one thread. We specify that it takes time $\Delta t$ for an agent to move from one gridsquare to another, during which time no other events may occur to the agent. So a gridsquare can calculate up to its ``frontier'' which is $\Delta t$ ahead of the earliest local time of its neighbouring squares. In this way we get a ``light cone'' constraint.
+
+Each gridsquare has a local time, $t$, a frontier time, $t_f$, a set of neighbours that this square is currently blocking and an ``incoming agent'' list. If $t=t_f$ we say the square is blocked. After an event is processed for a gridsquare, a ``next event'' is drawn for the interval $[t,t_f]$. If the set of Poisson processes contained in the gridsquare have rates $\rho_1...\rho_N$ and $R = \sum_i \rho_i$ then the probability that the next event occurs in the interval $[\tau, \tau+d\tau]$ from the current time is given by
+\[
+P_i(\tau)d\tau = Re^{-R\tau}d\tau
+\]
+
+So, draw a time offset $\tau$ from this exponential, if $t + \tau > t_f$ then the gridsquare becomes blocked on the earliest neighbour (randomly chosen if there are multiple earliest neighbours). Otherwise, $t \to t + \tau$, a process is chosen with probability $\frac{\rho_i}{R}$ and the event is added to a set of events to be processed.
+
+If the gridsquare's incoming-agent list is not empty and the next incoming agent is at time  $t < t' < t_f$ then we treat the interval $[t, t']$, add the agent if no intervening event occurs, otherwise process the event, and repeat.
+
+When a gridsquare's local-time is updated, any neighbours that are blocked on this one are notified of the new local time. When a blocked gridsquare receives an unblocking notification, it updates its frontier and draws an event as above, possibly blocking again and possibly sending further unblocking notifications.
+
+A simulation begins with all gridsquares at $t=0$ and all frontiers at $t_f=\Delta t$. Each gridsquare is drawn from to create the initial set of events to be processed, so that all squares are either blocked or have an event to be processed.
+
+If an agent moves from gridsquare $i$ to gridsquare $j$, then the agent is removed from $i$ and added to the destination gridsquare's incoming-agent list with timestamp $t_i + \Delta t$.
+
+\section{Computing over distributions}
+
+\subsection{Computing with non-local basis}
+
+
+
+\section{Computation for studying social norms}
+
+[What do we want to calculate? How should we use computation to do sociology?
+
+Existance proof that an observed social phenomenon does not require a given individual property. Proved by simulation of individuals that lack the given property yet robustly (i.e. not by luck/chance) demonstrate the given observed social behaviour.
+
+Calculation of posterior over individual behaviour given a prior and a set of social observations, in the form of timeseries or of properties of the attractor. Can be used to imply or engineer individual behaviour.
+
+Data assimilation, given individual behaviour and timeseries observation (or perhaps only prior over behaviour).
+
+Social engineering over social norms: Given a space of social norms, an individual behaviour (prior?) and an objective function, find a set of social norms that maximises the expectation of the objective function on the attractor [do societies ever reach the attractor? Can we expect all point on an attractor to have the same social norms (i.e. is it a point in social norm space)?]. 
+
+Stability analysis: Given a set of social norms, how stable is this set to deviant behaviour, subcultures, endogenous evolution, exogenous forcing?
+
+Engineering Revolution: Given a set of social norms, find the smallest (a small) perturbation, or set of small perturbations that leads to a new set of norms.
+
+]
+
+
+\subsection{Zero intelligence societies with social norms}
+
+Given a set of social norms, we can define the zero intelligence society as one where the majority of agents follow social norms, but act randomly to the extent of freedom within the norms. To this we can add a small percentage of deviant agents that break social norms to a greater or lesser degree.
+
+If we show that a zero intelligence society robustly exhibits a social observable, then we can have some confidence that this observable is a stable consequence of the norms.
 
 
 
