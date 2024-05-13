@@ -1,0 +1,46 @@
+\documentclass[a4paper]{article}
+%\documentclass[a4paper]{report}
+\usepackage{graphics}
+\usepackage{breqn}
+\setlength{\parindent}{0mm}
+\setlength{\parskip}{1.8mm}
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proof}{Proof}
+\title{On model reduction and equivalence}
+%%\date{$28^{th}$ August, 2007}
+\author{Daniel Tang}
+%%\linespread{1.3}
+
+\begin{document}
+\maketitle
+\section{Poisson models and Markov processes}
+
+Let a Poisson model be a dynamic system on some discrete state space such that the probability that the process will transition from state $x$ to state $x'$ in time $dt$ is given by $\rho('x|x)dt$. If we let $\rho_{ij}$ be a transition matrix such that
+\[
+\rho_{ij} = 
+\begin{cases}
+\rho(i|j) & \text{if } i \ne j\\
+\sum_{k \ne j} -\rho(k|j) & \text{if } i = j
+\end{cases}
+\]
+and let $X$ be a vector representing a probability distribution over the state space, then we can define the Poisson model as a continuous time dynamic system
+\[
+\frac{dX}{dt} = \rho X
+\]
+so that
+\[
+X(t) = e^{\rho t}X(0) = e^{(\mu - I)rt}X(0) = \sum_{k=0}^\infty \frac{ (rt)^k e^{-rt}}{k!}\mu^kX(0)
+\]
+where $r = \max_j \sum_{k \ne j} \rho(k|j)$ is a scalar and $\mu = \frac{\rho}{r} + I$. It can be seen that each entry of $\mu$ is non-negative and the sum of entries in each column is 1, so $\mu^k X(0)$ is the state of a discrete time Markov process at time $k$.
+
+So, each continuous-time Poisson model $\rho$ has an associated discrete-time Markov process $\mu = \frac{\rho}{r} + I$, and state of the Poisson model at time $t$ is the sum of states in a trajectory of the Markov process weighted by a Poisson distribution with rate $rt$.
+
+This means, among other things, that as $t \to \infty$ the state distribution of a Poisson model tends to the attractor of its associated Markov model. So every Poisson model tends to a steady state distribution.
+
+\section{Model reduction of Poisson models}
+
+
+
+
+\end{document}

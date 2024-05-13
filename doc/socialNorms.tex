@@ -28,14 +28,18 @@ We assume agents live within a Poisson ABM where each agent has a public and pri
 
 Given a set of social norms, we can define the zero intelligence society as one where the majority of agents follow social norms, but act randomly to the extent of freedom within the norms. To this we can add a small percentage of deviant agents that break social norms to a greater or lesser degree, acting randomly when deviant. Note that the zero inelligence agent requires no reward function.
 
-If we show that a zero intelligence society robustly exhibits a social observable, then we can have some confidence that this observable is a stable consequence of the norms. However, we can't show that the set of norms are themselves stable.
+If we show that a zero intelligence society robustly exhibits a social observable, then we can have some confidence that this observable is a stable consequence of the norms. However, we can't show that the set of norms are themselves stable or discoverable.
 
 \section{Selective copying}
-If agents are able to observe other's behaviour and have a propensity to copy it, we can define the social norm as the distribution of behaviour, given the context summed over the (perhaps time-weighted) history of all historical events. The context is defined as the smallest set such that any addition to the context makes no statistically significant difference. If this is encoded by an approximator, then the social norm is a probabilistic policy.
+If agents are able to observe other's behaviour (both unitary actions and binary interactions) and have a propensity to copy it, we can define the social norm as the distribution of behaviour given the context summed over the (perhaps time-weighted) history of all historical events. The context is defined as the smallest set such that any addition to the context makes no statistically significant difference to the distribution. In this way, then the social norm can be thought of as a probabilistic policy.
 
-If agents also learn a Q-function then they can choose to deviate from the norm based on the expected quality of each action (temptation).
+If agents also learn a Q-function then they can choose to deviate from the norm, or at least add a bias to the norm, based on the expected quality of each action (temptation). In practice, for a given context, an agent will likely have a small number of samples from the norm, so can decide which (if any) of these to copy given the Q value.
 
-If the mind has a bias towards copying more probable behaviours (beyond just drawing from the distribution), then the dynamics of such copying is to tend toward a delta functions in the space of behaviours. In this way roles may emerge from minds that have a propensity to copy.
+\subsection{Emergence of social norms from copying}
+
+Suppose there is a stochastic function $F(Z)$ which takes a ``zeitgeist'', $Z$, and returns a new zeitgeist so that we have a discrete-time dynamic system. Here $F(Z)$ represents the generation of an observed behaviour.  [in reality each agent has their own set of samples of (real and imagined) behaviours. $Z$ is an approximation of the posterior behaviour of other given all context. The nature of the approximation will affect the dynamics. The dynamics on Z is really a projection of the dynamics on an underlying ABM, ]
+
+If the mind has a bias towards copying more probable behaviours (i.e. probability of copying is greater than the probability of observing), then the dynamics of such copying is to tend toward a delta functions in the space of behaviours. In this way roles may emerge from minds that have a propensity to copy.
 
 [Do norms only apply to intra-dialogue behaviour, or are there norms on choosing which dialogues to enter into? If I am married and go to work, it would seem to be a social norm that I return home after work. So, norms (via roles) extend beyond dialogues and even dictate unitary action.]
 
