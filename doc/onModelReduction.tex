@@ -42,42 +42,31 @@ which we recognize as a sum of powers of $\mu$ weighted with a Poisson distribut
 
 This means, among other things, that as $t \to \infty$ the state distribution of a Poisson model tends to a uniform distribution over the attractor of its associated Markov model. So every Poisson model tends to a steady state distribution (i.e. a single point in distribution space).
 
-\section{Social frames}
+\section{Social norms and social agents}
 
-Suppose an agent knows it is in a Poisson model and has a set of observations of actions and interactions. The agent would like to set action rates given observations under the assumption that it is in a Poisson model (plus, likely, some additional assumptions). Algorithms for doing this can be rated against eachother by comparing their rewards under well defined conditions.
+Let a \textit{social role} be a tuple $\left<S, \sigma_0, A, Q\right>$ where $S$ is a domain of social states of the actor of which $\sigma_0$ is the default state given at the beginning of an episode, $A$ is a domain of social actions that can be performed by the actor and $Q$ is a social-quality function in $S \times A \to \mathcal{R}$. 
 
-Our hypothesis is that agents do this using social norms which consist of multiple, incommensurable ``social frames''. In each social frame the agent plays a different role in relation to a set of other agents. At any point in time an agent's social state is defined by the set of frames that agent is currently active in. When multiple agents share a frame and play their role the agents can exhibit a sequence of coordinated behaviour which we call a ``story''.
+Let a \textit{social norm} be defined as a tuple $\left<r_1, r_2, \tau \right>$ where $r_1$ and $r_2$ are social roles and $\tau$ is a state transition function in $S_1 \times A \times S_2 \to S_1 \times S_2$ saying that if two agents playing roles $r_1$ and $r_2$ are in states $s_1$ and $s_2$ respectively and agent 1 performs action $a$ on agent 2 then, after the action the agents have state $s'_1$ and $s'_2$ respectively.
 
-\subsection{What is a social frame?}
+Let a \textit{social connection} be a tuple $\left<N, s_1, s_2 \right>$ where $N$ is a social norm, $s_1$ is the social state of the first agent in $N$ and $s_2$ is the social state of the second.
 
-A social frame has a number of roles. When active, each role is assigned to an agent (or object, or may be an imaginary entity), and we say that the agent becomes a ``player'' in the frame (perhaps we also have ``out-group'' role which can be played by any agent that isn't playing any other role in the abstraction). Each role comes with a state space and a set of social actions that may be performed on the role player. However, a social action is distinct from a physical action, so each social action comes with
-\begin{enumerate}
-	\item an abstraction function that allows agents to recognize sets of physical actions as social actions within the abstraction
-	\item a concretization function that allows agents to perform social actions	
-\end{enumerate}
+Let a \textit{social network} be a directed graph, where each edge is associated with a social connection. So, each agent in a social network can be thought of as being in a number of social states (one for each edge) and each social state comes with a constraint on behaviour in the form of the social Q-functions.
 
-Each role also has a model defining state change as a result of social action, and a function from state to set of socially acceptable social actions (and perhaps explicitly forbidden social actions?). If an agent performs a physical action that can't be classified as a social action within the frame then the whole story breaks down.
+Let a \textit{social agent} be an agent who models their world as a social network in which they are one of the agents. The agent uses their own social state as a guide on how to behave and other's social states to help them predict other's behaviour when deciding how to behave. 
 
-So, a social frame is a Poisson ABM with a small number of agents with small state spaces, social actions and SocialQ-value state-action functions, and abstraction/concretisation functions between social action and physical action [is this necessary, or does each physical action have a (possibly null) meaning within the abstraction? Abstracted actions add heirarchical structure to actions, thereby making complex action easier (for example, me giving you a file which is currently on my USB stick may invilve a complex sequence of actions that may involve dealing with contingencies and entering into sub-interactions with you)]. If the agents in an abstraction have reward functions then the abstraction can be compared to the real reward functions of the players. If agents can berate/praise each other, and do it according to the social frame, and care about being berated/praised, the social frame becomes self-fulfilling.
+Agents in a social network need not, and often do not, physically exist. God, the government and Microsoft do not exist but many people model them as agents to which they have social connections, and these connections can be instrumental in the coordination of behaviour between physically existant agents.
 
-\subsection{Fiat belief}
+In many situations, we're only interested in the social actions that each agent performs, so we can model a set of agents as interacting via social actions. In reality, these social actions are grounded in physical actions and if we're interested in the details of this, then each social action must come with an extension which is a set of sequences of physical actions that qualify as this social action. The agent must then choose a physical action in consideration of the social interpretations of that action. In general, the physical substrate of the agent's social world adds additional constraints to the sequence of social actions it may perform.
 
-So, we can distinguish between physical and social belief, and physical and social state. Physical belief is a belief that the world is in some abstract state, and as such can be refuted by evidence. Social belief, on the other hand, concerns the state of an agent within a social frame and is neither true nor false but is an expression that one agent considers another agent as a player in a social frame. For example, if I say that you owe me £100, then I'm not saying something about your physical state in the way that I would be if I said that you had cancer. Instead, I am expressing an attitude towards you: I consider you to be a player in the lend/return social frame and you are in the state of oweing me £100. An agent can and will have attitudes towards herself. Alice can, of course, believe that she owes Bob £100.
+Modelling at the physical level also allows agents to perform actions that have multiple interpretations, so a single physical action or sequence of actions can qualify as mamy social actions. It is also possible for a physical action to be unclassifiable as a social action yet state changing in the social norm (e.g. I sit down at a restaurant, the waiter brings me the menu, i set fire to it). In this case the norm is considered null and new norms need to be negotiated.
 
-So, the state of a social situation can be defined as the social attitudes each agent has towards others. The attitudes Alice has towards Bob strongly constrains the way Alice behaves towards him.
-
-So, my social attitude towards you means that I will model your behaviour and interpret your actions within the frame of that attitude. A social attitude towards self gives us a model of how to behave. This is the true currency of social interaction. [Can all social situations be reduced to binary attitudes? Do we tend to reduce attitudes to social attributes (i.e. that the attribute inheres in the agent, rather than is an attitude towards an agent)?]
-
-This explains how we can deal with imaginary entities (like God, Microsoft or the government). If a number of agents have attitudes towards an imaginary entity, and social actions on that entity are abstracted away from any physical actions on the entity, then there is no need for the entity to have any physical existance, yet the attitudes towards it can be instrumental in collective behaviour among real agents.
-
-
-\section{How do agents learn social frames?}
+\section{How do agents learn social norms?}
 
 Language, telling stories. By accidentally breaking social norms.
 
-Can we learn social frames without language?
+Can we learn social norms without language?
 
-[how do agents negotiate roles to initiate a story?]
+\section{how do agents negotiate roles to form new social connections?}
 Context. Verbally.
 
 \end{document}
