@@ -7,7 +7,7 @@
 \newtheorem{definition}{Definition}
 \newtheorem{theorem}{Theorem}
 \newtheorem{proof}{Proof}
-\title{On model reduction and equivalence}
+\title{On model reduction and equivalence in ABMs}
 %%\date{$28^{th}$ August, 2007}
 \author{Daniel Tang}
 %%\linespread{1.3}
@@ -52,21 +52,48 @@ Let a \textit{social connection} be a tuple $\left<N, s_1, s_2 \right>$ where $N
 
 Let a \textit{social network} be a directed graph, where each edge is associated with a social connection. So, each agent in a social network can be thought of as being in a number of social states (one for each edge) and each social state comes with a constraint on behaviour in the form of the social Q-functions.
 
-Let a \textit{social agent} be an agent who models their world as a social network in which they are one of the agents. The agent uses their own social state as a guide on how to behave and other's social states to help them predict other's behaviour when deciding how to behave. 
+Let a \textit{social agent} be a node in a social network. The agent's internal state is the set of social states on its edges. The agent's behaviour towards each agent it has a social connection with is constrained by the Q-function associted with that connection.
 
-Agents in a social network need not, and often do not, physically exist. God, the government and Microsoft do not exist but many people model them as agents to which they have social connections, and these connections can be instrumental in the coordination of behaviour between physically existant agents.
+Agents in a social network need not, and often do not, physically exist. God, the government and Microsoft do not exist but many people model them as agents to which they have social connections. There raises no difficulty as long as the physical meaning of social actions involving the non-existant agent don't require its physical presence, and there's no reason it should need to. These actions can be instrumental in the coordination of behaviour between physically existant agents. I can be employed by, or sue Microsoft without ever expecting to meet face to face.
+
+\subsection{Social network as closure}
+
+If an agent models its world and assumes every other agent models the world in the same way, then evey agent in the model contains an instance of the model and we have an infinite regression, so we need some kind of closure.
+
+If we assume that the state of the social network is public knowlede, through observation, gossip etc. (where X is public knowledge if everyone knows X and it's public knowlege that everyone knows X) then, under discounting, agents can model their world as consisting of agents that act according to the public knowledge. For example, agents can use the social norm as the off-tree approximator and run Monte-Carlo tree search to account for potential breaking of the social norm. In this way, agents are able to come to the same equilibrium.
+
+
+
+\subsection{Social network as abstraction}
 
 In many situations, we're only interested in the social actions that each agent performs, so we can model a set of agents as interacting via social actions. In reality, these social actions are grounded in physical actions and if we're interested in the details of this, then each social action must come with an extension which is a set of sequences of physical actions that qualify as this social action. The agent must then choose a physical action in consideration of the social interpretations of that action. In general, the physical substrate of the agent's social world adds additional constraints to the sequence of social actions it may perform.
 
-Modelling at the physical level also allows agents to perform actions that have multiple interpretations, so a single physical action or sequence of actions can qualify as mamy social actions. It is also possible for a physical action to be unclassifiable as a social action yet state changing in the social norm (e.g. I sit down at a restaurant, the waiter brings me the menu, i set fire to it). In this case the norm is considered null and new norms need to be negotiated.
+Modelling at the physical level also allows agents to perform actions that have multiple social meanings, so a single physical action or sequence of actions can perform mamy social actions. It is also possible for a physical action to be unclassifiable as a social action yet state changing in the social norm (e.g. I sit down at a restaurant, the waiter brings me the menu, i set fire to it). In this case the norm is considered null and new norms need to be negotiated.
 
 \section{How do agents learn social norms?}
 
-Language, telling stories. By accidentally breaking social norms.
 
-Can we learn social norms without language?
+[Language, telling stories. By accidentally breaking social norms and being told off. It seems implausible that we learn social norms only through personal experience and direct observation: I haven't learned not to murder people by murdering a few and finding that it wasn't really worth it, nor even by whatching people murder others and imagining that it isn't worth it. Rather, I learn it on the social level, as part of the culture in which I live.]
+
+A learner of social norms that only has access to observed physical behaviours must somehow learn the abstraction function, the social quality function and the transition function. If thrown into a world where a social norm is already prevalent and stable, and we assume people are guided by social norms, then all this can theoretically be done by minimising the error in predicting other's behaviours.
+
+Alternatively, can can abstract over the physical and assume agents make observations at the social level of abstraction. This glosses over the learning of the abstraction function, which we learn from gossip etc. and focusses on the social dynamics. If agents are able to make social observations of their surroundings and their interactions then an agent can construct a probabilistic policy for each social norm (or if the norm type is itself negotiated, and we have a universal state and action space, then this can be a single policy...although it's hard to see the advantage of this compared to stratification by norm).
+
 
 \section{how do agents negotiate roles to form new social connections?}
 Context. Verbally.
+
+Again, we can abstract over the physical details of this and assume there is a public vocabulary of norms, and connections have an associated social norm type-id.
+
+\section{How do social norms evolve?}
+
+If agents choose to create social connections at a rate proportional to their expected reward then some social norms will be popular and others not. Ultimately, some may die out.
+
+New norms can be created by more or less intelligent mutation of existing norms (perhaps even unintentional misunderstandings or chance events), or specialisation of general-purpose norms: [this assumes there's a heirarchy of abstraction among norms, which we haven't talked about yet...] for example, hunting large game and sharing the meat may emerge as a specialisation of you-help-me-and-i'll-help-you norm...?
+
+\subsection{Punishment and praise in social norms}
+
+In a purely Q-learning environment, punishment and praise after the fact is ineffective in one-shot games. However, if a social norm consists of a whole policy, and is agreed upon at the beginning of an interaction, then a credible threat of contingent punishment and/or praise can be instrumental in making the policy a Nash equilibrium.
+
 
 \end{document}
