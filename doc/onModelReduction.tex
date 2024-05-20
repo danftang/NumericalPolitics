@@ -91,9 +91,24 @@ If agents choose to create social connections at a rate proportional to their ex
 
 New norms can be created by more or less intelligent mutation of existing norms (perhaps even unintentional misunderstandings or chance events), or specialisation of general-purpose norms: [this assumes there's a heirarchy of abstraction among norms, which we haven't talked about yet...] for example, hunting large game and sharing the meat may emerge as a specialisation of you-help-me-and-i'll-help-you norm...?
 
-\subsection{Punishment and praise in social norms}
+\subsection{Social judgement in social norms}
 
 In a purely Q-learning environment, punishment and praise after the fact is ineffective in one-shot games. However, if a social norm consists of a whole policy, and is agreed upon at the beginning of an interaction, then a credible threat of contingent punishment and/or praise can be instrumental in making the policy a Nash equilibrium.
+
+Perhaps social judgement goes two ways: it rewards the actor for socially beneficial behaviour, but also signals to everyone which behaviours should be copied and which avoided. This makes sense if social judgement is outcome based and/or defined on an abstract level. That is, the ability to make social judements allows everyone to easily see whether a given behaviour is good or bad, but it is more difficult to generate instances of behaviours that are good.
+
+\subsection{Justice}
+
+It's clear that concepts such as justice are largely shared and preceed law (i.e. are more than a respect for the rule of law). It's also clear that humans don't define justice in terms of reward, but rather in terms of some kind of social value (Has justice been done if I give you two camels for your daughter?).
+
+Moreover, a potential new social norm could conceivably conflict with other social norms (even though they have different state spaces), and so a new social behaviour cannot become established as a norm if it conflicts with already established norms. This implies that there is much more structure to social norms than we have allowed so far. What exactly is this structure, is it essential and how do we represent it?
+
+Justice isn't a social norm as we've defined it so far in that it doesn't seem to have an action space. It is more a property of a story (sequence of interactions between a set of agents). Unless it is a formula for how to take an unjust story and ``serve justice'' to transoform it into a just story.
+
+\section{Generative abstraction}
+
+To capture this, we propose \textit{generative abstraction} (which is something like the inverse of a formal semantics of natural language: while a semantics goes from a sentence to an extension, an abstraction goes from a set of observations to a representation. The abstraction is generative in the sense that the representation space grows exponentially with the size of the concept space).
+
 
 
 \end{document}

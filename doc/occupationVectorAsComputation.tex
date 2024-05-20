@@ -8,7 +8,7 @@
 \newtheorem{definition}{Definition}
 \newtheorem{theorem}{Theorem}
 \newtheorem{proof}{Proof}
-\title{Computation as a Poisson events on occupation numbers}
+\title{Modelling interacting Poisson agents}
 %%\date{$28^{th}$ August, 2007}
 \author{Daniel Tang}
 %%\linespread{1.3}
@@ -18,45 +18,101 @@
 \maketitle
 %%\tableofcontents
 
-Let $V$ be an $A$-dimensional vector of integers. Each element index represents a possible state of an agent and the integer value at that index represents the number of agents in that state. We'll call this an occupation vector. We define a transition rate, $\rho$, so that $\rho(V'|V)dt$ is the probability that a vector $V$ will transition to state $V'$ in time $dt$, so we have a Markov model with Poisson dynamics over the domain of occupation vectors.
+Let $\mathcal{A}$ be the domain of agent states, and let an \textit{occupation vector}, $V$, be an $|\mathcal{A}|$-dimensional vector of integers so that The index of each element represents a state of an agent and the integer value at that index represents the number of agents in that state.
 
-We assume that each transition in the Markov model is either a single agent responding to its own state, irrespective of the other agents around it, or is an interaction between two agents. So, the behaviour all agents can defined by two agent-based action rates:
+We define a Poisson agent as an agent whose state transition probability at any time can be expressed as a set of Poisson processes with rates $\rho_1..\rho_n$ so that in infinitesimal time $dt$ the probability of a transition due to the $i^{th}$ process is $\rho_i dt$. Furthermore, we assume that the processes can be expressed by the following two rate functions:
 \begin{enumerate}
 	\item $\rho_\psi(\Delta V)$ which is the rate at which an agent in state $\psi$ will perform an action that results in a perturbation in occupation vector of $\Delta V$ (i.e. $V' = V + \Delta V$) and
 	\item $\rho_{\psi\phi}(\Delta V)$ which is the rate at which an agent in state $\psi$ will interact with an agent in state $\phi$ to produce a perturbation of $\Delta V$. 
 \end{enumerate}
 
-So, the total rate of transition 
+
+we also assume that all rates are non-negative and an agent can only be removed from the model by itself, so $\rho_\psi(\Delta V)$ can only be non-zero if all elements of $\Delta V + 1_\psi$ are non-negative, similarly $\rho_{\psi\phi}(\Delta V)$ can only be non-zero if all elements of $\Delta V + 1_\psi + 1_\phi$ are non-negative (where $1_\xi$ is the vector whose $\xi^{th}$ element is one, and all other elements zero).
+
+Given the rates of an agent's processes, we can define the Poisson rates of transition, $\rho$, between occupation vectors in a model containing multiple agents, so that $\rho(V'|V)dt$ is the probability that a vector $V$ will transition to state $V'$ in time $dt$. So we have a Markov model over the domain of occupation vectors whose state changes are Poisson processes whise rates are given by 
 \begin{equation}
-\rho(V + \Delta V|V) = \sum_{\psi}  \rho_\psi(\Delta V) V_\psi + \sum_{\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma(V_\psi,V_\phi)
+\rho(V + \Delta V|V) = \sum_{\psi}  \rho_\psi(\Delta V) \gamma_1(V_\psi) + \sum_{\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma_1(V_\psi)\gamma_2(V_\phi)
 \label{rateEq}
 \end{equation}
-where $\gamma(n,m)$ gives the ``aggregation rate'', for now we consider only $\gamma(n,m) = nm$ or $\gamma(n,m) = n(m>0)$.
+where $V_\psi$ is the value of $\psi^{th}$ element of $V$, $\gamma_1(n)$ models how an agent's rate is affected by other agents in the same state, $\gamma_2(m)$ models how an agent's rate is affected when in the presence of multiple other agents in the same state. For now we consider only $\gamma_i(n) = n$ (interaction is like a chemical reaction. We'll take this to be the default behaviour if not otherwise stated), $\gamma_1(n) = (n>0)$ (agents only care about the presence or absence of other agents, and multiplicity doesn't affect the rate) or $\gamma_i(n) = \min(n,n_{\text{max}})$. Note that $\gamma_i(0) = 0$ and $\gamma_i(1) = 1$ for any valid definition.
 
 Given this, we can consider probability distributions over the domain of occupation vectors. The transition rates define a rate of change of a probability distribution,
 \begin{equation}
-\frac{d\Phi(V)}{dt} = \sum_{V'} \rho(V|V')\Phi(V') - \rho(V'|V)\Phi(V)
+\frac{d\Phi(V)}{dt} = \sum_{U} \rho(V|U)\Phi(U) - \sum_W \rho(W|V)\Phi(V)
 \label{changeEq}
 \end{equation}
-In this way we translate the agent based model into a dynamic system whose state space is the probability distributions over the domain of occupation vectors. [is it true that all attractors are point attractors in this space? Does it matter?]
+In this way we can translate the agent based model into a dynamic system whose state space is the probability distributions over the domain of occupation vectors.
 
-Substituting \ref{rateEq} into \ref{changeEq} and assuming $\gamma(n,m) = nm$
+If we consider $\Phi$ to be a vector with an element for each occupation vector, and define $\rho$ to be a matrix such that
+\[
+\rho_{VU} = 
+\begin{cases}
+	\rho(V|U) & \text{if } U \ne V\\
+	\sum_{W} -\rho(W|V) & \text{if } U = V
+\end{cases}
+\] 
+then equation \ref{changeEq} can be expressed as the matrix equation
+\begin{equation}
+	\frac{d\Phi}{dt} = \rho\Phi
+	\label{expChangeEq}
+\end{equation}
+
+so that
+\[
+\Phi(t) = e^{\rho t}\Phi(0) = e^{(\mu - I)rt}\Phi(0) = e^{-rt}e^{\mu rt}\Phi(0)
+\]
+where $r = \max_V -\rho_{VV}$ is a scalar and $\mu = \frac{\rho}{r} + I$ and the last step is valid since $\mu$ commutes with $I$.
+
+Expanding the exponential in $\mu$ gives
+\[
+\Phi(t)  = \sum_{k=0}^\infty \frac{ (rt)^k e^{-rt}}{k!}\mu^k\Phi(0)
+\]
+which we recognize as a sum of powers of $\mu$ weighted with a Poisson distribution. However, since each entry of $\mu$ is non-negative and the sum of entries in each column is 1, $\mu^k \Phi(0)$ is the state of a discrete time Markov process after $k$ steps. So, each continuous-time Poisson model $\rho$ has an associated discrete-time Markov process $\mu = \frac{\rho}{r} + I$ such that the state of the Poisson model at time $t$ is the weighted sum of states in a trajectory of the Markov process, where the weights are given by a Poisson distribution with rate $rt$.
+
+This means, among other things, that if the Markov model has an attractor then as $t \to \infty$ the state distribution of the corresponding Poisson model tends to an equilibrium distribution, and that distribution is the uniform probability over the attractor of its Markov model. So every Poisson model tends to a steady state distribution (i.e. a single point in distribution space).
+
+The occupation vectors can be thought of as points in an $|\mathcal{A}|$-dimensional space, and $\Phi$ can be thought of as a probability field over an $A$-dimensional grid on the non-negtive integer coordinate points in this space. With this in mind, we can re-express the multiplication by $\mu$ in terms of a convolution.
+\[
+\mu\Phi = \left(\frac{\rho}{r} + I\right)\Phi = \frac{1}{r} \rho\Phi + \Phi
+\]
+but
+\begin{dmath}
+\rho\Phi = 
+\sum_{V'}\left(
+\sum_{\psi}  \rho_\psi(V-V') \gamma_1(V'_\psi)
++ \sum_{\psi,\phi}  \rho_{\psi\phi}(V'-V) \gamma_1(V'_{\psi})\gamma_2(V'_{\phi})
+\right)\Phi(V') 
+-
+\left(
+\sum_{\Delta V,\psi}  \rho_\psi(\Delta V) \gamma_1(V_\psi) 
++ \sum_{\Delta V,\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma_1(V_\psi) \gamma_2(V_\phi)
+\right)
+\Phi(V)
+\end{dmath}
+---------------
+
+Substituting \ref{rateEq} into \ref{changeEq} gives
 \begin{dmath}
 \frac{d\Phi(V)}{dt} = 
 \sum_{V'}\left(
-\sum_{\psi}  \rho_\psi(V-V') V'_\psi
- + \sum_{\psi,\phi}  \rho_{\psi\phi}(V'-V) V'_{\psi}V'_{\phi}
+\sum_{\psi}  \rho_\psi(V-V') \gamma_1(V'_\psi)
+ + \sum_{\psi,\phi}  \rho_{\psi\phi}(V'-V) \gamma_1(V'_{\psi})\gamma_2(V'_{\phi})
  \right)\Phi(V') 
 -
 \left(
-\sum_{\Delta V,\psi}  \rho_\psi(\Delta V) V_\psi 
-+ \sum_{\Delta V,\psi,\phi}  \rho_{\psi\phi}(\Delta V) V_\psi V_\phi
+\sum_{\Delta V,\psi}  \rho_\psi(\Delta V) \gamma_1(V_\psi) 
++ \sum_{\Delta V,\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma_1(V_\psi) \gamma_2(V_\phi)
 \right)
 \Phi(V)
 \label{expandedchangeEq}
 \end{dmath}
 
-The occupation vectors can be thought of as points in an $A$-dimensional space, and $\Phi$ can be thought of as a probability field over an $A$-dimensional grid on the non-negtive integer coordinate points. With this in mind, we can simplify equation \ref{expandedchangeEq} by expressing the terms as convolutions. Let the ``transition kernel'' be
+---------------
+
+
+------------------------------
+
+simplify equation \ref{expandedchangeEq} by expressing the terms as convolutions. Let the ``transition kernels'' be
 \[
 \tau_\psi(\Delta V) = 
 \begin{cases}
@@ -72,22 +128,30 @@ and
 	\sum_{\Delta V'} -\rho_{\psi\phi}(\Delta V') & \text{if } \Delta V = 0
 \end{cases}
 \]
-and letting $n_\psi(V) = V_\psi$ so that the sums over $V'$ and $\Delta V$ become convolutions
+and let $n_{i\psi}$ denote an A-dimensional field such that $n_{i\psi}(V) = \gamma_i(V_\psi)$ so that the sums over $V'$ and $\Delta V$ become convolutions
 \begin{equation}
 \frac{d\Phi}{dt} = 
-\sum_{\psi}\tau_\psi \ast n_\psi\Phi
-+ \sum_{\psi,\phi}  \tau_{\psi\phi} \ast n_{\phi}n_{\psi}\Phi
+\sum_{\psi}\tau_\psi \ast n_{1\psi}\Phi
++ \sum_{\psi,\phi}  \tau_{\psi\phi} \ast n_{1\psi}n_{2\phi}\Phi
 \end{equation}
+where multiplication of fields is to be interpreted as being pointwise.
 
 We can calculate higher order rates of change, since $\Phi$ is the only term with time dependency we have 
 \begin{equation}
 	\frac{d^{n+1}\Phi}{dt^{n+1}} = 
-	\sum_{\psi}\tau_\psi \ast n_\psi \frac{d^n\Phi}{dt^n}
-	+ \sum_{\psi,\phi}  \tau_{\psi\phi} \ast n_{\phi}n_{\psi} \frac{d^n\Phi}{dt^n}
+	\sum_{\psi}\tau_\psi \ast n_{1\psi} \frac{d^n\Phi}{dt^n}
+	+ \sum_{\psi,\phi}  \tau_{\psi\phi} \ast n_{1\psi}n_{2\phi} \frac{d^n\Phi}{dt^n}
 \end{equation}
 
+-------------------------------------
 
-Now assume we have occupation matrices. The row gives the "interaction state" and the column gives the "agent type". Only agents in the same interaction state can interact.
+\section{Public states and Interaction states}
+
+We can distinguish between different classes of interaction rate function $\rho_{\psi\phi}$ in order to understand how the properties of this function affect the ABMs dynamics, and also to make computationally efficient algorithms.
+
+It may be possible to split the state of an agent into public and private states, $\psi = \left<\psi_u, \psi_l\right>$ so that the interaction rate depends only on the public state of the other agent $\rho_{\psi\left<\phi_u,\phi_l\right>} = \rho'_{\psi\phi_u}$, thereby reducing the dimensionality. Occupation vectors can then be represented as matrices where the row gives the public state and the column gives the private state.
+
+A speical case of this is when only agents with the same public state can interact. In this case, we call the public state an ``interaction state''.
 
 \section{Simulating}
 
