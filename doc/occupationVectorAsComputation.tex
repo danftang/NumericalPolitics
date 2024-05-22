@@ -18,12 +18,15 @@
 \maketitle
 %%\tableofcontents
 
+\section{Poisson models and Markov models}
+
 Let $\mathcal{A}$ be the domain of agent states, and let an \textit{occupation vector}, $V$, be an $|\mathcal{A}|$-dimensional vector of integers so that The index of each element represents a state of an agent and the integer value at that index represents the number of agents in that state.
 
 We define a Poisson agent as an agent whose state transition probability at any time can be expressed as a set of Poisson processes with rates $\rho_1..\rho_n$ so that in infinitesimal time $dt$ the probability of a transition due to the $i^{th}$ process is $\rho_i dt$. Furthermore, we assume that the processes can be expressed by the following two rate functions:
 \begin{enumerate}
 	\item $\rho_\psi(\Delta V)$ which is the rate at which an agent in state $\psi$ will perform an action that results in a perturbation in occupation vector of $\Delta V$ (i.e. $V' = V + \Delta V$) and
-	\item $\rho_{\psi\phi}(\Delta V)$ which is the rate at which an agent in state $\psi$ will interact with an agent in state $\phi$ to produce a perturbation of $\Delta V$. 
+	
+	\item $\rho_{\psi\phi}(\Delta V)$ which is the rate at which an agent in state $\psi$ will interact with an agent in state $\phi$ to produce a perturbation of $\Delta V$. If $\psi = \phi$ (i.e. it is an interaction with agents in the same state) then we allow interaction with self. If this is not intended, then the rate $\rho_\psi$ can be adjusted accordingly (with the consequence that we can have negative $\rho_\psi$ but not negative total rate).
 \end{enumerate}
 
 
@@ -31,7 +34,7 @@ we also assume that all rates are non-negative and an agent can only be removed 
 
 Given the rates of an agent's processes, we can define the Poisson rates of transition, $\rho$, between occupation vectors in a model containing multiple agents, so that $\rho(V'|V)dt$ is the probability that a vector $V$ will transition to state $V'$ in time $dt$. So we have a Markov model over the domain of occupation vectors whose state changes are Poisson processes whise rates are given by 
 \begin{equation}
-\rho(V + \Delta V|V) = \sum_{\psi}  \rho_\psi(\Delta V) \gamma_1(V_\psi) + \sum_{\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma_1(V_\psi)\gamma_2(V_\phi)
+\rho(W|V) = \sum_{\psi}  \rho_\psi(W-V) \gamma_1(V_\psi) + \sum_{\psi,\phi}  \rho_{\psi\phi}(W-V) \gamma_1(V_\psi)\gamma_2(V_\phi)
 \label{rateEq}
 \end{equation}
 where $V_\psi$ is the value of $\psi^{th}$ element of $V$, $\gamma_1(n)$ models how an agent's rate is affected by other agents in the same state, $\gamma_2(m)$ models how an agent's rate is affected when in the presence of multiple other agents in the same state. For now we consider only $\gamma_i(n) = n$ (interaction is like a chemical reaction. We'll take this to be the default behaviour if not otherwise stated), $\gamma_1(n) = (n>0)$ (agents only care about the presence or absence of other agents, and multiplicity doesn't affect the rate) or $\gamma_i(n) = \min(n,n_{\text{max}})$. Note that $\gamma_i(0) = 0$ and $\gamma_i(1) = 1$ for any valid definition.
@@ -43,14 +46,15 @@ Given this, we can consider probability distributions over the domain of occupat
 \end{equation}
 In this way we can translate the agent based model into a dynamic system whose state space is the probability distributions over the domain of occupation vectors.
 
-If we consider $\Phi$ to be a vector with an element for each occupation vector, and define $\rho$ to be a matrix such that
-\[
+If we consider $\Phi$ to be a vector with an element for each occupation vector, and define $\rho$ to be a matrix\footnote{We implicitly suppose there is a ``flattening'' of the occupation vectors onto the integers to give row and column indices. However, we also implicitly suppose that the semantics of indices reproduces the semantics of the occupation vectors, so that in effect we can consider indices as having a dual life as integers and occupation vectors. In this spirit, we can think of vectors as also being fields over the non-negative gridpoints in an $|\mathcal{A}|$-dimensional space and matrices as also being functions of gridpoint pairs.} such that
+\begin{equation}
 \rho_{VU} = 
 \begin{cases}
 	\rho(V|U) & \text{if } U \ne V\\
 	\sum_{W} -\rho(W|V) & \text{if } U = V
 \end{cases}
-\] 
+\label{rhoMatrixEq}
+\end{equation}
 then equation \ref{changeEq} can be expressed as the matrix equation
 \begin{equation}
 	\frac{d\Phi}{dt} = \rho\Phi
@@ -67,83 +71,121 @@ Expanding the exponential in $\mu$ gives
 \[
 \Phi(t)  = \sum_{k=0}^\infty \frac{ (rt)^k e^{-rt}}{k!}\mu^k\Phi(0)
 \]
-which we recognize as a sum of powers of $\mu$ weighted with a Poisson distribution. However, since each entry of $\mu$ is non-negative and the sum of entries in each column is 1, $\mu^k \Phi(0)$ is the state of a discrete time Markov process after $k$ steps. So, each continuous-time Poisson model $\rho$ has an associated discrete-time Markov process $\mu = \frac{\rho}{r} + I$ such that the state of the Poisson model at time $t$ is the weighted sum of states in a trajectory of the Markov process, where the weights are given by a Poisson distribution with rate $rt$.
+which we can recognize as a sum of powers of $\mu$ weighted with a Poisson distribution. However, since each entry of $\mu$ is non-negative and the sum of entries in each column is 1, $\mu^k \Phi(0)$ can be thought of as the state of a discrete time Markov process after $k$ steps. So, each continuous-time Poisson model $\rho$ has an associated discrete-time Markov process $\mu = \frac{\rho}{r} + I$ such that the state of the Poisson model at time $t$ is the weighted sum of states in a trajectory of the Markov process, where the weights are given by a Poisson distribution with rate $rt$.
 
 This means, among other things, that if the Markov model has an attractor then as $t \to \infty$ the state distribution of the corresponding Poisson model tends to an equilibrium distribution, and that distribution is the uniform probability over the attractor of its Markov model. So every Poisson model tends to a steady state distribution (i.e. a single point in distribution space).
 
-The occupation vectors can be thought of as points in an $|\mathcal{A}|$-dimensional space, and $\Phi$ can be thought of as a probability field over an $A$-dimensional grid on the non-negtive integer coordinate points in this space. With this in mind, we can re-express the multiplication by $\mu$ in terms of a convolution.
-\[
-\mu\Phi = \left(\frac{\rho}{r} + I\right)\Phi = \frac{1}{r} \rho\Phi + \Phi
-\]
-but
+The occupation vectors can be thought of as points in an $|\mathcal{A}|$-dimensional space, which makes $\Phi$ a probability field over an $|\mathcal{A}|$-dimensional grid on the non-negtive integer coordinate points in this space. With this in mind, we can re-express the multiplication by $\mu$ in terms of a convolution.
+
+\subsection{Markov step as convolution}
+
+We can expand $\rho\Phi$ using equations \ref{rateEq} and \ref{rhoMatrixEq} 
 \begin{dmath}
-\rho\Phi = 
-\sum_{V'}\left(
-\sum_{\psi}  \rho_\psi(V-V') \gamma_1(V'_\psi)
-+ \sum_{\psi,\phi}  \rho_{\psi\phi}(V'-V) \gamma_1(V'_{\psi})\gamma_2(V'_{\phi})
-\right)\Phi(V') 
--
-\left(
-\sum_{\Delta V,\psi}  \rho_\psi(\Delta V) \gamma_1(V_\psi) 
-+ \sum_{\Delta V,\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma_1(V_\psi) \gamma_2(V_\phi)
-\right)
-\Phi(V)
+	(\rho\Phi)_V = 
+	\sum_{V'}\left(
+	\sum_{\psi}  \rho_\psi(V-V') \gamma_1(V'_\psi)
+	+ \sum_{\psi,\phi}  \rho_{\psi\phi}(V'-V) \gamma_1(V'_{\psi})\gamma_2(V'_{\phi})
+	\right)\Phi_{V'} 
+	-
+	\left(
+	\sum_{\Delta V,\psi}  \rho_\psi(\Delta V) \gamma_1(V_\psi) 
+	+ \sum_{\Delta V,\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma_1(V_\psi) \gamma_2(V_\phi)
+	\right)
+	\Phi_V
 \end{dmath}
----------------
-
-Substituting \ref{rateEq} into \ref{changeEq} gives
-\begin{dmath}
-\frac{d\Phi(V)}{dt} = 
-\sum_{V'}\left(
-\sum_{\psi}  \rho_\psi(V-V') \gamma_1(V'_\psi)
- + \sum_{\psi,\phi}  \rho_{\psi\phi}(V'-V) \gamma_1(V'_{\psi})\gamma_2(V'_{\phi})
- \right)\Phi(V') 
--
-\left(
-\sum_{\Delta V,\psi}  \rho_\psi(\Delta V) \gamma_1(V_\psi) 
-+ \sum_{\Delta V,\psi,\phi}  \rho_{\psi\phi}(\Delta V) \gamma_1(V_\psi) \gamma_2(V_\phi)
-\right)
-\Phi(V)
-\label{expandedchangeEq}
-\end{dmath}
-
----------------
-
-
-------------------------------
-
-simplify equation \ref{expandedchangeEq} by expressing the terms as convolutions. Let the ``transition kernels'' be
+so, if we let the ``transition kernels'' be fields over the occupation vectors
 \[
-\tau_\psi(\Delta V) = 
+\tau^{\psi\phi}_{\Delta V} = 
 \begin{cases}
-	\rho_\psi(\Delta V) & \text{if } \Delta V \ne 0\\
-	\sum_{\Delta V'} -\rho_\psi(\Delta V') & \text{if } \Delta V = 0
+	\rho_{\psi\phi}(\Delta V) & \text{if } \Delta V \ne \vec{0}\\
+	-\sum_{\Delta V'} \rho_{\psi\phi}(\Delta V') & \text{if } \Delta V = \vec{0}
 \end{cases}
 \]
 and
 \[
-\tau_{\psi\phi}(\Delta V) = 
+\tau^\psi_{\Delta V} = 
 \begin{cases}
-	\rho_{\psi\phi}(\Delta V) & \text{if } \Delta V \ne 0\\
-	\sum_{\Delta V'} -\rho_{\psi\phi}(\Delta V') & \text{if } \Delta V = 0
+	\rho_\psi(\Delta V) & \text{if } \Delta V \ne \vec{0}\\
+	-\sum_{\Delta V'} \rho_\psi(\Delta V') & \text{if } \Delta V = \vec{0}
 \end{cases}
 \]
-and let $n_{i\psi}$ denote an A-dimensional field such that $n_{i\psi}(V) = \gamma_i(V_\psi)$ so that the sums over $V'$ and $\Delta V$ become convolutions
+then we can write
+\begin{dmath}
+	(\rho\Phi)_V = 
+	\sum_{V'}\left(
+	\sum_{\psi}  \tau^\psi_{(V-V')} \gamma_1(V'_\psi)
+	+ \sum_{\psi,\phi}  \tau^{\psi\phi}_{(V'-V)} \gamma_1(V'_{\psi})\gamma_2(V'_{\phi})
+	\right)\Phi_{V'} 
+\end{dmath}
+
+Now let $n_{i\psi}$ denote an $|\mathcal{A}|$-dimensional field such that $n_{i\psi}(V) = \gamma_i(V_\psi)$ so that the sums over $V'$ become $|\mathcal{A}|$-dimensional convolutions
 \begin{equation}
-\frac{d\Phi}{dt} = 
-\sum_{\psi}\tau_\psi \ast n_{1\psi}\Phi
-+ \sum_{\psi,\phi}  \tau_{\psi\phi} \ast n_{1\psi}n_{2\phi}\Phi
+	\rho\Phi = 
+	\sum_{\psi}\tau^\psi \ast (n_{1\psi}\Phi)
+	+ \sum_{\psi,\phi}  \tau^{\psi\phi} \ast (n_{1\psi}n_{2\phi}\Phi)
 \end{equation}
 where multiplication of fields is to be interpreted as being pointwise.
 
-We can calculate higher order rates of change, since $\Phi$ is the only term with time dependency we have 
-\begin{equation}
-	\frac{d^{n+1}\Phi}{dt^{n+1}} = 
-	\sum_{\psi}\tau_\psi \ast n_{1\psi} \frac{d^n\Phi}{dt^n}
-	+ \sum_{\psi,\phi}  \tau_{\psi\phi} \ast n_{1\psi}n_{2\phi} \frac{d^n\Phi}{dt^n}
-\end{equation}
+Since
+\[
+\mu\Phi = \left(\frac{\rho}{r} + I\right)\Phi = \frac{1}{r} \rho\Phi + \Phi
+\]
+then a timestep of the Markov model is given by
+\[
+\Phi^{t+1} = \mu\Phi^t = \Phi^t + 
+\frac{1}{r}\sum_{\psi}\tau^\psi \ast (n_{1\psi}\Phi^t)
++ \frac{1}{r}\sum_{\psi,\phi}  \tau^{\psi\phi} \ast (n_{1\psi}n_{2\phi}\Phi^t)
+\]
 
--------------------------------------
+\subsection{Distributions as Bernstein polynomials}
+If we represent the fields as stretched Bernstein polynomials then, in the space of Bernstein coefficients, multiplication by $n_{i\xi}$ corresponds to shifting by one along the $\xi$ axis.
+
+Convolution needs to be defined carefully as we're only interested in the integer points within the range of interest, so our aim is to find the lowest order polynomial that fits the integer points.
+
+\[
+B_{m,n} \ast B_{m'n'} =   {m \choose n}{m' \choose n'} \int_{0}^x y^m(1-y)^{n-m} (x-y)^{m'}(1-(x-y))^{n'-m'} dy
+\]
+
+\subsection{Chebyshev polynomials at the Chebyshev points}
+How about we represent as Chebyshev polynomials, but interpret the integer values at the Chebyshev points, so that we can easily go from space to frequency domain.
+
+\subsection{Fermionic agents}
+
+If we restrict ourselves to the unit hypercube, then a pre-requisite of a process being applicable is that any created agents are not already present. This will come out as higher order interactions, where some of the interactions involve absence of agents rather than presence.
+
+In this case, the aggregators, $n_i$, can be expressed as $B_{1,1}=x$ or $B_{0,1}=(1-x)$ and transitions are expressed again in delta space. That is, we can always fit a polynomial that is linear in any one variable. In the Bernstein basis, fitting only the points at 0 and 1 we have 
+\[
+B_{0,1} \ast B_{0,1} = B_{0,1}
+\]
+\[B_{0,1} \ast B_{1,1} = B_{1,1} \ast B_{0,1} = B_{1,1}\]
+\[
+B_{1,1} \ast B_{1,1} = 0
+\]
+similarly for multiplication
+\[
+B_{0,1}B_{0,1} = B_{0,1}
+\]
+\[
+B_{0,1}B_{1,1} = B_{1,1}B_{0,1} = 0
+\]
+\[
+B_{1,1}B_{1,1} = B_{1,1f}
+\]
+
+\subsection{Fermionic agents with bosonic interaction}
+
+If we both fermions and bosons in a simulation, but interaction can only happen between bosons and fermions that are in the same interaction state, then the state of a model becomes the joint state of the bosonic and fermionic fields. Interactions then will always be between a fermionic axis and a bosonic axis. If we also require that a boson is absorbed on interaction (and emission must be a separate process) then bosonic axes only ever multiply by x and shift downwards.
+
+\subsection{Distributions as operators on the vacuum}
+Since most occupation vectors of interest will have most elements zero, and most distributions will only have probability mass at points where most elements are zero, then we want to represent these states compactly. This is not the case with a simple polynomial basis, as each term will have most marginalisations with all mass at zero.
+
+One way to deal with this is to express the terms as operators on (convolutions with) the vacuum.
+
+\subsection{Deterministic vs probabilistic processes}
+
+So far we've been assuming processes are stochastic in the sense that the result is probabilistic. If we require that all processes are deterministic, then the convolutions are always just shifts of the field in occupation number space.
+
+So we can use any basis that allows shifts, multiplication by x and addition. Exponential polynomials [need to be careful not to import from the -ve occupation numbers on shift]. Deselby distributions. Exponentially decaying spectral. All should be expressed as operators on the vacuum.
 
 \section{Public states and Interaction states}
 
@@ -161,7 +203,7 @@ P_n(i) = \sum_{t=0}^\infty (1-\sum_k \rho_k dt)^t \rho_i dt = \frac{\rho_i}{\sum
 \]
 so we just need to choose a transition with probability proportional to the rate.
 
-If we express transitions as perturbations to the occupation vector, then on transition most transitions remain unchanged, so we can implement this as a distribution of transitions from which we choose a transition and use the chosen transition to update the dsitribution.
+If we express transitions as perturbations to the occupation vector, then on transition most transitions remain unchanged, so we can implement this by storing a distribution over transitions from which we draw a transition and use the chosen transition to perturb the dsitribution.
 
 \section{Spatial agents}
 
