@@ -137,6 +137,8 @@ then a timestep of the Markov model is given by
 + \frac{1}{r}\sum_{\psi,\phi}  \tau^{\psi\phi} \ast (n_{1\psi}n_{2\phi}\Phi^t)
 \]
 
+From here we assume $n_{1\psi} = n_{2\psi}$ and just write $n_\psi$ for convenience.
+
 \subsection{Distributions as Bernstein polynomials}
 If we represent the fields as stretched Bernstein polynomials then, in the space of Bernstein coefficients, multiplication by $n_{i\xi}$ corresponds to shifting by one along the $\xi$ axis.
 
@@ -177,15 +179,69 @@ B_{1,1}B_{1,1} = B_{1,1f}
 If we both fermions and bosons in a simulation, but interaction can only happen between bosons and fermions that are in the same interaction state, then the state of a model becomes the joint state of the bosonic and fermionic fields. Interactions then will always be between a fermionic axis and a bosonic axis. If we also require that a boson is absorbed on interaction (and emission must be a separate process) then bosonic axes only ever multiply by x and shift downwards.
 
 \subsection{Distributions as operators on the vacuum}
-Since most occupation vectors of interest will have most elements zero, and most distributions will only have probability mass at points where most elements are zero, then we want to represent these states compactly. This is not the case with a simple polynomial basis, as each term will have most marginalisations with all mass at zero.
+Since most occupation vectors of interest will have most elements zero, and most distributions will only have probability mass at points where most elements are zero, then we want to represent these states compactly. This is not the case with a simple polynomial basis.
 
 One way to deal with this is to express the terms as operators on (convolutions with) the vacuum.
 
+\subsection{Distribution as fluid}
+Since the convolution kernels all sum to zero, probability mass will act like a compressible fluid with conserved mass in occupation number space. If we add the constraint that any process may only add at most one agent in any state then, along with the constraint that an agent may only delete itself, we can calculate a divergence field and localised stability constraints. The divergence field can be separated into the sum of devergence contributions from each kernel.
+
+The kernels can be expressed in terms of finite difference operators, thus giving us an approximate link to a set of differential equations on a continuous field.
+
+[Can we characterise as an advection/diffusion equation by splitting the kernels into a random walk component plus an advection component?]
+
 \subsection{Deterministic vs probabilistic processes}
 
-So far we've been assuming processes are stochastic in the sense that the result is probabilistic. If we require that all processes are deterministic, then the convolutions are always just shifts of the field in occupation number space.
+So far we've been assuming processes are stochastic in the sense that the result is probabilistic and this is reflected in the transition kernels $\tau$. This is equivalent to separate deterministic process with different rates so we can express convolutions in the form:
+\[
+\tau \ast \Phi = \sum_k \rho_k(s_k(\Phi) - \Phi)
+\]
+where each $s_k$ shifts the field in occupation number space.
 
-So we can use any basis that allows shifts, multiplication by x and addition. Exponential polynomials [need to be careful not to import from the -ve occupation numbers on shift]. Deselby distributions. Exponentially decaying spectral. All should be expressed as operators on the vacuum.
+Furthermore, since agents can only remove themselves from the model we have
+\[
+\tau^\psi \ast (n_\psi\Phi) = \rho(s^+(\Phi) - \Phi)s^-_\psi n_\psi \Phi 
+\]
+and
+\[
+\tau^{\psi\phi} \ast (n_\psi n_\phi \Phi) = \rho(s^+(\Phi) - \Phi)s^-_\psi n_\psi s^-_\phi n_\phi \Phi 
+\]
+
+
+So we can use any basis that allows shifts (we'll write $s^+_i$ and $s^-_i$ for a shift in the +ve and -ve direction in the $i^{th}$ dimension respectively), multiplication by $n_i$, addition and multiplication by a real. Exponential polynomials [need to be careful not to import from the -ve occupation numbers on shift]. Deselby distributions. Exponentially decaying spectral. Polynomial times Heaviside step function. Shifted Chebyshev/Bernstein polynomial. Scaled Chebyshev/Bernstein.
+
+Discrete spectral approximation over a finite domain works well as shifting is multiplication by $e^{-i\omega \Delta t}$ and anything shifted out reappears on the other side of the domain, so if we only shift out zeroes we automatically get zeroes shifting in the other end.
+
+Bernstein polynomials can be shifted by noting that any mass shifted in will show up in just one basis, so we can then subtract a best approximation to a delta function.
+
+Note that a field that can be factored into the product of lower dimensional fields remains factorizable under each of the operations apart from addition (so can be expressed as the sum of factored fields).
+
+\subsection{The operator basis}
+
+Let a compound operator be an ordered list of $s$ and $n$ operators. The compound operators are not linerly independent since we have the commutation relations
+\[
+[n_i,s^+_i] = n_i s^+_i - s^+_i n_i = s^+_i  
+\]
+\[
+[s^-_i, n_i] = s^-_i n_i - n_i s^-_i = s^-_i  
+\]
+\[
+[n_i, n_j] = 0
+\]
+\[
+[s^*_i, n_{j \ne i}] = 0
+\]
+and
+\[
+s^-s^+_i
+\]
+where $s^*$ stands for either of $s^+$ or $s^-$.
+
+So, we can choose a subset of linearly independent compound operators that forms a basis that spans the set of all compound operators. Let the \textit{canonical compound operators} be the ones whose $n$ operators all preceed the $s$ operators (in order of operation on the field). Since the ordering of the $n$ and $s$ operators among themselves makes no difference, we can choose a canonical ordering, and identify a canonical compound operator as a pair of integer $|\mathcal{A}|$-dimensional vectors, $N$ and $S$, where the $i^{th}$ element of $N$ gives the number of $n_i$ operators
+
+So, all sequences of field operation are equivalent to  a weighted linear sum of the canonical compound operators. So, we call the canonical compound operators an \textit{operator basis}.
+
+Note that the vacuum field (the one with 1 at the origin and 0 elsewhere) is the unique field that is annihilated by all $n_i$ operators.
 
 \section{Public states and Interaction states}
 
