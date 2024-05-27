@@ -65,7 +65,7 @@ so that
 \[
 \Phi(t) = e^{\rho t}\Phi(0) = e^{(\mu - I)rt}\Phi(0) = e^{-rt}e^{\mu rt}\Phi(0)
 \]
-where $r = \max_V -\rho_{VV}$ is a scalar and $\mu = \frac{\rho}{r} + I$ and the last step is valid since $\mu$ commutes with $I$.
+where $r = \max_V(-\rho_{VV})$ is a scalar and $\mu = \frac{\rho}{r} + I$ and the last step is valid since $\mu$ commutes with $I$.
 
 Expanding the exponential in $\mu$ gives
 \[
@@ -131,13 +131,78 @@ Since
 \mu\Phi = \left(\frac{\rho}{r} + I\right)\Phi = \frac{1}{r} \rho\Phi + \Phi
 \]
 then a timestep of the Markov model is given by
-\[
+\begin{equation}
 \Phi^{t+1} = \mu\Phi^t = \Phi^t + 
 \frac{1}{r}\sum_{\psi}\tau^\psi \ast (n_{1\psi}\Phi^t)
 + \frac{1}{r}\sum_{\psi,\phi}  \tau^{\psi\phi} \ast (n_{1\psi}n_{2\phi}\Phi^t)
-\]
+\label{timestepEq}
+\end{equation}
 
 From here we assume $n_{1\psi} = n_{2\psi}$ and just write $n_\psi$ for convenience.
+
+\subsection{Deterministic vs probabilistic processes}
+
+So far we've been assuming processes are stochastic in the sense that the result is probabilistic and this is reflected in the transition kernels $\tau$. This is equivalent to separate deterministic process with different rates so we can express convolutions in the form:
+\[
+\tau \ast \Phi = \sum_{\Delta V \ne 0} \tau_{\Delta V}(s_{\Delta V} - 1)\Phi
+\]
+where $s_{\Delta V}$ is an operator that shifts the field by $\Delta V$ in occupation number space.
+
+Furthermore, since agents can only remove themselves from the model we can reduce each term in equation \ref{timestepEq} to terms involving some subset of $2|\mathcal{A}|$ operators:
+\[
+\tau^\psi \ast (n_\psi\Phi) = 
+\sum_{\Delta V \ge 0 }
+\rho_\psi(\Delta V - 1_\psi)
+\left(
+\prod_{\xi} \left( s^+_\xi\right)^{\Delta V_\xi}  - s^+_\psi
+\right)
+s^-_\psi \Phi 
+\]
+where $s^+_\psi$ shifts a field up by one in the $\psi$ direction, $s^-_\psi$ multiplies a field by $n_\psi$ then shifts it down by one in the $\psi$ direction, $\Delta V \ge 0$ means all elements of $\Delta V$ are non negative and $1_\psi$ is the unit vector in the $\psi$ direction.
+
+Similarly 
+\[
+\tau^{\psi\phi} \ast (n_\psi n_\phi \Phi) = 
+\sum_{\Delta V \ge 0}
+\rho_{\psi\phi}(\Delta V - 1_\psi - 1_\phi)
+\left(
+\prod_\xi \left(s^+_\xi\right)^{\Delta V_\xi} - s^+_\psi s^+_\phi
+\right)
+s^-_\psi s^-_\phi \Phi 
+\]
+
+So we can represent $\Phi$ in any way that allows shifts along the $\psi$ axes in the +ve direction, multiplication by $n_\psi$ followed by a shift in the -ve $\psi$ direction, addition and multiplication by a real.
+
+We define the commutation relations between two operators using the notation:
+\[
+[a,b] \equiv ab - ba
+\]
+
+We note that the following commutation relation holds on the $s^+$ and $s^-$ operators:
+\[
+[s^-_\psi, s^+_\psi] = 1
+\]
+all other operator pairs commute.
+
+So,
+\[
+s^-_\psi s^+_\psi = s^+_\psi s^-_\psi + 1
+\]
+and so
+\[
+s^-_\psi \left.s^+_\psi\right.^n = \left.s^+_\psi\right.^n s^-_\psi  + n\left.s^+_\psi\right.^{n-1}
+\]
+
+\subsection{Distributions as sums of fully factorized terms}
+
+If the initial distribution is fully factorizable into univariate functions so that
+\[
+\Phi_0 = \prod_\psi \Phi_\psi(V_\psi)
+\]
+then, since operators $s^+_\psi$ and $s^-_\psi$ maintain factorizability, then $\Psi$ will always be a sum of fully factorizable terms. However, at each timestep, the number of such terms is multiplied by the number of active Poisson processes. However, the weight of each term decays exponentially by $\frac{\rho}{r}$.
+
+Each term can be associated with a sequence of events.
+
 
 \subsection{Distributions as Bernstein polynomials}
 If we represent the fields as stretched Bernstein polynomials then, in the space of Bernstein coefficients, multiplication by $n_{i\xi}$ corresponds to shifting by one along the $\xi$ axis.
@@ -149,13 +214,13 @@ B_{m,n} \ast B_{m'n'} =   {m \choose n}{m' \choose n'} \int_{0}^x y^m(1-y)^{n-m}
 \]
 
 \subsection{Chebyshev polynomials at the Chebyshev points}
-How about we represent as Chebyshev polynomials, but interpret the integer values at the Chebyshev points, so that we can easily go from space to frequency domain.
+How about we represent as Chebyshev polynomials, but interpret the integer values at the Chebyshev points, so that we can easily go from space to frequency domain. [this is just the same as having a limited size spectral domain and discrete Fourier transforms.]
 
 \subsection{Fermionic agents}
 
-If we restrict ourselves to the unit hypercube, then a pre-requisite of a process being applicable is that any created agents are not already present. This will come out as higher order interactions, where some of the interactions involve absence of agents rather than presence.
+If we restrict ourselves to the unit hypercube, then a pre-requisite of a process being applicable is that any created agents are not already present. This will come out as higher order interactions, where some of the interactions involve absence of agents rather than presence [note that the outcome of adding an agent to all states where one is not already present is that the agent is present in all states - in a Fermionic model, if a process adds agents in state A and B what happens if just A is present? is B added or does the process not apply?].
 
-In this case, the aggregators, $n_i$, can be expressed as $B_{1,1}=x$ or $B_{0,1}=(1-x)$ and transitions are expressed again in delta space. That is, we can always fit a polynomial that is linear in any one variable. In the Bernstein basis, fitting only the points at 0 and 1 we have 
+In this case, the aggregators, $n_i$, can be expressed as $B_{1,1}=x$ for presence and $B_{0,1}=(1-x)$ for absence, and transitions are expressed again in delta space. That is, we can always fit a polynomial that is linear in any one variable. In the Bernstein basis, fitting only the points at 0 and 1 we have 
 \[
 B_{0,1} \ast B_{0,1} = B_{0,1}
 \]
@@ -174,6 +239,8 @@ B_{0,1}B_{1,1} = B_{1,1}B_{0,1} = 0
 B_{1,1}B_{1,1} = B_{1,1f}
 \]
 
+But this doesn't entirely avoid the curse of dimensionality. Although we can always end up with a sum of terms that are completely factorizable, the number of terms in the sum can potentially be multiplied by the number of active processes at every step.
+
 \subsection{Fermionic agents with bosonic interaction}
 
 If we both fermions and bosons in a simulation, but interaction can only happen between bosons and fermions that are in the same interaction state, then the state of a model becomes the joint state of the bosonic and fermionic fields. Interactions then will always be between a fermionic axis and a bosonic axis. If we also require that a boson is absorbed on interaction (and emission must be a separate process) then bosonic axes only ever multiply by x and shift downwards.
@@ -190,31 +257,6 @@ The kernels can be expressed in terms of finite difference operators, thus givin
 
 [Can we characterise as an advection/diffusion equation by splitting the kernels into a random walk component plus an advection component?]
 
-\subsection{Deterministic vs probabilistic processes}
-
-So far we've been assuming processes are stochastic in the sense that the result is probabilistic and this is reflected in the transition kernels $\tau$. This is equivalent to separate deterministic process with different rates so we can express convolutions in the form:
-\[
-\tau \ast \Phi = \sum_k \rho_k(s_k(\Phi) - \Phi)
-\]
-where each $s_k$ shifts the field in occupation number space.
-
-Furthermore, since agents can only remove themselves from the model we have
-\[
-\tau^\psi \ast (n_\psi\Phi) = \rho(s^+(\Phi) - \Phi)s^-_\psi n_\psi \Phi 
-\]
-and
-\[
-\tau^{\psi\phi} \ast (n_\psi n_\phi \Phi) = \rho(s^+(\Phi) - \Phi)s^-_\psi n_\psi s^-_\phi n_\phi \Phi 
-\]
-
-
-So we can use any basis that allows shifts (we'll write $s^+_i$ and $s^-_i$ for a shift in the +ve and -ve direction in the $i^{th}$ dimension respectively), multiplication by $n_i$, addition and multiplication by a real. Exponential polynomials [need to be careful not to import from the -ve occupation numbers on shift]. Deselby distributions. Exponentially decaying spectral. Polynomial times Heaviside step function. Shifted Chebyshev/Bernstein polynomial. Scaled Chebyshev/Bernstein.
-
-Discrete spectral approximation over a finite domain works well as shifting is multiplication by $e^{-i\omega \Delta t}$ and anything shifted out reappears on the other side of the domain, so if we only shift out zeroes we automatically get zeroes shifting in the other end.
-
-Bernstein polynomials can be shifted by noting that any mass shifted in will show up in just one basis, so we can then subtract a best approximation to a delta function.
-
-Note that a field that can be factored into the product of lower dimensional fields remains factorizable under each of the operations apart from addition (so can be expressed as the sum of factored fields).
 
 \subsection{The operator basis}
 
