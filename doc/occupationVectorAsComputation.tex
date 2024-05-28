@@ -39,12 +39,12 @@ Given the rates of an agent's processes, we can define the Poisson rates of tran
 \end{equation}
 where $V_\psi$ is the value of $\psi^{th}$ element of $V$, $\gamma_1(n)$ models how an agent's rate is affected by other agents in the same state, $\gamma_2(m)$ models how an agent's rate is affected when in the presence of multiple other agents in the same state. For now we consider only $\gamma_i(n) = n$ (interaction is like a chemical reaction. We'll take this to be the default behaviour if not otherwise stated), $\gamma_1(n) = (n>0)$ (agents only care about the presence or absence of other agents, and multiplicity doesn't affect the rate) or $\gamma_i(n) = \min(n,n_{\text{max}})$. Note that $\gamma_i(0) = 0$ and $\gamma_i(1) = 1$ for any valid definition.
 
-Given this, we can consider probability distributions over the domain of occupation vectors. The transition rates define a rate of change of a probability distribution,
+Given this, we can consider probability distributions over the domain of occupation vectors, which we'll call \textit{occupation distributions}. The transition rates define a rate of change of an occupation distribution,
 \begin{equation}
 \frac{d\Phi(V)}{dt} = \sum_{U} \rho(V|U)\Phi(U) - \sum_W \rho(W|V)\Phi(V)
 \label{changeEq}
 \end{equation}
-In this way we can translate the agent based model into a dynamic system whose state space is the probability distributions over the domain of occupation vectors.
+In this way we can translate the agent based model into a dynamic system whose state space is the set of all occupation distributions.
 
 If we consider $\Phi$ to be a vector with an element for each occupation vector, and define $\rho$ to be a matrix\footnote{We implicitly suppose there is a ``flattening'' of the occupation vectors onto the integers to give row and column indices. However, we also implicitly suppose that the semantics of indices reproduces the semantics of the occupation vectors, so that in effect we can consider indices as having a dual life as integers and occupation vectors. In this spirit, we can think of vectors as also being fields over the non-negative gridpoints in an $|\mathcal{A}|$-dimensional space and matrices as also being functions of gridpoint pairs.} such that
 \begin{equation}
@@ -140,7 +140,7 @@ then a timestep of the Markov model is given by
 
 From here we assume $n_{1\psi} = n_{2\psi}$ and just write $n_\psi$ for convenience.
 
-\subsection{Deterministic vs probabilistic processes}
+\subsection{The $s^+$ and $s^-$ operators}
 
 So far we've been assuming processes are stochastic in the sense that the result is probabilistic and this is reflected in the transition kernels $\tau$. This is equivalent to separate deterministic process with different rates so we can express convolutions in the form:
 \[
@@ -179,32 +179,86 @@ We define the commutation relations between two operators using the notation:
 \]
 
 We note that the following commutation relation holds on the $s^+$ and $s^-$ operators:
-\[
+\begin{equation}
 [s^-_\psi, s^+_\psi] = 1
-\]
+\label{commutationEq}
+\end{equation}
 all other operator pairs commute.
 
 So,
 \[
 s^-_\psi s^+_\psi = s^+_\psi s^-_\psi + 1
 \]
-and so
+and
 \[
 s^-_\psi \left.s^+_\psi\right.^n = \left.s^+_\psi\right.^n s^-_\psi  + n\left.s^+_\psi\right.^{n-1}
 \]
 
-\subsection{Distributions as sums of fully factorized terms}
+So the operators $s^+$, $s^-$, addition and multiplication together give us a language to describe the time evolution of occupation distributions. If we introduce the ``vacuum'' state, $\emptyset$, to be the distribution that has all its probability mass at the origin of the occupation space (i.e. there are definitely no agents in the model), then it is easily seen that any probability field can be described as a set of operations on $\emptyset$. In addition it can also be seen that, for all $\psi$
+\[
+s^-_\psi\emptyset = 0
+\]
+
+This relationship, along with the commutation relations and the usual rules of addition and multiplication define an algebra over the (un-normalised) occupation distributions. If we define the \textit{canonical representation} of an occupation distribution to be the representation in the form of a polynomial over $s^+$ operators:
+\[
+\Phi = \left(\sum_V A_V\prod_\psi \left.s^+_\psi\right.^{V_\psi} \right)\emptyset
+\]
+where the $A_V$ are reals, then we can identify each occupation distribution with its canonical representation.
+
+\subsection{Calculating expectation values}
+
+Suppose we want to calculate the expectation value of some observation operator $\Omega$ at some time in the future, given an initial occupation distribution $\Phi^0$
+\[
+\bar{\Omega}(t) = \Omega \sum_{k} P_{rt}(k)\mu^k \Phi^0
+\]
+where $P_{rt}$ is the Poisson distribution with rate $rt$.
 
 If the initial distribution is fully factorizable into univariate functions so that
 \[
-\Phi_0 = \prod_\psi \Phi_\psi(V_\psi)
+\Phi^0 = \prod_\psi \Phi_\psi(V_\psi)
 \]
-then, since operators $s^+_\psi$ and $s^-_\psi$ maintain factorizability, then $\Psi$ will always be a sum of fully factorizable terms. However, at each timestep, the number of such terms is multiplied by the number of active Poisson processes. However, the weight of each term decays exponentially by $\frac{\rho}{r}$.
+then, since operators $s^+_\psi$ and $s^-_\psi$ maintain factorizability, then $\Phi$ will always be a sum of fully factorizable terms. 
 
-Each term can be associated with a sequence of events.
+Considering the $\Phi_\psi$ as canonical-form operators in one dimension, it can be seen that
+\[
+s^-_\phi \left.s^+_\phi\right.^n\emptyset = n \left.s^+_\phi\right.^{n-1}\emptyset
+\]
+which is reminiscent of differentiation if we consider the terms as polynomials in $s^+_\psi$. Also, operating with $s^+_\phi$ simply increases the exponent by one. So, operating with a deterministic process, on a fully factorised, dense representation only increases the number of terms by the number of extra agents that are added by the process.
+
+However, when we come to add fully factorised terms that have undergone different processes we cannot expect this to always reduce to a fully factorised form. At each timestep, the number of such terms is potentially multiplied by twice the number of active Poisson processes. However, the weight of each term decays exponentially by $\frac{\rho}{r}$, and if we use the commutation relations then some terms may overlap.
+
+If we start with a fully factorised distribution, then after one timestep we have a wighted sum of factorised distributions. If we sample one from these with probability equal to its rate (with probability to stay where we are to make up to 1 - or alternatively importance sample) then we effectively sample from the final sum of fully factorised terms [note we also have to work out how many terms there are].
+
+Alternatively, we could consider each sequence of events as a separate term and sample from the space of sequences of events. Kind of depends on whether the expectation of the obervable we're trying to calculate can easily be calculated from a sequence of events.
+
+Equally, we could step the observation operator back in time, depending on how hard this is.
+
+[Could we sample from the set of all sets of events, rather than all sequences, and calculate the expectation of the observable over the sum of all orderings? Given a set of commutation relations between events (which gives an undirected graph), there is the set of partial orderings (i.e. the set of acyclic directed graphs generatable from the undirected graph) and the multiplicity (number of linear extensions) of each directed graph (counting the number of linear extensions of partially ordered sets is, apparently, \#P-complete)].
+
+\subsection{Finding the equilibrium distribution}
+
+Given a family of distributions on a manifold, we let a steady state distribution, $\Phi^*$, be one where the rate of change, $\rho\Phi^*$, is zero or perpendicular to the manifold (i.e. if we step forward by $dt$ then the closest member of the family is where we started). Since $\mu = \frac{\rho}{r} + I$ we have
+\[
+\mu\Phi^* = \frac{\rho\Phi^*}{r} + \Phi^* = \Phi^*
+\]
+so $\Phi^*$ corresponds to an eigenvector of $\mu$.
+
+Alternatively, we could start with a model that has a known attractor on the manifold, and slowly morph the model to the one of interest (by parameterising the process rates), while also morphing the equilibrium distribution. So
+\[
+(\mu + d\mu)(\Phi^* + d\Phi) = \Phi^* + d\mu\Phi^* + \mu d\Phi = \Phi^* + d\Phi
+\]
+so
+\[
+d\mu\Phi^*  = (1 - \mu) d\Phi = \frac{\rho d\Phi}{r}
+\]
+Since we have quite a lot of freedom to choose $d\mu$ (i.e. how we morph the model), we can do this in a way that makes the above equation easy to solve.
+
+\subsection{Optimising model parameters}
+
+Suppose the process rates are functions of some set of model parameters and we wish to find the set of parameters that maximise the expectation of some observation over the equilibrium distribution. 
 
 
-\subsection{Distributions as Bernstein polynomials}
+\subsection{Occupation distributions as Bernstein polynomials}
 If we represent the fields as stretched Bernstein polynomials then, in the space of Bernstein coefficients, multiplication by $n_{i\xi}$ corresponds to shifting by one along the $\xi$ axis.
 
 Convolution needs to be defined carefully as we're only interested in the integer points within the range of interest, so our aim is to find the lowest order polynomial that fits the integer points.
@@ -245,8 +299,8 @@ But this doesn't entirely avoid the curse of dimensionality. Although we can alw
 
 If we both fermions and bosons in a simulation, but interaction can only happen between bosons and fermions that are in the same interaction state, then the state of a model becomes the joint state of the bosonic and fermionic fields. Interactions then will always be between a fermionic axis and a bosonic axis. If we also require that a boson is absorbed on interaction (and emission must be a separate process) then bosonic axes only ever multiply by x and shift downwards.
 
-\subsection{Distributions as operators on the vacuum}
-Since most occupation vectors of interest will have most elements zero, and most distributions will only have probability mass at points where most elements are zero, then we want to represent these states compactly. This is not the case with a simple polynomial basis.
+\subsection{Occupation distributions as operators on the vacuum}
+Since most occupation vectors of interest will have most elements zero, most distributions will only have probability mass at points where most elements are zero and we want to represent these states compactly. This is not the case with a simple polynomial basis.
 
 One way to deal with this is to express the terms as operators on (convolutions with) the vacuum.
 
@@ -332,7 +386,7 @@ A simulation begins with all gridsquares at $t=0$ and all frontiers at $t_f=\Del
 
 If an agent moves from gridsquare $i$ to gridsquare $j$, then the agent is removed from $i$ and added to the destination gridsquare's incoming-agent list with timestamp $t_i + \Delta t$.
 
-\section{Computing over distributions}
+\section{Computing over occupation distributions}
 
 \subsection{Computing with non-local basis}
 
