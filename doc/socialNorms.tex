@@ -24,14 +24,17 @@ Social norms help make living within a society computationally tractable by redu
 
 We assume agents live within a Poisson ABM where each agent has a public and private state. Each event is either a unitary action or a binary interaction. Every agent has a fixed set of unitary actions (e.g. move left, eat, etc) and a set of ``initiate dialogue with agent with property P'' interactions based on the properties of the public state of the other agent. In a given state, the physical environment defines a mask dictating which of these actions are currently possible. An interaction event is a dialogue (turns-based encounter) with another agent. An agent's decision space is the Poisson rate it assigns to each physically possible action/interaction, and the next action it takes during a dialogue.
 
+Given a set of agents, we can define the average policy of the agents as...[Need to define this better:  distribution of behaviour given the context summed over the (perhaps time-weighted) history of all historical events w.r.t. a relationship. The context is defined as the smallest set such that any addition to the context makes no statistically significant difference to the distribution.]
+
 \section{Zero intelligence societies with social norms}
 
-Given a set of social norms, we can define the zero intelligence society as one where the majority of agents follow social norms, but act randomly to the extent of freedom within the norms. To this we can add a small percentage of deviant agents that break social norms to a greater or lesser degree, acting randomly when deviant. Note that the zero inelligence agent requires no reward function.
+Given a set of social norms, we can define the zero intelligence society as one where the majority of agents follow social norms, but act randomly within the constraints of the norms. To this we can add a small percentage of deviant agents that break social norms to a greater or lesser degree, acting randomly, constrained only by the physical mask when deviant. Note that the zero inelligence agent requires no reward function.
 
 If we show that a zero intelligence society robustly exhibits a social observable, then we can have some confidence that this observable is a stable consequence of the norms. However, we can't show that the set of norms are themselves stable or discoverable.
 
 \section{Selective copying}
-If agents are able to observe other's behaviour (both unitary actions and binary interactions) and have a propensity to copy it, we can define the social norm as the distribution of behaviour given the context summed over the (perhaps time-weighted) history of all historical events. The context is defined as the smallest set such that any addition to the context makes no statistically significant difference to the distribution. In this way, then the social norm can be thought of as a probabilistic policy.
+
+If agents are able to observe other's behaviour (both unitary actions and binary interactions) and have a propensity to copy it, 
 
 If agents also learn a Q-function then they can choose to deviate from the norm, or at least add a bias to the norm, based on the expected quality of each action (temptation). In practice, for a given context, an agent will likely have a small number of samples from the norm, so can decide which (if any) of these to copy given the Q value.
 
@@ -64,16 +67,46 @@ In addition to physical reward (eating, sex), agents are intrinsically rewarded 
 
 Each norm is associated with a model of the world. The model defines the actions available to the agent as an abstraction of its physical actions, and defines the roles played by the agents involved in the model. Among the vocabulary of norms there may be multiple models and at any one time an agent may be playing roles in multiple incomensurable models. 
 
-
 \section{Social status}
 
 Is social status something more than the playing of a role? Being a king requires not only that I play the role of a king, but also that a number of people play the role of subject when interacting with me. In this way I cannot unilaterally decide to be king. A king remains king as long as the ruler-subject relationships endure. Once a stable set of   What is the dynamics of the emergence of these social relationships and how do they remain stable and how do they crumble? 
 
 This requires agents to be able to identify each-other, in order to learn and identify the social status of other during an interaction [it also implies that during an interaction, I'm not only interacting with a single agent, but rather a node in a whole social network].
 
-\section{Social network}
+\section{Social ABM}
 
-This would come naturally out of a social network topology: an edge is a social tie that joins two agents in a well defined pair of roles. Social status comes in an agent's relationship to other agents through social ties. In this picture, an agent can then decide to make or break social ties, or enter into episodes with existing socially tied agents. Social tie types become the units of evolution, but these can be embeded within wider social networks which may themselves be considered units of replication (which may outlive the constituent agents)...[is this part of the explanationn for the success of capitalism?]...this could lead to interesting dynamics. A social structure that can expel agents that don't fulfil their requirements and recruit new ones would be stable over a very wide range of individual agent behaviours, given a diversity of agents in society. [Could we expand capitalism to zero-intelligence even if we include the formation and management of companies?]
+A Social ABM is a set of agents whose behaviour when interacting with an agent is a function of their past experiences with that agent. That is, agents can believe things about eachother. If Alice has beliefs about Bob we'll say that Alice has a \textit{relationship} to Bob and Bob is one of Alice's \textit{social ties}. This induces a \textit{social network} where each agent is a node and each relationship is a directed edge between agents. Social status is defined as a function of the beliefs associated with an agent's incoming edges. 
+
+An social agent (an agent in a social ABM) can decide whether to initiate an interaction with its social ties. Although at any point in time, the physical environment may render social ties unreachable.
+
+Relationships can be fixed or dynamic in value and fixed or dynamic in number. If not fixed in value and number then an agent can decide to make/break/replace social ties. An agent can introduce two of its ties to each-other by passing references. Also the physical environment may define a mechanism for introducing new agents.
+
+\subsection{Action space of an agent in a social ABM}
+
+An agent's relationship state is a map from agent-reference to belief state. Agents randomly forget ties through disuse. An agent may send any of a set of \textit{physical messages} to any of its currently physically contactable ties or to any random encounters that the physical environment may make available. At any time at most one tie is active. If one tie is active, then the action space is the action space of messages that can be sent to the active tie. If no ties are active then the action space is the activation of any one of the ties (i.e. initiation of an interaction). If another agent initiates an interaction, the tie becomes active at the end of any current interaction. [Show that this is a subset of the Poisson ABMs].
+
+\subsection{Belief states}
+
+A social role is a state space, an action space, an incoming message space, a dynamics mapping state-incoming message pairs to new state and a social acceptability on state-action pairs.
+
+If Alice has a relationship to Bob, Alice believes that Bob is playing social role R and is currently in state S within R's state space.
+
+ the posterior over the policy of the other agent given the history, $H$, of interactions with that agent, $P(\pi|H)$. So, a stranger has the prior $P(\pi)$ (though perhaps there are contextual clues, e.g. the stranger standing behind the counter in a coffee shop is more likely to make me a cup of coffee than the guy at the bus stop), and after each interaction this is updated. The update is well defined by Bayes' rule. We can also define the "empirical policy", $P(a|H) = \sum_{s_0}\sum_\pi P(\pi(f(s_0,H))=a)P(\pi|H)P(s_0)$. where $s=f(s_0|H)$ is the state of an agent given a start state $s_0$ and a set of actions $H$. But this implies a single policy on the history space which encodes the prior/posterior over policies.
+
+The descriptor, D, is part of the approximation:
+\[P(a|D(H)) \approx P(a|H)
+\]
+and
+\[D(a+H) = g(a,D(H))\]
+for some action a. [How does this translate to role negotiation and role playing? TODO: think about how agents that could play either of two games, but the beneficial game depends on their joint hidden state...will negotiation emerge?]
+
+It is the prior over policies, $P(pi)$, (or $P(a|H)$) that defines social norms. In a society that tends to conform to social norms, I expect you to conform to social norms, and you expect me to do the same, unless evidence suggests otherwise.
+
+[So, if we suppose agents have access to the empirical policy, then do social norms/roles emerge? How about if agents use finite sample size, or just their own experience (along with function approximation)?]
+
+-----
+
+ Social tie types become the units of evolution, but these can be embeded within wider social networks which may themselves be considered units of replication (which may outlive the constituent agents)...[is this part of the explanationn for the success of capitalism?]...this could lead to interesting dynamics. A social structure that can expel agents that don't fulfil their requirements and recruit new ones would be stable over a very wide range of individual agent behaviours, given a diversity of agents in society. [Could we expand capitalism to zero-intelligence even if we include the formation and management of companies?]
 
 A good test of a social network representation, for our needs, is: can it represent capitalism? Followed by: is it flexible enough to represent, e.g. feudalism, communism, sub-cultures, government, law-enforcement, Elinor Ostrom's cooperative groups... this is a pre-requisite to asking how structures can change.  
 
@@ -89,7 +122,7 @@ Given a set of roles, agents could be aware of the need for a given tie, which c
 
 Can two agents be linked by two different ties? i.e. play different roles in respect to each-other: it would seem so (perhaps my wife is also my dentist). In this case, how do agents distinguish roles?
 
-\section{Emergence of roles}
+\section{Emergence and evolution of roles}
 
 If a society is defined by its available roles and its state of social tie, how does a society develop new roles? Once agents are identifiable, roles can be encoded in a policy, so the existance and evolution of social roles is really just an abstract way of talking about policy learning. So, what are the necessary/sufficient conditions on learning that lead to the emergence of social roles?
 
