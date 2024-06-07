@@ -193,20 +193,52 @@ At base level, we assume agent's observations of the world around them cause cha
 
 However, the observable physical state does not include the brain state of the agents. In consequence, the social state is not an abstraction of the observable state, it includes information not contained in the physical state. However, a physical action must be interpretable as a social action given the current observable and social state, and if an agent intends to perform a social action they must be able to generate a set of physical actions that will achieve this.
 
-\subsection{'80s adventure game predicate physical worlds}
+\subsection{'80s adventure game physical worlds}
 
-We use as a physical world a multi-agent version of the predicate physical worlds of '80s adventure games where agents can move around a set of locations and interact in simple ways with various obejcts they find at those locations.
+We use as a physical world a multi-agent version of the physical worlds of '80s adventure games where agents can move around a set of locations and interact in simple ways with various obejcts they find at those locations.
 
-Such a world is represented as a set of objects, properties, relations, actions and rules. The state of the world is a set of true statements on the objects using the properties and relations. At the largest scale, some objects have the property \texttt{isLocation} that are located relative to eachother via \texttt{isNorthOf} and \texttt{isEastOf} relations. Each location can contain a number of objects, including agents, by asserting \texttt{isIn(Obj,Loc)}. An agent can move between neighbouring locations by performing the \texttt{moveNorth}, \texttt{moveSouth}, \texttt{moveEast} or \texttt{moveWest} actions.
+Let a \textit{physical world} be a tuple $(A,P,\alpha)$ where $A$ is a set of agents and objects in the world, $P$ is a set of unary or binary predicates, $\alpha$ is a set of actions which are $(oVars,iVars,p,c)$ tuples where $oVars$ are open variables which must be filled to instantiate the action, $iVars$ are a set of variables with unique (``the'') quantification, $p$ is a sentence giving the prerequisites that are required to be true for the action to be possible and $c$ are the consequences of performing an action in terms of changes to the state of the world. We can write this as
+\[
+X: \iota I: P(X,I) \underset{a}{\to} C(X,I)
+\]
+which is to be understood as distinct from implication.
 
-Rules specify what prerequisite conditions must be met for actions to be possible, and what are the consequences of the action after performance. For example a prerequisite for \texttt{moveNorth(Alice)} may be $\exists A,B: \texttt{isIn(Alice,A)} \wedge \texttt{isNorthOf(B,A)}$ and a consequence of $\texttt{isIn(Alice,B)} \wedge \neg \texttt{isIn(Alice,A)}$.
+The state of the world is a set of true predicates in $P$ applied to objects in $A$. In the case of an objective state, the absence of a predicate implies its negation. In the case of an agent-centric state, the absence of a predicate involving Self implies its negation, but the absence of any other predicate makes no commitment to its truth. In the agent-centric representation, the subject of all actions is implicitly assumed to be Self, so can be hard-wired into the prerequisites and consequences. In the objective representation, the Self is taken to be an open variable.
 
-Actions may have a direct object and indirect object. For example \texttt{pickup(Alice,Cup)} for Alice picks up the cup. The rule for this action may be $\exists R: \texttt{isIn(Cup,R)} \wedge \texttt{isIn(Alice,R)} \wedge \texttt{isAnimate(Alice)} \wedge \texttt{isLiftable(Cup)}$ and a consequence may be \texttt{has(Alice,Cup)}. 
+\subsection{Containment}
 
-In this way we can build up a physical world that has no reference to the social world.
+All objects can be arranged into a tree structure where the root of the tree is the \texttt{world} and every child is related to its parent with the \texttt{isIn(Child,Parent)} relation, which is to be understood that the child is contained within the parent.
 
-\subsection{Adding a social world}
+Only siblings and (parent,child) pairs can interact. Agents can \texttt{pickup} their siblings and \texttt{putdown} their children.
 
- 
+For example \texttt{pickup(S,X)} can be written
+\begin{dmath}
+S,O: \iota P: \texttt{isIn(O,P)} \wedge \texttt{isIn(S,P)} \wedge \texttt{canContain(S,O)} 
+\underset{pickup}{\to}
+\texttt{isIn(O,S)} \wedge \neg \texttt{isIn(O,P)}
+\end{dmath}
+
+\subsection{Locations}
+
+We can create a mapped world in which the agents can roam by adding objects that are located relative to eachother via spatial relations such as \texttt{isNorthOf} and \texttt{isEastOf}. Each location can contain a number of objects, including agents, by asserting \texttt{isIn(Obj,Loc)}. An agent can move between neighbouring locations by performing the \texttt{moveNorth}, \texttt{moveSouth}, \texttt{moveEast} or \texttt{moveWest} actions.
+
+For example \texttt{moveNorth(S)} can be written as
+\[
+S:\iota A,B: \texttt{isIn(S,A)} \wedge \texttt{isNorthOf(B,A)} \underset{moveNorth}{\to} \texttt{isIn(S,B)} \wedge \neg \texttt{isIn(S,A)}
+\]
+In this way we can build up a purely physical world that has no reference to the social world.
+
+\subsection{Belief, public knowledge and social facts}
+
+We can extend a physical world domain to the socio-physical world by allowing predicates that, on a physical level, refer to states of an agent's brain. These will specify the attitudes an agent has towards another agent and will affect the way an agent behaves towards the other and an agent's expectations about another's behaviour towards them. For example \texttt{customerRole(S,O)} means that agent \texttt{S} is playing the role of customer towards agent \texttt{O}. We call these \textit{social predicates}, they can be unserstood as meaning that an agent has some attitude towards another agent or object. If an agent has an attitude, we call that a \textit{social fact}.
+
+
+To reason about reasoning agents we need to include a \texttt{believes(S,$\Theta$)} predicate meaning agent \texttt{S} believes $\Theta$. However, social relations avoid this by relying on \textit{public knowledge}. A fact, $f$, is public knowledge among a group of agents if every agent knows $f$ and knows that $f$ is public knowledge. So, if Alice and Bob are in the group, this implies that Alice knows Bob knows $f$ and Bob knows that Alice knows he knows $f$ etc...
+
+A simple model would be to assume that social facts are always public knowledge among all agents (this is approximated by gossip). In this model, if we also assume every agent's model of the physical world is correct, we need not explicity mention belief at all. An alternative would be to assume that a social fact is public knowledge between the subject and object of the attitude. This can be in addition to beliefs of third-party observers.
+
+Agents can individually or collectively have attitudes towards objects that do not have any physical existance (e.g. Microsoft, God) and so we need to extend the domain of obects to include these. [although we need to explain how two agents come to refer to the same non-physical object and the types of relationship between non-physical and physical objects. Note that it is possible for a belief about Microsoft to be falsified.] 
+
+If we model an agent's beliefs about the physical world, an agent can (mistakenly) have beliefs about an object that doesn't physically exist. An agent can then act on the non-existant object. At this point, the physical world makes the agent aware that the object does not physically exist.
 
 \end{document}
