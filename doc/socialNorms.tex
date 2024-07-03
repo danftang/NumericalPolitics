@@ -139,6 +139,9 @@ If we're using MCTS then the role can be used as the off-tree policy.
 
 Learning roles: Suppese agents are able to learn from the exhibited behaviour of episodes of other pairs of agents, then roles just identify common Nash equilibria... perhaps we also need to see "lifestyles", i.e. how do multiple social ties fit together into the meta-game?
  
+\section{Social norms as Nash equilibria}
+
+Suppose at any moment an agent is either in a single active interaction with another agent or is having ``time alone''. Suppose also that an interaction is a turns-based exchange and during an interaction the context is taken to be the behaviuor of the two agents since the beginning of the interaction (and the objects-to-hand or available actions). So, for each given state of the world-to-hand there is a context space and the set of policies on that context space. Within each policy space there will, in general, be a number of Nash equilibria. Perhaps social norms simply identify a unique Nash equilibrium for each start state so that both agents implicitly promise to behave according to chosen Nash equilibrium. A complete society is one where all situations have an associated Nash equilibrium. [It is also worth defining an equilibrium w.r.t. an agent's search algorithm...such that no agent's search algorithm can find an improvement from the social norm]
 
 %%\appendix
 
