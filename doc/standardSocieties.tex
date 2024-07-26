@@ -2,6 +2,10 @@
 %\documentclass[a4paper]{report}
 \usepackage{graphics}
 \usepackage{breqn}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath}
+\usepackage{amssymb}
 %%\usepackage[english,greek]{babel}
 \setlength{\parindent}{0mm}
 \setlength{\parskip}{1.8mm}
@@ -18,18 +22,119 @@
 
 Here we define a heirarchy of standard models which we can use to perform numerical experiments on societies. The models form a heirarchy in that they make increasingly strong commitments but provide a minimal model that can be used as a starting point taking those commitments as given. This helps us make our commitments explicit while providing a modular library that helps us rapidly build models.
 
-\section{Root model}
-For any social simulation we need multiple agents that can interact. Each agent is represetned as an object which implements some number of standard interfaces. Interaction is by one agent executing a method on another agent. We write a call as $\sigma.m(A)$ which signifies that method $m$ on agent $\sigma$ is called with arguments $A$. We'll call an instance of a call an \textit{event}. Each method is a function from $(\sigma,A)$ to an ordered list of events. Agents change their state by calling methods on themselves.
+\section{Computational model}
 
-There also exists two special events
-\begin{description}
-\item[Creation event] which we write $T(\sigma)$. This creates a new agent of type $T$ in state $\sigma$ and returns a reference/pointer to the newly created agent. 
+We build societies on top of the following computational model: A calculation consists of a task that performs some computation and returns a set of tasks to be executed at some time after the completion of the original task, in any order. This implies a tree-shaped partial time-ordering of tasks. A join of tasks can be set up by creating a task which modifies a trigger state. The task is called on completion of each of its parent tasks. If the call isn't the final task to complete, it registers the call with the trigger and returns the empty set of tasks, on the final call the object is triggered and calls the payload task, returning its result. In this way we can create any parial ordering without ever having to block. If a task is to return a single task, it may call it directly as its last statement. This can be implemented in C++ by defining a task as a lambda function that returns a tuple of lambda functions. In this way the lambdas can capture any local data or references to external state.
 
-\item[Deletion event] which we write $delete()$. This deletes the calling agent.
+An object oriented version of this consists of making a task a runnable object which creates new runnable objects. These can be captured in a lambda or created and referred to in a lambda. A join can then be implemented using smart pointers captured in lambdas, can delete itself on triggering, can be self-sustained by returning a pointer to itself, or can be part of the result of the calculation. If objects can only modify their own state and data is passed forward into the child tasks, then we only need to ensure that trigger methods are thread safe and non-blocking. The initiating task may take parameters and/or a result object that has some number of trigger methods which take some partial results. A static dataflow graph can be simulated if the initiating task generates an object for each node and each node has triggers for its inputs and trigger-calls for its outputs. However, we can also have dynamic dataflow graphs by allowing nodes to create their own children at runtime. The program can then create different graphs depending on its inputs.
+
+An agent-based version of this defines a task to be one agent calling a method on another. Any method may only change the state of the called agent (optionally, an agents state may change on calling another agent). There exists a shared simulated-space-time and every agent has a trajectory through space-time and a state at each point on the trajectory. Space-time is equipped with a partial ordering, $\le$ such that
+\begin{itemize}
+	\item if $p \le q$ and $q \le r$ then $q \le r$.
 	
-\end{description}
+	\item Any point, $p$, on an agent's trajectory should partition the trajectory such that all points $q$ to one side of $p$ should have $p \le q$ and all points $r$ to the other side should have $r \le p$ i.e. any point in the trajectory splits the trajectory into a past trajectory and a future trajectory, or alternatively an agent's trajectory is a path through the partial order lattice.
+	
+\end{itemize}
+Note that, since this is a partial ordering,  $!(p \le q)$ does not imply $q < p$ as $p$ and $q$ could be space-like separated, so we use $p \nleq q$ to denote $!(p < q)$. Note also that all these relations are frame invariant.
 
-This model admits the possibility of dangling pointers (calls to agents that no longer exist). The result of such a call is the termination of the whole simulation.
+At any point in the computation each agent is at a space-time position on its trajectory, agents need not be at the same time in any frame of reference so in this way we distinguish simulated space-time from execution-time. When one agent calls another, it creates a method call which has a space-time position (it's origin) which is the location of the calling agent when the call is made. A call at point $p$ is executed on the target agent's trajectory at the earliest point, $q$, such that $p \le q$ (more generally, we can make this probabilistic). 
+
+This defines for each point $p$, a manifold of points, $q$, such that there exists a trajectory that has $q$ as earliest point such that $p \le q$ which we write $p \to q$ or $p$ calls $q$. We call the manifold of points $q$ such that $p \to q$ $p$'s future light cone. Similarly, we call the manifold of points $p$ such that $p \to q$ $q$'s past light cone.
+
+In execution time, an agent at $q$ may not move forward if there exists a potentially calling agent in its past as a call may be created there. So, it must block until it has no agents in its past. It can then move forward along its trajectory, absorbing calls as it goes, until a potentially calling agent touches its past again. So, at any point in the execution, we can imagine a directed acyclic graph whose nodes are agents and whose edges signify that the parent is blocking the child. There is necessarily at least one agent that is not blocking on any agent (if two or more agents are in the same space-time position we treat them as a single, compound agent until the agents diverge), so the execution can always move forward and non-blocked nodes can be moved forward in any order. So, we can define a 'moveForward()' method that returns moveForward() calls to all agents that it has unblocked by moving forward.
+
+If space and time is continuous we can assume that the agent moves in an inertial reference frame (i.e. has a fixed velocity) until it interacts with another agent or with itself.
+
+Agents become potential callers by opening channels to other agents and interact by creating a call on the channel. A channel can identify a specific interface on a single target agent, or can broadcast to all agents that implement an interface. Pointers can also have a decay rate so their probability of interaction decays with the spatial distance from the origin (in the frame of reference of the calling agent).
+
+It can be shown that the order in which calls are initiated by an agent is also the order in which the calls will be executed on a target agent. So, let a comms-channel be a queue of undelivered calls. The calling agent has an output channel pointer that initiates a call by adding it to the back of the queue. Each item in the queue records the method, arguments and space-time origin, and represents a future light-cone whose origin is the agent's space-time locaton at call initiation. Each target agent has an input channel pointer which points to the front of the queue, which is the next call it will intersect [a broadcast channel can be templated on the broadcast type and can have a static collection of (initiatingAgent,channel) pairs and a non-static front-of-queue pointer]. An input channel has a position given by the origin of the call at the front of the queue, or if the queue is empty, the position of the sending agent, or if the calling agent no longer exists, then $\top$, the point after all points.
+
+\begin{algorithm}
+	\caption{moveForward() algorithm}
+\begin{algorithmic}
+	\STATE $inChannels \gets $ collection of input channels
+	\STATE $iBlockAgents \gets $ collection of agents blocked on this
+	\STATE $pos \gets $ agent's current space-time position
+	\STATE $loopChannel \gets \{NextSelfInteraction\}$
+	\STATE $nextChannel \gets loopChannel$
+	\STATE $v \gets loopChannel.pos() - pos$ \COMMENT{4-velocity of this}
+	\STATE $nextPos \gets loopChannel.pos()$ \COMMENT{position at next call execution}
+	\FORALL{$channel \in inChannels$}
+		\IF{$channel.pos() \nless pos$ \AND $channel.pos() < nextPos$}
+			\STATE $nextPos \gets vt$ such that $|pos + vt - channel.pos()| = 0$ 
+			\STATE $nextChannel \gets channel$ 
+		\ENDIF
+	\ENDFOR
+	\STATE $onwaredCalls \gets \emptyset$
+	\FORALL{$blockedAgent \in iBlockAgents$}
+		\IF{$|nextPos - blockedAgent.pos()| \ne 0$}
+			\STATE remove $blockedAgent$ from $iBlockAgents$
+			\STATE onwardCalls.add(blockedAgent.moveForwrad())
+		\ENDIF
+	\ENDFOR
+	\STATE simulate forward to $nextPos$
+	\STATE $pos \gets nextPos$
+	\IF{$nextChannel.isEmpty()$}
+		\STATE $nextChannel.sendingAgent().iBlockAgents.add(this)$
+	\ELSE
+		\STATE $nextChannel.popAndExecute()$
+		\STATE $onwardCalls.add(this.moveForward())$
+	\ENDIF
+	\RETURN onwardCalls
+\end{algorithmic}
+\end{algorithm}
+
+If space is discrete, it could be that many calls may share the same origin and target...these calls should commute. Also, in moving from one point to another, an agent disappears from one point in space and re-appears at another point at some later time, so its trajectory consists of jumps from one space-time position to another. This means an agent may block when a jump moves it into the future of an potentially interacting agent, but because of the temporary disappearance of the agent when it moves, the velocity between the call origin and its execution may be slightly slower than light speed, but we don't really care.
+
+Agent dynamics in a discrete space induces a directed graph whose nodes are the spatial positions and an edge from $A$ to $B$ denotes that $A$ can directly preceed $B$ in an agent's trajectory. If each edge has a distance then we can define a spatial distance, $\Delta x(p,q)$, between any two points as the length of the shortest path between them. We can then define $p \le q$ iff $\Delta x(p,q)^2 \le c\Delta t(p,q)^2$ where $\Delta t(p,q)$ is the time difference between $p$ and $q$. Note that the spatial distance is not frame invariant, but if space is discrete and time isn't then there is necessarily a ``natural'' frame of reference where each discrete spatial point is stationary (assuming space itself isn't deforming).
+
+If time is also discrete then velocities are also discrete, light cones consist of sets of points and trajectories are ordered lists of space-time points.
+
+If space-time is heirarchical (i.e. has an \texttt{isIn} relation) with fixed ``gateways'' (i.e. ways an object can change the object it is contained within, such that an object disappears from being contained in A and appears in the future contained in B) and an object can move into its grandparent or its sibling, we can define the spatial distance between objects as the number of edges in the shortest path between them. Gateways can define transitions, but distances can be calculated using only the \texttt{isIn} tree.  
+
+There exists a heterogeneous collection of objects, each of which implements an \texttt{interactionState()} method which returns an object with a binary \texttt{==} operator. This defines a partition of the space of all objects. There also exists a \texttt{step(P)} method which takes a set of objects in a partition and returns a set of objects (possibly stochastically and not necessarily in the same partition). This induces a directed graph whose nodes are partition steps and whose edges indicate that execution on the source partition may return an object in the destination partition, so calculation of the desitination step depends on the source step, we have a computational graph. The partition and execution function should be chosen such that this graph is acyclic. At any point in the computation, let the \textit{active graph} be the (acyclic) subgraph of nodes with non-zero occupation number. In an acyclic graph, there must be at least one node that has no incoming edges. These are the \textit{complete nodes} which can be immediately executed. At any point we have the set of complete nodes.
+
+[In full generality, there is a directed graph in computational time whhose edges mean the source could call the destination. If space-time is itself a set of objects then this can be the graph of pointers that each object has (in computational time). In this view, we reify the non-empty partitions and constrain the movement of objects to neighbouring partitions. This means that partition objects can have a dependency on their neighbours in either direction...effectively, each partition has a watch on the simulated time of each of its neighbours, and a trigger...but this is an observation and the observation can also contain a trigger...so one event schedules other events...easy. This makes a clean separation of computational and simulated time. It is then left up to the higher levels to ensure no race conditions: there is no guarantee on the order of execution of submitted-but-not-completed events. If events return a set of events, then there is a guarantee only that the returned events occur after the causing event has completed: this gives us the partial ordering. This gives us a tree ordering. To specify a join we create a trigger object which is called by each of its parents on completion, on the final call the object is triggered and calls, or schedules, its body. In this way we can create any parial ordering without ever having to block. ]
+
+[]
+
+This model of computation works if both time and space are discrete and we have a synchronous timestep in simulated time. This allows us to step spatial positions forward without necessarily waiting for all other spatial positions to catch up.
+
+If time is continuous and space is discrete, and we include a travel time between spatial positions, then a partition step advances the time of all objects in the position until it reaches the light cone of another object/position. At this point a new object may enter the partition so there is a possible dependency.
+
+If space and time are continuous, then instead of discrete state changes, we have a rate of change of state (i.e. a direction in space-time, within its light cone) and an object follows a continuous trajectory within its light cone. We then ask the probability of an interaction within a volume of space-time [every object has a distribution on a manifold in space-time]
+
+[When space-time is continuous, we have the problem that as we go to the limit of infinite partitions, the probability of objects being in the same state tends to zero. So, we need to define a fixed-scale interaction-kernel in space-time, and define the prob of interaction to be the integral over the joint times the A==B line convolved with the kernel. If the prob changes slowly compared to the width of the kernel, then this will be well approximated by some constant times the line integral along A==B where the probabilities are expressed as probability density per unit volume, this leads to a non-zero limit. This implies a generalisation where the \texttt{==} operator is probabilistic and objects can interact between partitions. However, if we define the rate of interaction as a rate per space-time distance (or per second from the frame of the actor[?]) and the state of an object as a probability density per space-time volume, then the line integral of rate times space-time position has a proper limit.]
+
+
+We build societies on top of the following computational model: There exists a heterogeneous collection of objects, each of which implement some set of interfaces and an overloaded \textit{interaction method}, \texttt{episode(A)}, which takes an object that implements a given interface. An agent may have an episode with itself (this can be implemented as \texttt{A_1.episode()} if desired). Episodes can only modify the two agents involved, so episodes that involve non-intersecting agents commute. There also exists a partition, $S$, of the space of all objects such that only agents within the same partition can interact. We call an object's partition its \textit{space-time coordinate}, note that this is an abstraction of its full state. The partitions induce a directed graph whose nodes are partitions and whose edges indicate that there exists an interaction between members of the source partition that results in an agent in the destination partition. The partition should be chosen such that this graph is acyclic. 
+
+
+
+\section{Root model}
+
+A social simulation consists of multiple interacting objects, at least two of which are considered \textit{agents} in that they have \textit{minds} and \textit{bodies}. Each object implements some number of standard \textit{interfaces} each of which consists of a number of \textit{methods}. An \textit{event} is an atomic interaction which is defined as a function $e(x,A,y)$ that signifies that object $x$ has performed action $e$ on object $y$ with arguments $A$. We also define \textit{autonomous events} that involve only one agent $e(x,A)$ acting on itself.
+
+An event can be defined as a program that takes interface references for $x$ and $y$ and can call the methods on those interfaces, can delete the underlying objects or create new objects. Functionally, this can be thought of as a function that takes object states and arguments and returns a set of object states that contains the post-event states of the passed objects (if they're not deleted) and the states of any new agents created.
+
+A simulation is a directed graph whose nodes are events and whose edges are objects. Each node has associated with it an event type and a set of arguments, its incoming edges (marked as subject and object in binary interactions) are the object references and each of its outgoing edges is an object resulting from the event. Exactly one event is the initial event which takes no agents and exactly one event is the final event which takes any number of agents and deletes them all.
+
+The dynamics of a model is a function that builds a directed graph from the set of objects from the initial event.
+
+
+\subsection{Time-stepping}
+
+Events occur at the start of each timestep. Onward events occur at the start of the next timestep. [what if two non-commuting methods are called on an agent in one timestep: how do we decide which order these are called in? We can define an order (e.g. observations first, timestep last), choose a random ordering or require that all methods commute. In general, we define n substeps within the time-step and each method belongs to a substep. All methods in a substep commute. - so, in-fact, non-commutive methods exist in the interfaces but there is a run-time guarantee that in a (sub-)step only commutative methods will be called.]. We can define an order over calls by defining an order over agents: each agent has a call queue, for each agent in agent-order we call the methods on its method queue in order, and this adds calls to other agent's call queues for the next timestep.
+
+\subsection{Rate of call}
+
+Each method on an agent has a rate of activation which is a function of the states of other agents in the environment. So, the probability that a method will be called in time $dt$ is $\rho dt$. For each method, we define the self-call rate $\rho_\sigma$ in state $\sigma$, and the interaction rate $\rho_{\sigma \sigma'}$. The total rate is given by
+\[
+\rho = \rho_\sigma + \sum_{\sigma'} \rho_{\sigma\sigma'}
+\]
+
+[If a method call doesn't change the state of the caller, then we can sum over the caller (so we never know who was the caller). If we allow a call to change the state of the caller, then we can't do the sum as it results in different states depending on the caller, so either each method has a set of potential callers, or each caller has a set of potential calls. Or, an event is a complementary pair of calls. Or an event is a method $\sigma_1.m(A, \sigma_2)$ which can call methods on $\sigma_2$ and agents cannot store pointers/references to other agents (so a method call can only be a binary interaction). This is the most general.]
+
 
 \subsection{The environment}
 
@@ -80,19 +185,35 @@ This way of defining the relation between local times has the advantage that an 
 
 Even more generally, it is not agents but events (interactions) that have space-time points. We define three functions
 \begin{enumerate}
-	\item $P(\pi' | \sigma, \pi)$ which gives the probability that an agent in state $\sigma$ at point $\pi$ will enter an interaction at space-time point $\pi'$
+	\item $C(\pi' | \sigma, \pi)$ which gives the rate-coefficient that an agent created in state $\sigma$ at point $\pi$ will enter its next interaction at space-time point $\pi'$. Or, if we assume homogeneity of space-time then $C(\Delta\pi | \sigma)$ where $\Delta\pi = \pi' - \pi$ is the space-time vector between interactions. [This is a coefficient (amplitude), not a probability. Or is it a probability density in space]
 
-	\item $\rho(R | \sigma_1, \sigma_2, \pi)$ which is the rate that an agent in state $\sigma_1$ co-located with an agent in state $\sigma_2$ at $\pi$ will interact and produce a set of agents $R$ at $\pi$.
+	\item $\rho(R | \sigma_1, \sigma_2)$ which is the rate that an agent in state $\sigma_1$ co-located with an agent in state $\sigma_2$ will interact and produce a set of agents $R$ at $\pi$. [is this a probability density in time? ]
 	
-	\item $\rho(R | \sigma, \pi)$ the rate that an event will occur that turns an agent in state $\sigma$ into the agents in $R$ at $\pi$.
+	\item $\rho(R | \sigma)$ the rate that an event will occur that turns an agent in state $\sigma$ into the agents in $R$.
 \end{enumerate}	
 
-So, for example, given boundary conditions of two agents in states $\sigma_1$ at $\pi_1$ and $\sigma_2$ at $\pi_2$, then the rate of interaction at $\pi_3$ is given by
+So, for example, given boundary conditions of two agents in states $\sigma_1$ at $\pi_1$ and $\sigma_2$ at $\pi_2$, then the rate of interaction at $\pi_3$, given homogeneity of space-time, is given by
 \[
-\rho(R, \pi_3 | \sigma_1, \pi_1, \sigma_2, \pi_2) = \rho(R | \sigma_1, \sigma_2, \pi_3)P(\pi_3 | \sigma_1, \pi_1)P(\pi_3 | \sigma_2, \pi_2)
+\rho(R, \pi_3 | \sigma_1, \pi_1, \sigma_2, \pi_2) = \rho(R | \sigma_1, \sigma_2)C(\pi_3 - \pi_1 | \sigma_1)C(\pi_3 - \pi_2 | \sigma_2)
 \]
 
-[Need to decide whether state encodes point of creation or not. Probably best if it does...]
+and the rate of spontaneous transition is given by
+\[
+\rho(R, \pi_2 | \sigma_1, \pi_1) = \rho(R | \sigma_1)C(\pi_2 - \pi_1 | \sigma_1)
+\]
+
+So, an object created at a given space-time point $\pi$ can be thought of as a rate-coefficient function centred on $\pi$. 
+
+[This should come out of a sum over paths over time dt.
+
+...or movement is just death and rebirth at another point (with positive space-time distance) at some rate, so space-time position becomes nothing special beyond a variable that afects interaction rate....we can then choose to sum over sponeaneous transitions which gives a probability distribution over states given that no interactions occur. In space-time a rate is a probability per unit volume. If the total probability of interaction is small, then we can consider trajectories with $n$ interactions as $n^{th}$ order perturbations.
+
+Suppose a 1D space with move-right rate $a$ and spontaneous transition rate $b$ so in time $dt$ there's a probability of moving and transitioning
+\[
+\int_0^T a t. b dt = ab \int_0^T t dt = ab. T^2/2
+\]
+
+]
 
 \subsubsection{Poisson time}
 

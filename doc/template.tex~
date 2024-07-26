@@ -2,7 +2,6 @@
 %\documentclass[a4paper]{report}
 \usepackage{graphics}
 \usepackage{breqn}
-\usepackage{algorithmic}
 %%\usepackage[english,greek]{babel}
 \setlength{\parindent}{0mm}
 \setlength{\parskip}{1.8mm}

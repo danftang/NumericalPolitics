@@ -20,7 +20,7 @@
 
 \section{Poisson models and Markov models}
 
-Let $\mathcal{A}$ be the domain of agent states, and let an \textit{occupation vector}, $V$, be an $|\mathcal{A}|$-dimensional vector of integers so that The index of each element represents a state of an agent and the integer value at that index represents the number of agents in that state.
+Let $\mathcal{A}$ be the domain of agent states, and let an \textit{occupation vector}, $V$, be an $|\mathcal{A}|$-dimensional vector of integers so that the index of each element represents a state of an agent and the integer value at that index represents the number of agents in that state.
 
 We define a Poisson agent as an agent whose state transition probability at any time can be expressed as a set of Poisson processes with rates $\rho_1..\rho_n$ so that in infinitesimal time $dt$ the probability of a transition due to the $i^{th}$ process is $\rho_i dt$. Furthermore, we assume that the processes can be expressed by the following two rate functions:
 \begin{enumerate}
@@ -29,10 +29,9 @@ We define a Poisson agent as an agent whose state transition probability at any 
 	\item $\rho_{\psi\phi}(\Delta V)$ which is the rate at which an agent in state $\psi$ will interact with an agent in state $\phi$ to produce a perturbation of $\Delta V$. If $\psi = \phi$ (i.e. it is an interaction with agents in the same state) then we allow interaction with self. If this is not intended, then the rate $\rho_\psi$ can be adjusted accordingly (with the consequence that we can have negative $\rho_\psi$ but not negative total rate).
 \end{enumerate}
 
+We also assume that all rates are non-negative and an agent can only be removed from the model by itself, so $\rho_\psi(\Delta V)$ can only be non-zero if all elements of $\Delta V + 1_\psi$ are non-negative, similarly $\rho_{\psi\phi}(\Delta V)$ can only be non-zero if all elements of $\Delta V + 1_\psi + 1_\phi$ are non-negative (where $1_\xi$ is the vector whose $\xi^{th}$ element is one, and all other elements zero).
 
-we also assume that all rates are non-negative and an agent can only be removed from the model by itself, so $\rho_\psi(\Delta V)$ can only be non-zero if all elements of $\Delta V + 1_\psi$ are non-negative, similarly $\rho_{\psi\phi}(\Delta V)$ can only be non-zero if all elements of $\Delta V + 1_\psi + 1_\phi$ are non-negative (where $1_\xi$ is the vector whose $\xi^{th}$ element is one, and all other elements zero).
-
-Given the rates of an agent's processes, we can define the Poisson rates of transition, $\rho$, between occupation vectors in a model containing multiple agents, so that $\rho(V'|V)dt$ is the probability that a vector $V$ will transition to state $V'$ in time $dt$. So we have a Markov model over the domain of occupation vectors whose state changes are Poisson processes whise rates are given by 
+Given the rates of an agent's processes, we can define the Poisson rates of transition, $\rho$, between occupation vectors in a model containing multiple agents, so that $\rho(V'|V)dt$ is the probability that a vector $V$ will transition to state $V'$ in time $dt$. So we have a Markov model over the domain of occupation vectors whose state changes are Poisson processes whose rates are given by 
 \begin{equation}
 \rho(W|V) = \sum_{\psi}  \rho_\psi(W-V) \gamma_1(V_\psi) + \sum_{\psi,\phi}  \rho_{\psi\phi}(W-V) \gamma_1(V_\psi)\gamma_2(V_\phi)
 \label{rateEq}
@@ -65,13 +64,21 @@ so that
 \[
 \Phi(t) = e^{\rho t}\Phi(0) = e^{(\mu - I)rt}\Phi(0) = e^{-rt}e^{\mu rt}\Phi(0)
 \]
-where $r = \max_V(-\rho_{VV})$ is a scalar and $\mu = \frac{\rho}{r} + I$ and the last step is valid since $\mu$ commutes with $I$.
+where $r \ge \max_V(-\rho_{VV})$ is a scalar and $\mu = \frac{\rho}{r} + I$ and the last step is valid since $\mu$ commutes with $I$.
 
 Expanding the exponential in $\mu$ gives
 \[
 \Phi(t)  = \sum_{k=0}^\infty \frac{ (rt)^k e^{-rt}}{k!}\mu^k\Phi(0)
 \]
-which we can recognize as a sum of powers of $\mu$ weighted with a Poisson distribution. However, since each entry of $\mu$ is non-negative and the sum of entries in each column is 1, $\mu^k \Phi(0)$ can be thought of as the state of a discrete time Markov process after $k$ steps. So, each continuous-time Poisson model $\rho$ has an associated discrete-time Markov process $\mu = \frac{\rho}{r} + I$ such that the state of the Poisson model at time $t$ is the weighted sum of states in a trajectory of the Markov process, where the weights are given by a Poisson distribution with rate $rt$.
+which we can recognize as a sum of powers of $\mu$ weighted with a Poisson distribution. However, since each entry of $\mu$ is non-negative and the sum of entries in each column is 1, $\mu^k \Phi(0)$ can be thought of as the state of a discrete time Markov process after $k$ steps. So, given a Poisson model, $\rho$, and a time-scale, $r$, we can define an associated discrete-time Markov processes, $\mu = \frac{\rho}{r} + I$, such that the state of the Poisson model at time $t$ is the weighted sum of states in a trajectory of the Markov process, where the weights are given by a Poisson distribution with rate $rt$. 
+
+So, given a set of agent-based action/interaction functions $\rho_\psi$ and $\rho_{\psi\phi}$, and an upper bound $r$ on the rate of transition of the whole model, we can define the Poisson model's associated Markov process by just dividing each rate by $r$ (note that having a finite $r$ depends on the number of agents in the simulation being bounded).
+
+Conversely, every Markov model, $\mu$, has a set of associated Poisson models whose rate matrix is given by $\rho = r(\mu-I)$ for any $r$. We can arbitrarily define the set of cannonical Poisson models as those whose $r=1$ (i.e. whose unit of time is defined such that the maximal rate of transition is exactly 1), in which case each Markov model has a unique cannonical Poisson model.
+
+Another way of thinking about this is to consider a single timestepping trajectory, but to consider the simulated-time at each step as a distribution. So, if we sample times from these distributions we end up with a sample from the Poisson model. That is, a sample of the timestepping model can be turned into a sample of a Poisson model by simply sampling the times of the steps one at a time from start to finish. This method doesn't require the number of agents to be bounded.
+
+[What if we define a timestepping model such that each agent calculates a weight based on its state and environment. An agent is chosen with probability proportional to its weight and that agent then chooses a transition (not to self). The size of the timestep is a function of the sum of weights. We then show the probability of being in a state at time t is the same as the Poisson model.]
 
 This means, among other things, that if the Markov model has an attractor then as $t \to \infty$ the state distribution of the corresponding Poisson model tends to an equilibrium distribution, and that distribution is the uniform probability over the attractor of its Markov model. So every Poisson model tends to a steady state distribution (i.e. a single point in distribution space).
 
